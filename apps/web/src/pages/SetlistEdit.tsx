@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { type Setlist, type SetlistItem, type Song, db, listSongs } from '../lib/db.ts';
 import { deleteSetlist, keyOptions, moveItem, updateSetlist } from '../lib/setlists.ts';
+import { ExportButton } from '../components/PackageButtons.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
 
 const fold = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
@@ -119,6 +120,7 @@ export const SetlistEdit = () => {
           <span className="block text-muted-foreground">Data</span>
           <input type="date" aria-label="Data" value={setlist.date ?? ''} onChange={(e) => save({ date: e.target.value || undefined })} className="h-10 rounded-lg border border-border bg-surface px-2" />
         </label>
+        <ExportButton songIds={items.map((i) => i.songId)} title={setlist.name} setlist={setlist} label="Exportar lista" />
         <Button onClick={() => navigate(`/palco/lista/${id}`)} disabled={items.length === 0}>
           <Play className="size-4" /> Tocar no palco
         </Button>

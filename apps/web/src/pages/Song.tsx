@@ -16,6 +16,7 @@ import { type PipelineProgress, runPipeline } from '../lib/pipeline.ts';
 import { prefersFlats, transposeChord, transposeKey } from '../lib/transpose.ts';
 import { toDisplayLabel } from '@will-music/engine';
 import { AddToSetlist } from '../components/AddToSetlist.tsx';
+import { ExportButton } from '../components/PackageButtons.tsx';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
 import { ChordPanel, readInstrument } from '../components/ChordPanel.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
@@ -224,6 +225,7 @@ export const Song = () => {
             <MonitorPlay className="size-4" /> Palco
           </Link>
           <AddToSetlist songId={song.id} />
+          <ExportButton songIds={[song.id]} title={song.title} />
           <Button variant="ghost" onClick={() => setEditingInfo((v) => !v)} aria-pressed={editingInfo}>
             <Info className="size-4" /> Dados
           </Button>

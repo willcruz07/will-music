@@ -1,6 +1,7 @@
 import { Music, Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { ImportButton } from '../components/PackageButtons.tsx';
 import { type Song, listSongs } from '../lib/db.ts';
 
 const STATUS: Record<Song['analysisStatus'], string | null> = {
@@ -15,6 +16,7 @@ const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '
 export const Library = () => {
   const [songs, setSongs] = useState<Song[] | null>(null);
   const [query, setQuery] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     void listSongs().then(setSongs);
@@ -29,13 +31,22 @@ export const Library = () => {
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold tracking-tight">Biblioteca</h1>
+        <div className="flex flex-wrap gap-2">
+        <ImportButton
+          onImported={(message) => {
+            setNotice(message);
+            void listSongs().then(setSongs);
+          }}
+        />
         <Link
           to="/nova"
           className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:brightness-105"
         >
           <Plus className="size-4" /> Adicionar música
         </Link>
+        </div>
       </div>
+      {notice && <p className="mt-3 text-sm" role="status">{notice}</p>}
 
       {songs && songs.length > 0 && (
         <label className="mt-6 flex items-center gap-2 rounded-lg border border-border bg-surface px-3">
