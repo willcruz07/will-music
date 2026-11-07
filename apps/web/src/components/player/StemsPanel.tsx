@@ -1,6 +1,7 @@
 import type { StemMode } from '@will-music/engine';
 import { Download, Layers, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { formatBytes, requestPersistence, storageStatus } from '../../lib/storage.ts';
 import { downloadBlob } from '../../lib/download.ts';
 import { MODE_INFO, availableModes } from '../../lib/stems.ts';
 import type { StemsState } from '../../lib/useStems.ts';
@@ -8,6 +9,32 @@ import { Button } from '../../ui/Button.tsx';
 import { Mixer } from '../Mixer.tsx';
 
 const mb = (n: number) => Math.round(n / 1e6);
+
+/** How much this site may still store, and the button to ask the browser to keep the data. */
+const StorageNote = () => {
+  const [status, setStatus] = useState<{ usage?: number; quota?: number; persisted: boolean } | null>(null);
+  const refresh = () => void storageStatus().then(setStatus);
+  useEffect(refresh, []);
+  if (!status) return null;
+  const free = status.quota !== undefined && status.usage !== undefined ? status.quota - status.usage : undefined;
+  return (
+    <div className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
+      {free !== undefined && (
+        <p>
+          Espaço livre para o app: <span className="font-semibold text-foreground">{formatBytes(free)}</span> (usando {formatBytes(status.usage!)}).
+          {free < 600e6 && ' Pouco espaço: numa janela anônima o limite é bem menor; use uma janela normal.'}
+        </p>
+      )}
+      {status.persisted ? (
+        <p className="mt-0.5">Seus dados estão protegidos: o navegador não apaga as músicas, faixas e modelos sozinho.</p>
+      ) : (
+        <button type="button" className="mt-1 font-semibold text-chord underline underline-offset-2" onClick={() => void requestPersistence().then(refresh)}>
+          Proteger meus dados (pedir ao navegador para não apagar)
+        </button>
+      )}
+    </div>
+  );
+};
 
 /** Separation types, the running job, the active set's mixer and the MP3 export, all inside the player drawer. */
 export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; title: string; hasAudio: boolean }) => {
@@ -77,6 +104,7 @@ export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; titl
         <>
           <p className="mb-2 text-sm text-muted-foreground">Escolha como separar. Cada tipo baixa o modelo uma vez e fica guardado no aparelho. Precisa de Chrome ou Edge com WebGPU.</p>
           {chooser}
+          <StorageNote />
           {hasStems && (
             <Button variant="ghost" className="mt-2" onClick={() => setChoosing(false)}>
               Voltar ao mixer

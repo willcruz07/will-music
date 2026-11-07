@@ -50,7 +50,12 @@ export const fetchModel = async (
   const bytes = await readWithProgress(response, model.bytes, onProgress);
   const actual = toHex(await crypto.subtle.digest('SHA-256', bytes));
   if (actual !== model.sha256) throw new Error(`Modelo corrompido: ${id}. Tente de novo.`);
-  await cache.put(model.url, new Response(bytes));
+  try {
+    await cache.put(model.url, new Response(bytes));
+  } catch (error) {
+    // Storage full (e.g. a private window): the verified model still works now, it is just downloaded again next time.
+    console.warn(`Modelo ${id} não foi guardado no aparelho`, error);
+  }
   return bytes;
 };
 

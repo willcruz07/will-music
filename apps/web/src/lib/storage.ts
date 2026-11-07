@@ -23,3 +23,26 @@ export const requestPersistence = async (): Promise<boolean> => {
     return false;
   }
 };
+
+/** The browser refused to store more data for this site (also when the error crossed a worker as text). */
+export const isQuotaError = (error: unknown): boolean =>
+  (error instanceof DOMException && error.name === 'QuotaExceededError') || (error instanceof Error && (error.name === 'QuotaExceededError' || /quota/i.test(error.message)));
+
+/** What to tell the user when the site's storage is full, with the browser's own numbers. */
+export const explainQuota = (estimate: { usage?: number; quota?: number }): string => {
+  const numbers = estimate.usage !== undefined && estimate.quota ? ` (usando ${formatBytes(estimate.usage)} de ${formatBytes(estimate.quota)} permitidos)` : '';
+  return (
+    `O navegador não deixou guardar mais dados do will-music${numbers}. ` +
+    'Se estiver numa janela anônima ou no perfil de visitante, abra o app numa janela normal: lá o limite é bem menor. ' +
+    'Se não, libere espaço apagando faixas de outras músicas ou modelos em Ajustes.'
+  );
+};
+
+/** Throws the explanation above when clearly less than `needed` bytes are left for this site. */
+export const ensureRoom = async (needed: number, storage: StorageApi | undefined = api()): Promise<void> => {
+  const estimate = await storage?.estimate?.().catch(() => undefined);
+  if (!estimate?.quota || estimate.usage === undefined) return; // unknown: let the browser decide
+  if (estimate.quota - estimate.usage < needed) throw new Error(explainQuota(estimate));
+};
+
+export type { StorageApi };

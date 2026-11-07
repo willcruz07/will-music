@@ -78,7 +78,7 @@ describe('review fixes: separation', () => {
     const song = await createSong({ title: 'A', artist: '', durationSec: 1 }, new Blob(['x']));
     const original = db.stemSets.put.bind(db.stemSets);
     db.stemSets.put = (() => Promise.reject(Object.assign(new Error('quota'), { name: 'QuotaExceededError' }))) as unknown as typeof db.stemSets.put;
-    await expect(separateSong(song.id, () => {}, { gpu, decode, run: tracksOf(['instrumental', 'lead', 'backing']) })).rejects.toThrow(/Sem espaço/);
+    await expect(separateSong(song.id, () => {}, { gpu, decode, run: tracksOf(['instrumental', 'lead', 'backing']) })).rejects.toThrow(/não deixou guardar/);
     db.stemSets.put = original;
   });
 });

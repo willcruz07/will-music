@@ -1,6 +1,8 @@
 import { MODELS, type ModelId, SEPARATION_GEOMETRY, STEM_MODES, type StemMode, modelVersion, toStereoPlanar } from '@will-music/engine';
 import type { SeparationResponse, SeparationTracks } from '../worker/separationProtocol.ts';
 import { type StemName, type StemsRecord, db, now } from './db.ts';
+import { listCachedModels } from './models.ts';
+import { type StorageApi, ensureRoom, isQuotaError, requestPersistence, storageStatus, explainQuota } from './storage.ts';
 
 export const NO_WEBGPU = 'A separação de faixas precisa de um navegador com WebGPU (Chrome ou Edge atualizados).';
 
@@ -51,7 +53,6 @@ export const runSeparationInWorker = (planar: Float32Array, samples: number, mod
   });
 
 type GpuLike = { requestAdapter?: () => Promise<unknown> };
-export const SEM_ESPACO = 'Sem espaço no aparelho para guardar as faixas. Libere espaço ou apague as faixas de outras músicas.';
 
 /** A GPU object is not enough: blocklisted GPUs return no adapter. */
 export const hasUsableWebGpu = async (gpu: GpuLike | undefined): Promise<boolean> => {
@@ -64,6 +65,8 @@ export const hasUsableWebGpu = async (gpu: GpuLike | undefined): Promise<boolean
 
 type Deps = {
   mode?: StemMode;
+  storage?: StorageApi;
+  cachedModels?: () => Promise<{ id: ModelId }[]>;
   gpu?: GpuLike;
   signal?: AbortSignal;
   decode?: (blob: Blob) => Promise<{ planar: Float32Array; samples: number }>;
@@ -77,6 +80,13 @@ export const separateSong = async (songId: string, onProgress: (p: SeparationPro
   if (!(await hasUsableWebGpu(gpu))) throw new Error(NO_WEBGPU);
   const audio = await db.audio.get(songId);
   if (!audio) throw new Error('Esta música não tem áudio para separar.');
+  // Room for the models not on the device yet plus the new tracks (MP3 at 192 kbps), with a margin.
+  const cached = new Set((await (deps.cachedModels ?? listCachedModels)().catch(() => [])).map((m) => m.id));
+  const modelBytes = MODE_INFO[mode].models.filter((m) => !cached.has(m)).reduce((n, m) => n + MODELS[m].bytes, 0);
+  const song = await db.songs.get(songId);
+  const trackBytes = (song?.durationSec || 300) * 24000 * STEM_MODES[mode].tracks.length;
+  void requestPersistence();
+  await ensureRoom((modelBytes + trackBytes) * 1.1, deps.storage);
   const { planar, samples } = await (deps.decode ?? decodeForSeparation)(audio.blob);
   const tracks = await (deps.run ?? runSeparationInWorker)(planar, samples, mode, onProgress, deps.signal);
   const names = STEM_MODES[mode].tracks;
@@ -94,7 +104,7 @@ export const separateSong = async (songId: string, onProgress: (p: SeparationPro
   try {
     await db.stemSets.put(record);
   } catch (error) {
-    if (error instanceof Error && error.name === 'QuotaExceededError') throw new Error(SEM_ESPACO);
+    if (isQuotaError(error)) throw new Error(explainQuota(await storageStatus()));
     throw error;
   }
 };
