@@ -1,14 +1,14 @@
 /// <reference lib="webworker" />
 import { createMp3Encoder } from 'wasm-media-encoders';
 
-export type MixRequest = { left: Float32Array; right: Float32Array; sampleRate: number };
+export type MixRequest = { left: Float32Array; right: Float32Array; sampleRate: number; bitrate?: number };
 export type MixResponse = { type: 'result'; mp3: ArrayBuffer } | { type: 'error'; message: string };
 
 self.onmessage = async (event: MessageEvent<MixRequest>) => {
   try {
-    const { left, right, sampleRate } = event.data;
+    const { left, right, sampleRate, bitrate = 192 } = event.data;
     const encoder = await createMp3Encoder();
-    encoder.configure({ sampleRate, channels: 2, bitrate: 192 });
+    encoder.configure({ sampleRate, channels: 2, bitrate: bitrate as 192 });
     const parts: Uint8Array[] = [];
     for (let i = 0; i < left.length; i += sampleRate) parts.push(encoder.encode([left.subarray(i, i + sampleRate), right.subarray(i, i + sampleRate)]).slice());
     parts.push(encoder.finalize().slice());

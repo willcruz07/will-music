@@ -13,6 +13,8 @@ export type Song = {
   tempo?: number;
   capo?: number;
   timeSignature?: string;
+  /** User folder in the chart library (e.g. Culto, Natal, Ensaio). */
+  folder?: string;
   favorite: boolean;
   analysisStatus: AnalysisStatus;
   analysisError?: string;
@@ -84,6 +86,7 @@ export const db = new Dexie('will-music') as Dexie & {
   setlists: EntityTable<Setlist, 'id'>;
   stemSets: Table<StemsRecord, [string, StemMode]>;
   peaks: EntityTable<PeaksRecord, 'songId'>;
+  settings: EntityTable<{ key: string; value: unknown }, 'key'>;
   scores: EntityTable<ScoreRecord, 'songId'>;
 };
 
@@ -105,6 +108,8 @@ db.version(5)
     await tx.table('stemSets').bulkPut(old.map((r) => ({ ...r, mode: 'vocals', selectedAt: r.createdAt })));
   });
 db.version(6).stores({ stems: null });
+// v7: app settings that must survive (e.g. the connected device folder handle).
+db.version(7).stores({ settings: 'key' });
 
 export const now = (): string => new Date().toISOString();
 

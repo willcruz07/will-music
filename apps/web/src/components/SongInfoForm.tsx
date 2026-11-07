@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import type { Song } from '../lib/db.ts';
+import { useEffect, useState } from 'react';
+import { type Song, db } from '../lib/db.ts';
 import { Button } from '../ui/Button.tsx';
 
-export type SongInfo = { title: string; artist: string; capo?: number; tempo?: number; timeSignature?: string };
+export type SongInfo = { title: string; artist: string; capo?: number; tempo?: number; timeSignature?: string; folder?: string };
 
 const field = 'mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary';
 
@@ -12,6 +12,11 @@ export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: Song
   const [capo, setCapo] = useState(song.capo ?? 0);
   const [tempo, setTempo] = useState(song.tempo ? String(song.tempo) : '');
   const [timeSignature, setTimeSignature] = useState(song.timeSignature ?? '');
+  const [folder, setFolder] = useState(song.folder ?? '');
+  const [folders, setFolders] = useState<string[]>([]);
+  useEffect(() => {
+    void db.songs.toArray().then((all) => setFolders([...new Set(all.map((s) => s.folder).filter((f): f is string => !!f))].sort()));
+  }, []);
 
   return (
     <form
@@ -25,6 +30,7 @@ export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: Song
           capo: capo || undefined,
           tempo: tempo ? Number(tempo) : undefined,
           timeSignature: timeSignature || undefined,
+          folder: folder.trim() || undefined,
         });
       }}
     >
@@ -59,6 +65,15 @@ export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: Song
             <option key={t}>{t}</option>
           ))}
         </select>
+      </label>
+      <label className="block">
+        <span className="text-sm font-semibold">Pasta</span>
+        <input aria-label="Pasta" list="wm-folders" value={folder} placeholder="Ex.: Culto, Natal, Ensaio" onChange={(e) => setFolder(e.target.value)} className={field} />
+        <datalist id="wm-folders">
+          {folders.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
       </label>
       <div className="flex items-end">
         <Button type="submit">Salvar dados</Button>

@@ -1,5 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import { type Analysis, type Chart, type Setlist, type Song, db, now } from './db.ts';
+import { type Analysis, type Chart, type ScoreRecord, type Setlist, type Song, db, now } from './db.ts';
 
 export const PACKAGE_VERSION = 1;
 const NOT_A_PACKAGE = 'Este arquivo não é um pacote do will-music.';
@@ -11,6 +11,7 @@ export type PackagedSong = {
   song: Song;
   chart?: Chart;
   analysis?: Analysis;
+  score?: ScoreRecord;
   audio?: { bytes: Uint8Array; mimeType: string };
 };
 export type PackageContents = { manifest: Manifest; songs: PackagedSong[]; setlists: Setlist[] };
@@ -44,6 +45,8 @@ export const exportSongs = async (
     }
     const analysis = await db.analyses.where('songId').equals(id).first();
     if (analysis) files[`${base}analysis.json`] = json(analysis);
+    const score = await db.scores.get(id);
+    if (score) files[`${base}score.json`] = json(score);
     if (opts.includeAudio) {
       const audio = await db.audio.get(id);
       if (audio) {
@@ -100,6 +103,7 @@ export const readPackage = async (file: Blob): Promise<PackageContents> => {
       song,
       chart: chartMeta && cho ? ({ ...chartMeta, chordPro: strFromU8(cho) } as Chart) : undefined,
       analysis: parse<Analysis>(`${base}analysis.json`),
+      score: parse<ScoreRecord>(`${base}score.json`),
       audio: audioPath && audioMeta ? { bytes: entries[audioPath]!, mimeType: audioMeta.mimeType } : undefined,
     });
   }
@@ -141,6 +145,7 @@ export const importPackage = async (
       }
       await db.songs.put({ ...entry.song, id, analysisStatus: entry.song.analysisStatus === 'running' ? 'pending' : entry.song.analysisStatus, updatedAt: stamp });
       if (entry.chart) await db.charts.put({ ...entry.chart, id: copy ? crypto.randomUUID() : entry.chart.id, songId: id });
+      if (entry.score) await db.scores.put({ ...entry.score, songId: id });
       if (entry.analysis) await db.analyses.put({ ...entry.analysis, id: copy ? crypto.randomUUID() : entry.analysis.id, songId: id });
       if (entry.audio) {
         await db.audio.put({ songId: id, blob: new Blob([entry.audio.bytes as Uint8Array<ArrayBuffer>], { type: entry.audio.mimeType }), mimeType: entry.audio.mimeType });
