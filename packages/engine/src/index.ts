@@ -23,3 +23,4 @@ export * from './separation/demucs.ts';
 export * from './audio/peaks.ts';
 export * from './score/drums.ts';
 export * from './score/parts.ts';
+export * from './audio/pitch.ts';
