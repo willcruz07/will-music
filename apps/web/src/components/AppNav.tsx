@@ -1,4 +1,4 @@
-import { Library, ListMusic, Music4, Plus, Settings } from 'lucide-react';
+import { Library, ListMusic, Mic, Music4, Plus, Settings } from 'lucide-react';
 import { Link, NavLink } from 'react-router';
 
 type Item = { to: string; label: string; icon: typeof Library; end: boolean };
@@ -7,12 +7,20 @@ const ITEMS: Item[] = [
   { to: '/', label: 'Biblioteca', icon: Library, end: true },
   { to: '/listas', label: 'Listas', icon: ListMusic, end: false },
   { to: '/partituras', label: 'Partituras', icon: Music4, end: false },
-  { to: '/ajustes', label: 'Ajustes', icon: Settings, end: false },
+  { to: '/microfone', label: 'Microfone', icon: Mic, end: false },
 ];
+const SETTINGS: Item = { to: '/ajustes', label: 'Ajustes', icon: Settings, end: false };
+
+/** Settings live in the header on phones (the bottom bar keeps the four main places). */
+export const SettingsLink = () => (
+  <NavLink to="/ajustes" aria-label="Ajustes" title="Ajustes" className={({ isActive }) => `inline-flex size-10 items-center justify-center rounded-lg hover:bg-muted md:hidden ${isActive ? 'text-chord' : 'text-foreground'}`}>
+    <Settings className="size-5" />
+  </NavLink>
+);
 
 export const TopNav = () => (
   <nav className="hidden items-center gap-1 md:flex" aria-label="Principal">
-    {ITEMS.map(({ to, label, end }) => (
+    {[...ITEMS, SETTINGS].map(({ to, label, end }) => (
       <NavLink
         key={to}
         to={to}

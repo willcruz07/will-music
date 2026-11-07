@@ -66,18 +66,31 @@ export const createScoreSynth = () => {
     out.connect(master!);
     const dur = e.dur / rate;
     if (e.pitch !== undefined) {
-      const osc = ctx.createOscillator();
-      osc.type = 'triangle';
-      osc.frequency.value = midiToHz(e.pitch);
+      // Piano-like: a bright attack that fades on its own (two partials, the upper one dying faster).
+      const hz = midiToHz(e.pitch);
+      const end = at + dur + 0.25;
+      const peak = 0.32;
       out.gain.setValueAtTime(0, at);
-      out.gain.linearRampToValueAtTime(0.35, at + 0.005);
-      out.gain.exponentialRampToValueAtTime(0.12, at + Math.min(0.3, dur));
-      out.gain.setValueAtTime(0.12, at + dur);
-      out.gain.exponentialRampToValueAtTime(0.0001, at + dur + 0.08);
-      osc.connect(out);
-      osc.start(at);
-      osc.stop(at + dur + 0.1);
-      track(osc);
+      out.gain.linearRampToValueAtTime(peak, at + 0.004);
+      out.gain.exponentialRampToValueAtTime(peak * 0.35, at + Math.min(0.9, dur + 0.05));
+      out.gain.setValueAtTime(peak * 0.35, at + dur);
+      out.gain.exponentialRampToValueAtTime(0.0001, end);
+      const body = ctx.createOscillator();
+      body.type = 'triangle';
+      body.frequency.value = hz;
+      body.connect(out);
+      const bright = ctx.createOscillator();
+      bright.type = 'sine';
+      bright.frequency.value = hz * 2;
+      const brightGain = ctx.createGain();
+      brightGain.gain.setValueAtTime(0.35, at);
+      brightGain.gain.exponentialRampToValueAtTime(0.01, at + 0.4);
+      bright.connect(brightGain).connect(out);
+      for (const o of [body, bright]) {
+        o.start(at);
+        o.stop(end + 0.02);
+        track(o);
+      }
       return;
     }
     if (e.drum === 'kick') {

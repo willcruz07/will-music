@@ -1,4 +1,4 @@
-import { Music, Plus, Search } from 'lucide-react';
+import { FolderOpen, Music, Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { ImportButton } from '../components/PackageButtons.tsx';
@@ -17,6 +17,8 @@ export const Library = () => {
   const [songs, setSongs] = useState<Song[] | null>(null);
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  // null = every song, '' = songs without a folder.
+  const [folder, setFolder] = useState<string | null>(null);
 
   useEffect(() => {
     void listSongs().then(setSongs);
@@ -24,14 +26,23 @@ export const Library = () => {
 
   const visible = useMemo(() => {
     const q = normalize(query.trim());
-    return (songs ?? []).filter((s) => !q || normalize(`${s.title} ${s.artist}`).includes(q));
-  }, [songs, query]);
+    return (songs ?? []).filter((s) => (folder === null || (s.folder ?? '') === folder) && (!q || normalize(`${s.title} ${s.artist}`).includes(q)));
+  }, [songs, query, folder]);
+
+  const folders = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of songs ?? []) counts.set(s.folder ?? '', (counts.get(s.folder ?? '') ?? 0) + 1);
+    return [...counts.entries()].sort(([a], [z]) => (a === '' ? 1 : z === '' ? -1 : a.localeCompare(z)));
+  }, [songs]);
 
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold tracking-tight">Biblioteca</h1>
         <div className="flex flex-wrap gap-2">
+        <Link to="/pasta" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm hover:bg-muted">
+          <FolderOpen className="size-4" /> Minha pasta
+        </Link>
         <ImportButton
           onImported={(message) => {
             setNotice(message);
@@ -53,6 +64,22 @@ export const Library = () => {
             className="h-11 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
           />
         </label>
+      )}
+
+      {folders.length > 1 && (
+        <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Pastas">
+          {[[null, 'Todas', songs?.length ?? 0] as const, ...folders.map(([f, n]) => [f, f || 'Sem pasta', n] as const)].map(([value, label, count]) => (
+            <button
+              key={value ?? '__all__'}
+              type="button"
+              aria-pressed={folder === value}
+              onClick={() => setFolder(value)}
+              className={`min-h-9 shrink-0 rounded-full border px-3 text-sm ${folder === value ? 'border-primary bg-primary/15 font-semibold text-chord' : 'border-border text-muted-foreground hover:text-foreground'}`}
+            >
+              {label} <span className="tabular-nums opacity-70">{count}</span>
+            </button>
+          ))}
+        </div>
       )}
 
       {songs && songs.length === 0 && (

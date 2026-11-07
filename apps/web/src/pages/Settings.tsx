@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { ExportButton, ImportButton } from '../components/PackageButtons.tsx';
 import { InstallApp } from '../components/PwaPrompts.tsx';
 import { db } from '../lib/db.ts';
@@ -114,6 +115,17 @@ export const Settings = () => {
             Proteger meus dados
           </Button>
         )}
+      </Section>
+
+      <Section title="Seus dados">
+        <div className="flex flex-wrap gap-2">
+          <Link to="/pasta" className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm hover:bg-muted">
+            Minha pasta (salvar e restaurar arquivos)
+          </Link>
+          <Link to="/armazenamento" className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 text-sm hover:bg-muted">
+            Espaço por música
+          </Link>
+        </div>
       </Section>
 
       <Section title="Backup">

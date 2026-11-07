@@ -1,7 +1,7 @@
 import { AudioLines, Moon, Sun } from 'lucide-react';
 import { Suspense, lazy, useEffect } from 'react';
 import { Link, Route, Routes } from 'react-router';
-import { BottomNav, TopNav } from './components/AppNav.tsx';
+import { BottomNav, SettingsLink, TopNav } from './components/AppNav.tsx';
 import { InstallBanner, InstallButton, UpdateBanner } from './components/PwaPrompts.tsx';
 import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
 import { Library } from './pages/Library.tsx';
@@ -18,6 +18,9 @@ const SetlistEdit = named(() => import('./pages/SetlistEdit.tsx'), 'SetlistEdit'
 const Settings = named(() => import('./pages/Settings.tsx'), 'Settings');
 const Scores = named(() => import('./pages/Scores.tsx'), 'Scores');
 const SongScore = named(() => import('./pages/SongScore.tsx'), 'SongScore');
+const FolderPage = named(() => import('./pages/FolderPage.tsx'), 'FolderPage');
+const StoragePage = named(() => import('./pages/StoragePage.tsx'), 'StoragePage');
+const MicPage = named(() => import('./pages/MicPage.tsx'), 'MicPage');
 const Stage = named(() => import('./pages/Stage.tsx'), 'Stage');
 
 // Reads the saved preference, never the <html> class (the stage forces dark while it is open).
@@ -56,6 +59,7 @@ const Layout = () => (
         </Link>
         <div className="flex items-center gap-2">
           <TopNav />
+          <SettingsLink />
           <InstallButton />
           <ThemeToggle />
         </div>
@@ -71,6 +75,9 @@ const Layout = () => (
           <Route path="/musica/:id/editar" element={<EditChart />} />
           <Route path="/musica/:id/partitura" element={<SongScore />} />
           <Route path="/partituras" element={<Scores />} />
+          <Route path="/pasta" element={<FolderPage />} />
+          <Route path="/microfone" element={<MicPage />} />
+          <Route path="/armazenamento" element={<StoragePage />} />
           <Route path="/listas" element={<Setlists />} />
           <Route path="/listas/:id" element={<SetlistEdit />} />
           <Route path="/ajustes" element={<Settings />} />

@@ -3,6 +3,7 @@ import {
   type ChordSegment,
   type KeyResult,
   type NoteEvent,
+  buildChoirXml,
   buildDrumXml,
   buildGrid,
   buildMusicXml,
@@ -11,7 +12,9 @@ import {
   detectDrumHits,
   estimateTempo,
   quantize,
+  splitVoices,
   tickAt,
+  VOICE_PARTS,
 } from '@will-music/engine';
 import type { TranscriptionRequest, TranscriptionResponse } from '../worker/transcription.worker.ts';
 import { type ScoreRecord, type Song, db, now } from './db.ts';
@@ -20,12 +23,13 @@ import { getStems } from './stems.ts';
 export type ScoreProgress = { stage: 'decode' | 'models' | 'notes'; done: number; total: number };
 
 /** The kinds of score the app writes. */
-export type ScoreType = 'melody' | 'guitar' | 'keys' | 'drums';
+export type ScoreType = 'melody' | 'guitar' | 'keys' | 'drums' | 'choir';
 export const SCORE_TYPES: { type: ScoreType; label: string; hint: string }[] = [
   { type: 'melody', label: 'Melodia', hint: 'A linha da voz com a cifra por cima.' },
   { type: 'guitar', label: 'Guitarra', hint: 'A melodia em pauta e tablatura, com as casas de cada nota.' },
   { type: 'keys', label: 'Teclado', hint: 'Clave de sol e clave de fá, com a armadura do tom.' },
   { type: 'drums', label: 'Bateria', hint: 'Bumbo, caixa e chimbal. Precisa da faixa de bateria separada.' },
+  { type: 'choir', label: 'Coral (SATB)', hint: 'Soprano, contralto, tenor e baixo, com a letra. Cada naipe tem uma guia com som de piano.' },
 ];
 
 export const getScore = (songId: string): Promise<ScoreRecord | undefined> => db.scores.get(songId);
@@ -51,13 +55,41 @@ export const buildSongScore = (song: Pick<Song, 'title' | 'artist'>, analysis: A
 
 /** Whether the stored score already has what a type needs. */
 export const hasScoreType = (score: ScoreRecord | undefined, type: ScoreType): boolean =>
-  !!score && (type === 'keys' ? !!score.piano?.notes.length : type === 'drums' ? !!score.drums?.hits.length : score.notes.length > 0);
+  !!score &&
+  (type === 'keys'
+    ? !!score.piano?.notes.length
+    : type === 'drums'
+      ? !!score.drums?.hits.length
+      : type === 'choir'
+        ? !!score.choir && VOICE_PARTS.some((v) => score.choir!.voices[v].length > 0)
+        : score.notes.length > 0);
 
 /** MusicXML for one score type, or null when that part has not been transcribed yet. */
-export const buildScoreXml = (type: ScoreType, song: Pick<Song, 'title' | 'artist'>, analysis: AnalysisLike, score: ScoreRecord | undefined): string | null => {
+export const buildScoreXml = (
+  type: ScoreType,
+  song: Pick<Song, 'title' | 'artist'>,
+  analysis: AnalysisLike,
+  score: ScoreRecord | undefined,
+  extra: { lyrics?: readonly { time: number; text: string }[] } = {},
+): string | null => {
   if (!score || !hasScoreType(score, type)) return null;
   if (type === 'melody' || type === 'guitar') return buildSongScore(song, analysis, score, { tab: type === 'guitar' });
   const chords = usableChords(analysis);
+  if (type === 'choir') {
+    const voices = score.choir!.voices;
+    const all = VOICE_PARTS.flatMap((v) => voices[v]);
+    const bpm = safeBpm(score.bpm, all);
+    const grid = buildGrid(bpm, all.map((n) => n.start), chords.map((c) => c.start));
+    return buildChoirXml({
+      title: song.title,
+      artist: song.artist,
+      bpm,
+      key: analysis?.key,
+      voices: { S: quantize(voices.S, grid), A: quantize(voices.A, grid), T: quantize(voices.T, grid), B: quantize(voices.B, grid) },
+      harmonies: chordsToHarmony(analysis?.chords ?? [], grid),
+      lyrics: (extra.lyrics ?? []).filter((l) => l.text.trim()).map((l) => ({ tick: tickAt(grid, l.time), text: l.text })),
+    });
+  }
   if (type === 'keys') {
     const notes = score.piano!.notes;
     const bpm = safeBpm(score.bpm, notes);
@@ -165,11 +197,29 @@ export const transcribeDrums = async (song: Song, onProgress: (p: ScoreProgress)
   return store(song, { drums: { hits } }, hits.map((h) => ({ start: h.time })));
 };
 
+export const CHOIR_NEEDS_STEMS = 'A partitura de coral precisa da voz separada: abra os controles do player e separe as faixas (qualquer tipo serve).';
+
+/** Choir parts: every note heard in the separated voices, split into soprano, alto, tenor and bass. */
+export const transcribeChoir = async (song: Song, onProgress: (p: ScoreProgress) => void): Promise<ScoreRecord> => {
+  onProgress({ stage: 'decode', done: 0, total: 1 });
+  const tracks = (await getStems(song.id))?.tracks ?? [];
+  const voiceTracks = tracks.filter((t) => t.name === 'lead' || t.name === 'backing' || t.name === 'vocals');
+  if (!voiceTracks.length) throw new Error(CHOIR_NEEDS_STEMS);
+  const parts = await Promise.all(voiceTracks.map((t) => decodeMono(t.blob, BASIC_PITCH.SAMPLE_RATE)));
+  const pcm = new Float32Array(Math.max(...parts.map((p) => p.length)));
+  for (const p of parts) for (let i = 0; i < p.length; i++) pcm[i] = pcm[i]! + p[i]!;
+  const { notes } = await runWorker(pcm, true, onProgress);
+  const sung = notes.filter((n) => n.pitch >= 38 && n.pitch <= 86);
+  if (!sung.length) throw new Error('Nenhuma nota clara foi encontrada nas vozes.');
+  return store(song, { choir: { voices: splitVoices(sung), source: voiceTracks.map((t) => t.name).join('+') } }, sung);
+};
+
 export const TRANSCRIBE: Record<ScoreType, (song: Song, onProgress: (p: ScoreProgress) => void) => Promise<ScoreRecord>> = {
   melody: transcribeMelody,
   guitar: transcribeMelody,
   keys: transcribeKeys,
   drums: transcribeDrums,
+  choir: transcribeChoir,
 };
 
 export const downloadText = (text: string, fileName: string, type: string): void => {

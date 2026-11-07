@@ -82,7 +82,12 @@ export const exportMixMp3 = async (tracks: readonly { blob: Blob; volume: number
   }
   onStep('Gerando o MP3');
   const { left, right } = sum.finish();
-  return new Promise((resolve, reject) => {
+  return encodeMp3(left, right, RATE, 192);
+};
+
+/** Encodes stereo PCM to MP3 in a worker (the buffers are transferred). */
+export const encodeMp3 = (left: Float32Array, right: Float32Array, sampleRate: number, bitrate: number): Promise<Blob> =>
+  new Promise((resolve, reject) => {
     const worker = new Worker(new URL('../worker/mix.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (event: MessageEvent<MixResponse>) => {
       worker.terminate();
@@ -93,6 +98,5 @@ export const exportMixMp3 = async (tracks: readonly { blob: Blob; volume: number
       worker.terminate();
       reject(new Error(e.message || 'Não foi possível gerar o MP3.'));
     };
-    worker.postMessage({ left, right, sampleRate: RATE } satisfies MixRequest, [left.buffer, right.buffer]);
+    worker.postMessage({ left, right, sampleRate, bitrate } satisfies MixRequest, [left.buffer, right.buffer]);
   });
-};

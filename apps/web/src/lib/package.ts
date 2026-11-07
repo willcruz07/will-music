@@ -1,5 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
-import { type Analysis, type Chart, type Setlist, type Song, db, now } from './db.ts';
+import { type Analysis, type Chart, type ScoreRecord, type Setlist, type Song, db, now } from './db.ts';
 
 export const PACKAGE_VERSION = 1;
 const NOT_A_PACKAGE = 'Este arquivo não é um pacote do will-music.';
@@ -11,6 +11,7 @@ export type PackagedSong = {
   song: Song;
   chart?: Chart;
   analysis?: Analysis;
+  score?: ScoreRecord;
   audio?: { bytes: Uint8Array; mimeType: string };
 };
 export type PackageContents = { manifest: Manifest; songs: PackagedSong[]; setlists: Setlist[] };
@@ -44,6 +45,8 @@ export const exportSongs = async (
     }
     const analysis = await db.analyses.where('songId').equals(id).first();
     if (analysis) files[`${base}analysis.json`] = json(analysis);
+    const score = await db.scores.get(id);
+    if (score) files[`${base}score.json`] = json(score);
     if (opts.includeAudio) {
       const audio = await db.audio.get(id);
       if (audio) {
@@ -100,6 +103,7 @@ export const readPackage = async (file: Blob): Promise<PackageContents> => {
       song,
       chart: chartMeta && cho ? ({ ...chartMeta, chordPro: strFromU8(cho) } as Chart) : undefined,
       analysis: parse<Analysis>(`${base}analysis.json`),
+      score: parse<ScoreRecord>(`${base}score.json`),
       audio: audioPath && audioMeta ? { bytes: entries[audioPath]!, mimeType: audioMeta.mimeType } : undefined,
     });
   }
@@ -116,8 +120,10 @@ export const readPackage = async (file: Blob): Promise<PackageContents> => {
 export const importPackage = async (
   contents: PackageContents,
   resolve: (conflicts: Song[]) => Promise<'replace' | 'keep-both'>,
+  opts: { skipSongIds?: ReadonlySet<string>; skipExistingSetlists?: boolean } = {},
 ): Promise<{ songs: number; setlists: Setlist[]; setlist?: Setlist }> => {
-  const conflicts = (await Promise.all(contents.songs.map((e) => db.songs.get(e.song.id)))).filter((s): s is Song => !!s);
+  const entries = contents.songs.filter((e) => !opts.skipSongIds?.has(e.song.id));
+  const conflicts = (await Promise.all(entries.map((e) => db.songs.get(e.song.id)))).filter((s): s is Song => !!s);
   const decision = conflicts.length ? await resolve(conflicts) : 'replace';
   const conflictIds = new Set(conflicts.map((s) => s.id));
   const idMap = new Map<string, string>();
@@ -125,28 +131,34 @@ export const importPackage = async (
   const setlists: Setlist[] = [];
 
   await db.transaction('rw', [db.songs, db.charts, db.analyses, db.audio, db.setlists, db.stemSets, db.scores, db.peaks], async () => {
-    for (const entry of contents.songs) {
+    for (const entry of entries) {
       const original = entry.song.id;
       const copy = conflictIds.has(original) && decision === 'keep-both';
       const id = copy ? crypto.randomUUID() : original;
       idMap.set(original, id);
       if (conflictIds.has(original) && !copy) {
         await db.songs.delete(original);
-        await db.audio.delete(original);
-        await db.stemSets.where('songId').equals(original).delete();
-        await db.peaks.delete(original);
+        // A package without audio (a light backup) must not take away the audio and tracks on the device.
+        if (entry.audio) {
+          await db.audio.delete(original);
+          await db.stemSets.where('songId').equals(original).delete();
+          await db.peaks.delete(original);
+        }
         await db.scores.delete(original);
         await db.analyses.where('songId').equals(original).delete();
         await db.charts.where('songId').equals(original).delete();
       }
       await db.songs.put({ ...entry.song, id, analysisStatus: entry.song.analysisStatus === 'running' ? 'pending' : entry.song.analysisStatus, updatedAt: stamp });
       if (entry.chart) await db.charts.put({ ...entry.chart, id: copy ? crypto.randomUUID() : entry.chart.id, songId: id });
+      if (entry.score) await db.scores.put({ ...entry.score, songId: id });
       if (entry.analysis) await db.analyses.put({ ...entry.analysis, id: copy ? crypto.randomUUID() : entry.analysis.id, songId: id });
       if (entry.audio) {
         await db.audio.put({ songId: id, blob: new Blob([entry.audio.bytes as Uint8Array<ArrayBuffer>], { type: entry.audio.mimeType }), mimeType: entry.audio.mimeType });
       }
     }
+    const existingNames = opts.skipExistingSetlists ? new Set((await db.setlists.toArray()).map((l) => l.name.trim().toLowerCase())) : new Set<string>();
     for (const list of contents.setlists) {
+      if (existingNames.has(list.name.trim().toLowerCase())) continue;
       const imported: Setlist = {
         ...list,
         id: crypto.randomUUID(),
@@ -158,7 +170,7 @@ export const importPackage = async (
       setlists.push(imported);
     }
   });
-  return { songs: contents.songs.length, setlists, setlist: setlists[0] };
+  return { songs: entries.length, setlists, setlist: setlists[0] };
 };
 
 export const downloadBlob = (blob: Blob, fileName: string): void => {

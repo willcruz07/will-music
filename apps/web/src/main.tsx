@@ -5,7 +5,10 @@ import { registerSW } from 'virtual:pwa-register';
 import { App } from './App.tsx';
 import './styles.css';
 
+import { startFolderAutoSync } from './lib/folder.ts';
 import { notifyNeedRefresh, notifyOfflineReady } from './lib/pwa.ts';
+
+startFolderAutoSync();
 
 // A new build waits until the user taps Atualizar, so a song being played is never cut by a reload.
 const updateSW = registerSW({
