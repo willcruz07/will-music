@@ -18,8 +18,13 @@ const readTab = () => {
   }
 };
 
+/** Keyed by the song id, so a transcription still running for the previous song can never land on this one. */
 export const SongScore = () => {
   const { id = '' } = useParams();
+  return <SongScorePage key={id} id={id} />;
+};
+
+const SongScorePage = ({ id }: { id: string }) => {
   const [song, setSong] = useState<Song | null | undefined>(undefined);
   const [analysis, setAnalysis] = useState<Analysis | undefined>();
   const [score, setScore] = useState<ScoreRecord | undefined>();
@@ -29,13 +34,18 @@ export const SongScore = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       const [s, a, sc, audio] = await Promise.all([db.songs.get(id), db.analyses.where('songId').equals(id).first(), db.scores.get(id), db.audio.get(id)]);
+      if (cancelled) return;
       setAnalysis(a);
       setScore(sc);
       setHasAudio(!!audio);
       setSong(s ?? null);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const xml = useMemo(() => (song && score ? buildSongScore(song, analysis, score, { tab }) : ''), [song, analysis, score, tab]);
@@ -63,8 +73,14 @@ export const SongScore = () => {
     });
   };
 
-  const setBpm = (bpm: number) => {
-    if (!score || !Number.isFinite(bpm) || bpm < 40 || bpm > 240) return;
+  const setBpm = (input: HTMLInputElement) => {
+    const bpm = Number(input.value);
+    if (!score) return;
+    if (!Number.isFinite(bpm) || bpm < 40 || bpm > 240) {
+      input.value = String(score.bpm); // out of range: show the tempo actually used
+      return;
+    }
+    if (Math.round(bpm) === score.bpm) return;
     const next = { ...score, bpm: Math.round(bpm) };
     setScore(next);
     void saveScore(next);
@@ -112,8 +128,8 @@ export const SongScore = () => {
               key={score.bpm}
               aria-label="Andamento (BPM)"
               className="w-16 bg-transparent text-right font-semibold tabular-nums outline-none"
-              onBlur={(e) => setBpm(Number(e.currentTarget.value))}
-              onKeyDown={(e) => e.key === 'Enter' && setBpm(Number(e.currentTarget.value))}
+              onBlur={(e) => setBpm(e.currentTarget)}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
             />
           </label>
           <Button variant="outline" onClick={() => downloadText(xml, `${song.title || 'partitura'}.musicxml`, 'application/vnd.recordare.musicxml+xml')}>

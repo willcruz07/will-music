@@ -10,6 +10,10 @@ export const saveScore = async (score: ScoreRecord): Promise<void> => {
   await db.scores.put(score);
 };
 
+/** A usable tempo: the given one when it is plausible (40–240 BPM), else an estimate from the notes. */
+export const safeBpm = (bpm: number | undefined, notes: ScoreRecord['notes']): number =>
+  bpm !== undefined && Number.isFinite(bpm) && bpm >= 40 && bpm <= 240 ? Math.round(bpm) : estimateTempo(notes.map((n) => n.start));
+
 /** Builds the lead sheet (melody + chords, optionally guitar tab) from the stored melody. */
 export const buildSongScore = (
   song: Pick<Song, 'title' | 'artist'>,
@@ -17,7 +21,7 @@ export const buildSongScore = (
   score: ScoreRecord,
   opts: { tab: boolean; bpm?: number },
 ): string => {
-  const bpm = opts.bpm ?? score.bpm;
+  const bpm = safeBpm(opts.bpm ?? score.bpm, score.notes);
   const chords = analysis?.chords ?? [];
   const grid = buildGrid(bpm, score.notes.map((n) => n.start), chords.filter((c) => c.raw !== 'N' && c.raw !== 'X').map((c) => c.start));
   return buildMusicXml({
@@ -72,7 +76,7 @@ export const transcribeMelody = async (song: Song, onProgress: (p: ScoreProgress
   const score: ScoreRecord = {
     songId: song.id,
     notes,
-    bpm: song.tempo ?? estimateTempo(notes.map((n) => n.start)),
+    bpm: safeBpm(song.tempo, notes),
     source: lead ? 'lead' : 'mix',
     model,
     createdAt: now(),

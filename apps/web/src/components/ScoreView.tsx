@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
+type Sheet = { load: (xml: string) => Promise<unknown>; render: () => void; clear: () => void };
+
 /**
  * Draws MusicXML with OpenSheetMusicDisplay (BSD-3), loaded on demand. The score sits on a light
- * "paper" sheet in both themes, since engraving is black on transparent.
+ * "paper" sheet in both themes, since engraving is black on transparent. OSMD's own autoResize adds a
+ * window listener it never removes, so resizing is driven here by a ResizeObserver owned by this effect.
  */
 export const ScoreView = ({ xml }: { xml: string }) => {
   const host = useRef<HTMLDivElement>(null);
@@ -11,7 +14,8 @@ export const ScoreView = ({ xml }: { xml: string }) => {
 
   useEffect(() => {
     let cancelled = false;
-    let osmd: { clear: () => void } | undefined;
+    let sheet: Sheet | undefined;
+    let observer: ResizeObserver | undefined;
     setLoading(true);
     setError(null);
     void (async () => {
@@ -19,11 +23,26 @@ export const ScoreView = ({ xml }: { xml: string }) => {
         const { OpenSheetMusicDisplay } = await import('opensheetmusicdisplay');
         if (cancelled || !host.current) return;
         host.current.innerHTML = '';
-        const view = new OpenSheetMusicDisplay(host.current, { autoResize: true, backend: 'svg', drawTitle: true, drawComposer: true, drawPartNames: true });
-        osmd = view;
+        const view: Sheet = new OpenSheetMusicDisplay(host.current, { autoResize: false, backend: 'svg', drawTitle: true, drawComposer: true, drawPartNames: true });
+        sheet = view;
         await view.load(xml);
-        if (cancelled) return;
+        if (cancelled) {
+          view.clear();
+          return;
+        }
         view.render();
+        if (typeof ResizeObserver === 'function' && host.current) {
+          let width = host.current.clientWidth;
+          let frame = 0;
+          observer = new ResizeObserver(([entry]) => {
+            const next = Math.round(entry?.contentRect.width ?? 0);
+            if (!next || Math.abs(next - width) < 8) return;
+            width = next;
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => !cancelled && view.render());
+          });
+          observer.observe(host.current);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Não foi possível desenhar a partitura.');
       } finally {
@@ -32,7 +51,8 @@ export const ScoreView = ({ xml }: { xml: string }) => {
     })();
     return () => {
       cancelled = true;
-      osmd?.clear();
+      observer?.disconnect();
+      sheet?.clear();
     };
   }, [xml]);
 

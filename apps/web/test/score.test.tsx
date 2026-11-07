@@ -99,3 +99,15 @@ describe('score pages', () => {
     expect(screen.getByLabelText('Andamento (BPM)')).toHaveValue(120);
   });
 });
+
+describe('review fixes: tempo and navigation', () => {
+  it('ignores an impossible tempo instead of breaking the score', () => {
+    for (const bpm of [0, -5, 99999, Number.NaN]) {
+      const xml = buildSongScore({ title: 'a', artist: '' }, undefined, { ...record('x'), bpm }, { tab: true });
+      const tempo = Number(/<per-minute>(\d+)<\/per-minute>/.exec(xml)?.[1]);
+      expect(tempo).toBeGreaterThanOrEqual(40);
+      expect(tempo).toBeLessThanOrEqual(240);
+      expect((xml.match(/<measure /g) ?? []).length).toBeLessThan(20);
+    }
+  });
+});

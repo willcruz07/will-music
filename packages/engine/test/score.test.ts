@@ -88,3 +88,27 @@ describe('toMelody', () => {
     for (let i = 1; i < melody.length; i++) expect(melody[i]!.start).toBeGreaterThanOrEqual(melody[i - 1]!.end);
   });
 });
+
+describe('runBasicPitch timing', () => {
+  it('does not drift: a click one minute in lands on its own frame', async () => {
+    const at = 60 * SAMPLE_RATE + 1234;
+    const pcm = new Float32Array(at + 5 * SAMPLE_RATE);
+    pcm[at] = 1;
+    // Fake model: onset where the click falls inside this window.
+    const runner: TensorRunner = {
+      async run(feeds) {
+        const input = Object.values(feeds)[0]!.data;
+        const onset = new Float32Array(FRAMES_PER_WINDOW * BINS);
+        const i = input.indexOf(1);
+        if (i >= 0) onset[Math.round(i / HOP_SAMPLES) * BINS] = 1;
+        return { [BASIC_PITCH.NOTE_OUTPUT]: new Float32Array(FRAMES_PER_WINDOW * BINS), [BASIC_PITCH.ONSET_OUTPUT]: onset };
+      },
+      release: async () => {},
+    };
+    const p = await runBasicPitch(pcm, runner);
+    const frames: number[] = [];
+    for (let f = 0; f < p.frames; f++) if (p.onset[f * BINS] === 1) frames.push(f);
+    expect(frames.length).toBeGreaterThan(0);
+    for (const f of frames) expect(Math.abs(f - at / HOP_SAMPLES)).toBeLessThanOrEqual(1);
+  });
+});

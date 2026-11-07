@@ -7,8 +7,11 @@ export const BASIC_PITCH = {
   WINDOW: 43844,
   HOP_SAMPLES: 256,
   OVERLAP_FRAMES: 30,
-  /** WINDOW minus the overlap (30 frames × 256 samples). */
-  HOP: 43844 - 30 * 256,
+  /**
+   * Window hop = the frames kept per window (172 − 30) × 256 samples. The reference uses 43844 − 7680
+   * (36164), which drifts 188 samples per window; this keeps every stitched frame on its true time.
+   */
+  HOP: (172 - 30) * 256,
   FRAMES_PER_WINDOW: 172,
   BINS: 88,
   /** MIDI number of bin 0 (A0). */
