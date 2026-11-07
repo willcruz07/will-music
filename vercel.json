@@ -1,5 +1,4 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm ci -w @will-music/web",
   "buildCommand": "npm run build -w @will-music/web && rm -rf dist && cp -r apps/web/dist dist",
