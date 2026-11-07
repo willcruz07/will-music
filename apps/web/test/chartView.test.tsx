@@ -52,3 +52,24 @@ describe('ChartView picking', () => {
     expect(picks).toEqual([[0, 8], [1, 3]]);
   });
 });
+
+describe('Player loop', () => {
+  it('jumps back to A after passing B', () => {
+    render(<Player src="blob:x" onTime={() => {}} />);
+    const audio = document.querySelector('audio')!;
+    Object.defineProperty(audio, 'duration', { value: 100, configurable: true });
+    fireEvent.loadedMetadata(audio);
+    audio.currentTime = 5;
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar A' }));
+    audio.currentTime = 12;
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar B' }));
+    expect(screen.getByText(/Loop 0:05–0:12/)).toBeInTheDocument();
+    audio.currentTime = 12.3;
+    fireEvent.timeUpdate(audio);
+    expect(audio.currentTime).toBe(5);
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar loop' }));
+    audio.currentTime = 50;
+    fireEvent.timeUpdate(audio);
+    expect(audio.currentTime).toBe(50);
+  });
+});

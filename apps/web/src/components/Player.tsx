@@ -1,5 +1,6 @@
 import { Pause, Play, ScrollText } from 'lucide-react';
 import { useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { normalizeLoop } from '../lib/loop.ts';
 
 export const activeIndexAt = (starts: readonly number[], t: number): number => {
   let lo = 0;
@@ -47,6 +48,25 @@ export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, con
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(100);
+  const [markA, setMarkA] = useState<number | null>(null);
+  const [markB, setMarkB] = useState<number | null>(null);
+  const loop = normalizeLoop(markA, markB, duration);
+  const loopRef = useRef(loop);
+  loopRef.current = loop;
+
+  // Called on every time update: jumps back to A once playback passes B.
+  const follow = (t: number) => {
+    const audio = audioRef.current;
+    const l = loopRef.current;
+    if (audio && l && t >= l.b) {
+      audio.currentTime = l.a;
+      t = l.a;
+    }
+    setTime(t);
+    onTime(t);
+  };
+  const followRef = useRef(follow);
+  followRef.current = follow;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -59,9 +79,7 @@ export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, con
     if (!playing) return;
     let frame = 0;
     const tick = () => {
-      const t = audioRef.current?.currentTime ?? 0;
-      setTime(t);
-      onTime(t);
+      followRef.current(audioRef.current?.currentTime ?? 0);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -84,10 +102,7 @@ export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, con
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-        onTimeUpdate={(e) => {
-          setTime(e.currentTarget.currentTime);
-          onTime(e.currentTarget.currentTime);
-        }}
+        onTimeUpdate={(e) => follow(e.currentTarget.currentTime)}
       />
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
         <button
@@ -113,6 +128,27 @@ export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, con
             className="flex-1 accent-[var(--primary)]"
           />
           <span>{clock(duration)}</span>
+        </div>
+        <div className="flex items-center gap-1 text-sm">
+          <button type="button" onClick={() => setMarkA(audioRef.current?.currentTime ?? 0)} className={`rounded-lg px-2 py-2 ${markA !== null ? 'bg-muted font-semibold' : 'text-muted-foreground'}`} aria-label="Marcar A">
+            A
+          </button>
+          <button type="button" onClick={() => setMarkB(audioRef.current?.currentTime ?? 0)} className={`rounded-lg px-2 py-2 ${markB !== null ? 'bg-muted font-semibold' : 'text-muted-foreground'}`} aria-label="Marcar B">
+            B
+          </button>
+          {loop && <span className="tabular-nums text-chord">Loop {clock(loop.a)}–{clock(loop.b)}</span>}
+          {(markA !== null || markB !== null) && (
+            <button
+              type="button"
+              onClick={() => {
+                setMarkA(null);
+                setMarkB(null);
+              }}
+              className="rounded-lg px-2 py-2 text-muted-foreground hover:bg-muted"
+            >
+              Limpar loop
+            </button>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <span className="w-10 text-right tabular-nums">{speed}%</span>
