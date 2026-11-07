@@ -5,6 +5,7 @@ import { Button } from '../ui/Button.tsx';
 import { ChordDiagram, type Instrument } from './ChordDiagram.tsx';
 import { InstrumentToggle, readInstrument } from './ChordPanel.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
+import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 type Props = {
   /** Chords already in the song, offered first. */
@@ -104,25 +105,18 @@ export const ChordLibrary = ({ suggestions, title = 'Escolha o acorde', allowRem
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <label className="flex items-center gap-2">
-              Baixo
-              <select
+            <span className="flex items-center gap-2">
+              <span aria-hidden>Baixo</span>
+              <SheetSelect
+                label="Baixo do acorde"
                 value={bass}
-                onChange={(e) => {
-                  setBass(e.target.value);
+                onChange={(v) => {
+                  setBass(v);
                   setTyped(null);
                 }}
-                className="h-10 rounded-lg border border-border bg-background px-2"
-                aria-label="Baixo do acorde"
-              >
-                <option value="">Sem baixo</option>
-                {ROOTS.map((r) => (
-                  <option key={r} value={r}>
-                    /{r}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={[{ value: '', label: 'Sem baixo' }, ...ROOTS.map((r) => ({ value: r, label: `/${r}` }))]}
+              />
+            </span>
             <label className="flex items-center gap-2">
               Ou digite
               <input

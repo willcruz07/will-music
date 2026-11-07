@@ -39,7 +39,7 @@ export const Fretboard = ({ pcs, root, box, tuning = STANDARD_LOW_FIRST }: { pcs
   const set = new Set(pcs);
   const strings = [...tuning].reverse(); // high string on top, like the tab
   return (
-    <div className="no-scrollbar overflow-x-auto">
+    <div className="thin-scrollbar overflow-x-auto pb-1">
       <svg viewBox={`0 0 ${left + frets * fw + 10} ${top + (strings.length - 1) * sh + 26}`} className="min-w-[34rem]" role="img" aria-label="Notas da escala no braço do violão">
         {box !== undefined && <rect x={box <= 1 ? left - 18 : left + (box - 2) * fw} y={top - 9} width={left + (Math.max(0, box - 1) + 4) * fw - (box <= 1 ? left - 18 : left + (box - 2) * fw)} height={(strings.length - 1) * sh + 18} rx={8} fill="color-mix(in oklab, var(--glow) 12%, transparent)" />}
         {Array.from({ length: frets + 1 }, (_, f) => (

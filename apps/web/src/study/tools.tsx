@@ -7,6 +7,7 @@ import { LessonBlocks, intervalName } from './blocks.tsx';
 import { SCALE_LIBRARY, type ScaleId } from './theory.ts';
 import type { Block } from './types.ts';
 import { useStudySynth } from './widgets.tsx';
+import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 const chip = (active: boolean) =>
   `min-h-10 scroll-mx-4 whitespace-nowrap rounded-lg px-3 text-sm ${active ? 'bg-primary font-semibold text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`;
@@ -241,22 +242,20 @@ export const ScaleExplorer = () => {
     <div className="mt-6 max-w-3xl">
       <h2 className="text-xl font-semibold">Escalas no braço e no teclado</h2>
       <p className="mt-1 text-muted-foreground">Escolha uma das {Object.keys(SCALE_LIBRARY).length} escalas e uma tônica: veja as notas, o desenho no teclado, no braço e a digitação em tablatura.</p>
-      <label className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-        Escala
-        <select value={scale} onChange={(e) => setScale(e.target.value as ScaleId)} aria-label="Escala" className="h-10 max-w-full rounded-lg border border-border bg-background px-2">
-          {FAMILIES.map((f) => (
-            <optgroup key={f} label={f}>
-              {(Object.keys(SCALE_LIBRARY) as ScaleId[])
-                .filter((id) => SCALE_LIBRARY[id].family === f)
-                .map((id) => (
-                  <option key={id} value={id}>
-                    {SCALE_LIBRARY[id].name}
-                  </option>
-                ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        <span aria-hidden>Escala</span>
+        <SheetSelect
+          label="Escala"
+          value={scale}
+          onChange={(v) => setScale(v as ScaleId)}
+          className="w-full max-w-xs font-semibold"
+          options={FAMILIES.flatMap((f) =>
+            (Object.keys(SCALE_LIBRARY) as ScaleId[])
+              .filter((id) => SCALE_LIBRARY[id].family === f)
+              .map((id) => ({ value: id, label: SCALE_LIBRARY[id].name, group: f })),
+          )}
+        />
+      </div>
       <LessonBlocks key={scale} blocks={[{ kind: 'scale', scale, root: 'C' }]} lessonId="explorar-escalas" />
     </div>
   );

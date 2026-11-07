@@ -7,6 +7,7 @@ import { InstrumentToggle, readInstrument } from '../components/ChordPanel.tsx';
 import { CHORD_TYPES, INTERVAL_NAMES, KEYS, ROOTS, SCALES, type ScaleKind, SOLFEGE, chordFormation, harmonicField, pcOf, scaleNotes } from '../lib/chordTheory.ts';
 import { rovingKeys } from '../lib/a11y.ts';
 import { CircleOfFifths, IntervalTrainer, ProgressionCatalog, ScaleExplorer } from '../study/tools.tsx';
+import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 type Tab = 'chords' | 'theory' | 'scales' | 'circle' | 'progressions' | 'fretboard' | 'ear';
 /** The tabs, with the name each one has in links (?aba=). */
@@ -324,26 +325,14 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
   return (
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <label className="flex items-center gap-2">
-          Tom
-          <select aria-label="Tom" value={key} onChange={(e) => setKey(e.target.value)} className="h-10 rounded-lg border border-border bg-surface px-2">
-            {KEYS.map((r) => (
-              <option key={r} value={r}>
-                {r} ({solfege(r)})
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-2">
-          Escala
-          <select aria-label="Escala" value={kind} onChange={(e) => setKind(e.target.value as ScaleKind)} className="h-10 rounded-lg border border-border bg-surface px-2">
-            {(Object.keys(SCALES) as ScaleKind[]).map((k) => (
-              <option key={k} value={k}>
-                {SCALES[k].name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <span className="flex items-center gap-2">
+          <span aria-hidden>Tom</span>
+          <SheetSelect label="Tom" value={key} onChange={setKey} className="font-semibold" options={KEYS.map((r) => ({ value: r, label: r, hint: solfege(r) }))} renderValue={(o) => (o ? `${o.label} (${o.hint})` : '')} />
+        </span>
+        <span className="flex items-center gap-2">
+          <span aria-hidden>Escala</span>
+          <SheetSelect label="Escala" value={kind} onChange={(v) => setKind(v as ScaleKind)} className="font-semibold" options={(Object.keys(SCALES) as ScaleKind[]).map((k) => ({ value: k, label: SCALES[k].name }))} />
+        </span>
       </div>
 
       <section className="rounded-2xl border border-border bg-surface p-5">

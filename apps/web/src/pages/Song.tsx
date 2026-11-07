@@ -1,6 +1,7 @@
 import { ArrowLeft, FileText, Info, Minus, MonitorPlay, Music4, Pencil, Plus, RefreshCw, Timer, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { AnalysisProgress } from '../components/AnalysisProgress.tsx';
 import { ChartView } from '../components/ChartView.tsx';
 import { LyricsPanel } from '../components/LyricsPanel.tsx';
@@ -206,7 +207,13 @@ export const Song = () => {
       )}
 
       {chart && (
-        <div className="-mx-4 mt-5 flex items-center gap-2 no-scrollbar overflow-x-auto border-y border-border px-4 py-2 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&>*]:shrink-0">
+        <ScrollStrip
+          role="toolbar"
+          label="Ferramentas da música"
+          className="mt-5 border-y border-border py-1.5 md:mx-0"
+          stripClassName="md:overflow-visible md:px-0"
+          innerClassName="items-center gap-2 md:w-auto md:flex-wrap"
+        >
           <span className="text-sm text-muted-foreground">Transpor</span>
           <IconButton label="Meio tom abaixo" onClick={() => void saveChart({ transpose: chart.transpose - 1 })}>
             <Minus className="size-4" />
@@ -260,7 +267,7 @@ export const Song = () => {
           >
             <Trash2 className="size-4" />
           </IconButton>
-        </div>
+        </ScrollStrip>
       )}
 
       {progress && <AnalysisProgress progress={progress} />}

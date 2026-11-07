@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createSong, db, updateSong } from '../src/lib/db.ts';
 import { createSetlist, keyOptions } from '../src/lib/setlists.ts';
 import { SetlistEdit } from '../src/pages/SetlistEdit.tsx';
+import { choose } from './choose.ts';
 
 beforeEach(async () => {
   await Promise.all([db.songs.clear(), db.audio.clear(), db.analyses.clear(), db.charts.clear(), db.setlists.clear()]);
@@ -45,7 +46,7 @@ describe('setlist editor', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Descer Galileu' }));
     await waitFor(async () => expect((await db.setlists.get(list.id))!.items.map((i) => i.songId)).toEqual([b.id, a.id]));
 
-    await userEvent.selectOptions(screen.getByLabelText('Tom de Galileu'), 'A');
+    await choose('Tom de Galileu', 'A');
     await waitFor(async () => expect((await db.setlists.get(list.id))!.items[1]!.targetKey).toBe('A'));
   });
 });

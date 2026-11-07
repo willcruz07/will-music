@@ -9,6 +9,7 @@ import { TUNINGS, type TunerReading, decimate2, median, tunerReading } from '../
 import type { LiveChordsRequest, LiveChordsResponse } from '../worker/liveChords.worker.ts';
 import { Button } from '../ui/Button.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
+import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 type Tab = 'tuner' | 'voice' | 'chords';
 const TABS: { id: Tab; label: string }[] = [
@@ -280,16 +281,10 @@ export const MicPage = () => {
       {tab === 'tuner' && (
         <div className="mt-6">
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <label className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-              Instrumento
-              <select value={presetId} onChange={(e) => setPresetId(e.target.value)} className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 sm:flex-none">
-                {TUNINGS.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <span className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+              <span aria-hidden>Instrumento</span>
+              <SheetSelect label="Instrumento" value={presetId} onChange={setPresetId} className="flex-1 font-semibold sm:flex-none" options={TUNINGS.map((t) => ({ value: t.id, label: t.label }))} />
+            </span>
             <label className="flex items-center gap-2">
               Lá de referência
               <input

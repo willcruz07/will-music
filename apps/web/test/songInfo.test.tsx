@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SongInfoForm } from '../src/components/SongInfoForm.tsx';
 import { setChordProMeta } from '../src/lib/chordProEdit.ts';
 import type { Song } from '../src/lib/db.ts';
+import { choose } from './choose.ts';
 
 const song: Song = { id: 's', title: 'Velho nome', artist: '', durationSec: 1, favorite: false, analysisStatus: 'done', createdAt: '', updatedAt: '' };
 
@@ -20,7 +21,7 @@ describe('song info', () => {
     await userEvent.clear(screen.getByLabelText('Música'));
     await userEvent.type(screen.getByLabelText('Música'), 'Primeiros Passos');
     await userEvent.type(screen.getByLabelText('Artista'), 'Ton Carfi');
-    await userEvent.selectOptions(screen.getByLabelText('Capotraste'), '2');
+    await choose('Capotraste', 'Casa 2');
     await userEvent.type(screen.getByLabelText('Andamento (BPM)'), '118');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar dados' }));
     expect(onSave).toHaveBeenCalledWith({ title: 'Primeiros Passos', artist: 'Ton Carfi', capo: 2, tempo: 118 });

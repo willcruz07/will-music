@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { type Song, db } from '../lib/db.ts';
 import { Button } from '../ui/Button.tsx';
+import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 export type SongInfo = { title: string; artist: string; capo?: number; tempo?: number; timeSignature?: string; folder?: string };
 
@@ -45,13 +46,13 @@ export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: Song
       </label>
       <label className="block">
         <span className="text-sm font-semibold">Capotraste</span>
-        <select aria-label="Capotraste" value={capo} onChange={(e) => setCapo(Number(e.target.value))} className={field}>
-          {Array.from({ length: 12 }, (_, i) => (
-            <option key={i} value={i}>
-              {i === 0 ? 'Sem capotraste' : `Casa ${i}`}
-            </option>
-          ))}
-        </select>
+        <SheetSelect
+          label="Capotraste"
+          value={String(capo)}
+          onChange={(v) => setCapo(Number(v))}
+          className="mt-1 h-11 w-full"
+          options={Array.from({ length: 12 }, (_, i) => ({ value: String(i), label: i === 0 ? 'Sem capotraste' : `Casa ${i}` }))}
+        />
       </label>
       <label className="block">
         <span className="text-sm font-semibold">Andamento (BPM)</span>
@@ -59,12 +60,13 @@ export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: Song
       </label>
       <label className="block">
         <span className="text-sm font-semibold">Compasso</span>
-        <select aria-label="Compasso" value={timeSignature} onChange={(e) => setTimeSignature(e.target.value)} className={field}>
-          <option value="">Não informado</option>
-          {['4/4', '3/4', '2/4', '6/8', '12/8'].map((t) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
+        <SheetSelect
+          label="Compasso"
+          value={timeSignature}
+          onChange={setTimeSignature}
+          className="mt-1 h-11 w-full"
+          options={[{ value: '', label: 'Não informado' }, ...['4/4', '3/4', '2/4', '6/8', '12/8'].map((t) => ({ value: t, label: t }))]}
+        />
       </label>
       <label className="block">
         <span className="text-sm font-semibold">Pasta</span>
