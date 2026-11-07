@@ -1,10 +1,23 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
+import { copyFileSync, mkdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { VitePWA } from 'vite-plugin-pwa';
+
+const ortDir = dirname(createRequire(import.meta.url).resolve('onnxruntime-web/ort-wasm-simd-threaded.wasm'));
+const copyOrt = () => ({
+  name: 'copy-ort',
+  buildStart() {
+    mkdirSync('public/ort', { recursive: true });
+    for (const f of ['ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs']) copyFileSync(join(ortDir, f), join('public/ort', f));
+  },
+});
 
 export default defineConfig({
   plugins: [
+    copyOrt(),
     react(),
     tailwindcss(),
     VitePWA({
