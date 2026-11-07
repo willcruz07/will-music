@@ -62,11 +62,14 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
   const shownKey = entry?.targetKey ?? originalKey;
   const transpose = useMemo(() => (entry?.song.key && shownKey ? semitonesTo(entry.song.key, shownKey) : (entry?.chart?.transpose ?? 0)), [entry, shownKey]);
 
+  // Read through a ref: a pedal press right after the list loads must not use a stale (empty) list.
+  const countRef = useRef(0);
+  countRef.current = entries?.length ?? 0;
   const go = useCallback((delta: number) => {
     setScrolling(false);
-    setPos((p) => Math.min(Math.max(0, p + delta), (entries?.length ?? 1) - 1));
+    setPos((p) => Math.min(Math.max(0, p + delta), Math.max(0, countRef.current - 1)));
     window.scrollTo?.({ top: 0 });
-  }, [entries]);
+  }, []);
 
   const changeKey = (delta: number) => {
     if (!entry || !shownKey) return;
