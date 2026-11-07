@@ -4,6 +4,7 @@ import { CHORD_TYPES, ROOTS, SOLFEGE } from '../lib/chordTheory.ts';
 import { Button } from '../ui/Button.tsx';
 import { ChordDiagram, type Instrument } from './ChordDiagram.tsx';
 import { InstrumentToggle, readInstrument } from './ChordPanel.tsx';
+import { rovingKeys } from '../lib/a11y.ts';
 
 type Props = {
   /** Chords already in the song, offered first. */
@@ -61,7 +62,7 @@ export const ChordLibrary = ({ suggestions, title = 'Escolha o acorde', allowRem
         <div className="space-y-3">
           <div>
             <p className="text-xs text-muted-foreground">Nota</p>
-            <div className="mt-1 grid grid-cols-6 gap-1" role="radiogroup" aria-label="Nota do acorde">
+            <div className="mt-1 grid grid-cols-6 gap-1" role="radiogroup" onKeyDown={rovingKeys} aria-label="Nota do acorde">
               {ROOTS.map((r) => (
                 <button
                   key={r}
@@ -83,7 +84,7 @@ export const ChordLibrary = ({ suggestions, title = 'Escolha o acorde', allowRem
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Tipo</p>
-            <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" aria-label="Tipo do acorde">
+            <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" onKeyDown={rovingKeys} aria-label="Tipo do acorde">
               {CHORD_TYPES.map((t) => (
                 <button
                   key={t.suffix}

@@ -101,13 +101,22 @@ export const SCALES: Record<ScaleKind, { name: string; steps: number[]; about: s
   blues: { name: 'Blues', steps: [0, 3, 5, 6, 7, 10], about: 'Pentatônica menor com a "blue note" (quinta diminuta).' },
 };
 
+/** Scale degree (letters above the root) of each note of the gapped scales: 1 2 3 5 6, 1 b3 4 5 b7, 1 b3 4 b5 5 b7. */
+const GAPPED_DEGREES: Partial<Record<ScaleKind, number[]>> = {
+  majorPentatonic: [0, 1, 2, 4, 5],
+  minorPentatonic: [0, 2, 3, 4, 6],
+  blues: [0, 2, 3, 4, 4, 6],
+};
+
+/** Keys offered for scales: sharp and flat names, so G#m and D#m are there as well as Ab and Eb. */
+export const KEYS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
+
 export const scaleNotes = (root: string, kind: ScaleKind): string[] => {
   const steps = SCALES[kind].steps;
-  const rootPc = pcOf(root);
-  const pcs = steps.map((s) => (rootPc + s) % 12);
-  if (steps.length === 7) return spellDiatonic(root, pcs);
-  const names = root.includes('b') || flatKey(rootPc, kind !== 'majorPentatonic') ? FLAT : SHARP;
-  return pcs.map((pc, i) => (i === 0 ? root : names[pc]!));
+  if (steps.length === 7) return spellDiatonic(root, steps.map((s) => (pcOf(root) + s) % 12));
+  // The other scales are spelled by degree too, so the blue note of E is Bb (a flat fifth), not A#.
+  const degrees = GAPPED_DEGREES[kind]!;
+  return steps.map((s, i) => spellNote(root, s, degrees[i]!));
 };
 
 const MAJOR_FIELD = [
@@ -129,8 +138,22 @@ const MINOR_FIELD = [
   ['VII', '', '7'],
 ] as const;
 
+/** Harmonic minor: the raised seventh makes V major (the V7 that leads home) and vii° a full diminished. */
+const HARMONIC_MINOR_FIELD = [
+  ['i', 'm', 'm(7M)'],
+  ['ii°', '°', 'm7(b5)'],
+  ['III+', '+', '7M(#5)'],
+  ['iv', 'm', 'm7'],
+  ['V', '', '7'],
+  ['VI', '', '7M'],
+  ['vii°', '°', '°7'],
+] as const;
+
+export type FieldMode = 'major' | 'minor' | 'harmonicMinor';
+
 /** The seven chords built on each degree of the key (triads and four-note chords). */
-export const harmonicField = (root: string, mode: 'major' | 'minor'): { roman: string; triad: string; tetrad: string; note: string }[] => {
+export const harmonicField = (root: string, mode: FieldMode): { roman: string; triad: string; tetrad: string; note: string }[] => {
   const notes = scaleNotes(root, mode);
-  return (mode === 'major' ? MAJOR_FIELD : MINOR_FIELD).map(([roman, t3, t4], i) => ({ roman, note: notes[i]!, triad: `${notes[i]}${t3}`, tetrad: `${notes[i]}${t4}` }));
+  const field = mode === 'major' ? MAJOR_FIELD : mode === 'minor' ? MINOR_FIELD : HARMONIC_MINOR_FIELD;
+  return field.map(([roman, t3, t4], i) => ({ roman, note: notes[i]!, triad: `${notes[i]}${t3}`, tetrad: `${notes[i]}${t4}` }));
 };

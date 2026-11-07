@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHORD_TYPES, chordFormation, harmonicField, scaleNotes } from '../src/lib/chordTheory.ts';
+import { CHORD_TYPES, KEYS, chordFormation, harmonicField, scaleNotes } from '../src/lib/chordTheory.ts';
 import { CAVAQUINHO, findVoicings } from '../src/lib/frettedShapes.ts';
 import { chordNotes } from '../src/lib/chordNotation.ts';
 
@@ -53,5 +53,27 @@ describe('fretted voicings', () => {
   it('drops the fifth when a four-string instrument meets a five-note chord', () => {
     const shapes = findVoicings([0, 4, 7, 10, 2], 0, CAVAQUINHO.tuning);
     expect(shapes.length).toBeGreaterThan(0);
+  });
+});
+
+describe('pending fixes: theory', () => {
+  it('spells pentatonic and blues notes by degree (the blue note is a flat fifth)', () => {
+    expect(scaleNotes('E', 'blues')).toEqual(['E', 'G', 'A', 'Bb', 'B', 'D']);
+    expect(scaleNotes('A', 'blues')).toEqual(['A', 'C', 'D', 'Eb', 'E', 'G']);
+    expect(scaleNotes('F', 'minorPentatonic')).toEqual(['F', 'Ab', 'Bb', 'C', 'Eb']);
+    expect(scaleNotes('D', 'majorPentatonic')).toEqual(['D', 'E', 'F#', 'A', 'B']);
+  });
+
+  it('builds the harmonic field of the harmonic minor (with the major V)', () => {
+    const field = harmonicField('A', 'harmonicMinor');
+    expect(field.map((d) => d.triad)).toEqual(['Am', 'B°', 'C+', 'Dm', 'E', 'F', 'G#°']);
+    expect(field[4]!.tetrad).toBe('E7');
+    expect(field[6]!.tetrad).toBe('G#°7');
+  });
+
+  it('offers sharp minor keys like G#m and D#m', () => {
+    expect(KEYS).toContain('G#');
+    expect(KEYS).toContain('D#');
+    expect(scaleNotes('G#', 'minor')).toEqual(['G#', 'A#', 'B', 'C#', 'D#', 'E', 'F#']);
   });
 });

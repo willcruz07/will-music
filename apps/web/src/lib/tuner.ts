@@ -39,3 +39,12 @@ export const median = (values: readonly number[]): number => {
   const m = s.length >> 1;
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
 };
+
+/**
+ * Halves the sample rate (average of each pair) into `out`: pitch detection then costs about a quarter,
+ * which matters on modest phones, and 22–24 kHz is far more than any tuned note needs.
+ */
+export const decimate2 = (input: Float32Array, out: Float32Array): Float32Array => {
+  for (let i = 0; i < out.length; i++) out[i] = (input[2 * i]! + input[2 * i + 1]!) * 0.5;
+  return out;
+};

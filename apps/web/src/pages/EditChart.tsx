@@ -9,6 +9,7 @@ import { restoreGeneratedChart, saveEditedChart } from '../lib/chartEdit.ts';
 import { type Song, db } from '../lib/db.ts';
 import { createHistory } from '../lib/history.ts';
 import { Button, IconButton } from '../ui/Button.tsx';
+import { rovingKeys } from '../lib/a11y.ts';
 
 type Format = 'cifra' | 'chordpro';
 const FORMAT_KEY = 'wm-edit-format';
@@ -164,7 +165,7 @@ export const EditChart = () => {
   const editor = (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label="Formato do texto">
+        <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" onKeyDown={rovingKeys} aria-label="Formato do texto">
           {(
             [
               ['cifra', 'Acordes em cima'],
@@ -289,7 +290,7 @@ export const EditChart = () => {
         </p>
       )}
 
-      <div className="mt-4 flex gap-2 md:hidden" role="tablist">
+      <div className="mt-4 flex gap-2 md:hidden" role="tablist" onKeyDown={rovingKeys}>
         {(['texto', 'ver'] as const).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`rounded-lg px-4 py-2 text-sm ${tab === t ? 'bg-muted font-semibold' : 'text-muted-foreground'}`}>
             {t === 'texto' ? 'Texto' : 'Ver'}

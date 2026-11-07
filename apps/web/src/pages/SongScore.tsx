@@ -23,6 +23,7 @@ import {
 import { createScoreSynth, toSynthEvents } from '../lib/synth.ts';
 import { useStems } from '../lib/useStems.ts';
 import { Button } from '../ui/Button.tsx';
+import { rovingKeys } from '../lib/a11y.ts';
 
 const progressLabel = (p: ScoreProgress) =>
   p.stage === 'decode' ? 'Preparando o áudio' : p.stage === 'models' ? 'Baixando o modelo de notas' : `Escutando as notas (${p.done} de ${p.total})`;
@@ -241,7 +242,7 @@ const SongScorePage = ({ id }: { id: string }) => {
       <h1 className="mt-2 text-3xl font-bold tracking-tight">Partitura</h1>
 
       <div className="-mx-4 mt-4 overflow-x-auto px-4">
-        <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="radiogroup" aria-label="Tipo de partitura">
+        <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="radiogroup" onKeyDown={rovingKeys} aria-label="Tipo de partitura">
           {SCORE_TYPES.map((t) => (
             <button
               key={t.type}

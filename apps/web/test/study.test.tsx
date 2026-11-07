@@ -51,3 +51,16 @@ describe('study section', () => {
     expect(screen.getByRole('heading', { name: /Tríades/ })).toBeInTheDocument();
   });
 });
+
+describe('pending fixes: keyboard', () => {
+  it('moves through a radio group with the arrow keys', async () => {
+    open();
+    const c = screen.getByRole('radio', { name: 'C (Dó)' });
+    c.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByRole('radio', { name: 'C# (Dó#)' })).toHaveAttribute('aria-checked', 'true');
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'C# (Dó#)' }));
+    await userEvent.keyboard('{End}');
+    expect(screen.getByRole('radio', { name: 'B (Si)' })).toHaveAttribute('aria-checked', 'true');
+  });
+});

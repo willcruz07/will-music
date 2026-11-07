@@ -7,6 +7,7 @@ import { deleteCachedModel, deleteCachedModels, downloadAllModels, listCachedMod
 import { formatBytes, requestPersistence, storageStatus } from '../lib/storage.ts';
 import { useThemePref } from '../lib/theme.ts';
 import { Button } from '../ui/Button.tsx';
+import { rovingKeys } from '../lib/a11y.ts';
 
 const MODEL_NAMES: Record<string, string> = { chordnet: 'Acordes (ChordMini)', cqtPlan: 'Plano de frequências dos acordes', skey: 'Tom (S-KEY)', kara2Core: 'Separação de faixas (estrutura)', kara2Data: 'Separação de faixas (pesos)', basicPitch: 'Notas da partitura (Basic Pitch)', demucs6s: 'Separação em 4 e 6 faixas (HTDemucs)' };
 
@@ -37,7 +38,7 @@ export const Settings = () => {
       <h1 className="text-3xl font-bold tracking-tight">Ajustes</h1>
 
       <Section title="Tema">
-        <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label="Tema">
+        <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" onKeyDown={rovingKeys} aria-label="Tema">
           {(['light', 'dark', 'system'] as const).map((t) => (
             <button
               key={t}
