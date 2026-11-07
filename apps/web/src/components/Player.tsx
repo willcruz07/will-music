@@ -78,22 +78,68 @@ export const Player = ({ src, sources, onTime, autoScroll = true, onAutoScrollCh
         if (fix !== null) others[i]!.currentTime = fix;
       });
     }
+    lastTime.current = t;
     setTime(t);
     onTime(t);
   };
   const followRef = useRef(follow);
   followRef.current = follow;
 
-  useEffect(() => {
+  // Switching between the original file and the separated tracks reloads the master: keep the
+  // position, speed and play state across the reload.
+  const lastTime = useRef(0);
+  const wasPlaying = useRef(false);
+  wasPlaying.current = playing;
+  const sourceKey = tracks.map((t) => t.src).join('|');
+  const resumeAt = useRef<number | null>(null);
+  const resumePlaying = useRef(false);
+  const previousKey = useRef(sourceKey);
+  if (previousKey.current !== sourceKey) {
+    previousKey.current = sourceKey;
+    resumeAt.current = lastTime.current;
+    resumePlaying.current = wasPlaying.current;
+  }
+
+  const applyRate = () => {
     for (const a of all()) {
       a.preservesPitch = true;
       a.playbackRate = speed / 100;
     }
-  }, [speed, tracks.length]);
+  };
+  useEffect(applyRate, [speed, sourceKey]);
 
   useEffect(() => {
-    all().forEach((a, i) => (a.volume = tracks[i]?.volume ?? 1));
+    all().forEach((a, i) => {
+      const volume = tracks[i]?.volume ?? 1;
+      a.volume = volume;
+      // iOS ignores volume: muting is what silences a track there.
+      a.muted = volume === 0;
+    });
   });
+
+  const onMasterLoaded = (audio: HTMLAudioElement) => {
+    setDuration(audio.duration);
+    if (resumeAt.current === null) return;
+    const t = resumeAt.current;
+    resumeAt.current = null;
+    seekAll(t);
+    applyRate();
+    if (resumePlaying.current) for (const a of all()) void a.play();
+  };
+
+  // Followers mirror the master's pauses and stalls (buffering, audio focus loss, Bluetooth).
+  const mirrorPause = () => {
+    for (const a of followers.current) a?.pause();
+  };
+  const mirrorPlay = () => {
+    const master = audioRef.current;
+    if (!master) return;
+    for (const a of followers.current) {
+      if (!a) continue;
+      a.currentTime = master.currentTime;
+      void a.play();
+    }
+  };
 
   useEffect(() => {
     if (!playing) return;
@@ -122,8 +168,14 @@ export const Player = ({ src, sources, onTime, autoScroll = true, onAutoScrollCh
         src={tracks[0]?.src}
         preload="metadata"
         onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onPlaying={mirrorPlay}
+        onPause={() => {
+          setPlaying(false);
+          mirrorPause();
+        }}
+        onWaiting={mirrorPause}
+        onEmptied={() => setPlaying(false)}
+        onLoadedMetadata={(e) => onMasterLoaded(e.currentTarget)}
         onTimeUpdate={(e) => follow(e.currentTarget.currentTime)}
       />
       {tracks.slice(1).map((t, i) => (

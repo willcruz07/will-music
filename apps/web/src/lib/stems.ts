@@ -1,7 +1,6 @@
 import { SEPARATION_GEOMETRY, modelVersion, toStereoPlanar } from '@will-music/engine';
 import type { SeparationResponse, SeparationTracks } from '../worker/separationProtocol.ts';
 import { type StemsRecord, db, now } from './db.ts';
-import { encodeWav16 } from './wav.ts';
 
 export const NO_WEBGPU = 'A separação de faixas precisa de um navegador com WebGPU (Chrome ou Edge atualizados).';
 
@@ -10,7 +9,8 @@ export type SeparationProgress = { stage: 'models' | 'separate'; done: number; t
 export const decodeForSeparation = async (blob: Blob): Promise<{ planar: Float32Array; samples: number }> => {
   const context = new OfflineAudioContext(2, 1, SEPARATION_GEOMETRY.sampleRate);
   const buffer = await context.decodeAudioData(await blob.arrayBuffer());
-  return toStereoPlanar(Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c).slice()));
+  // toStereoPlanar copies into one planar buffer; the channel views need no extra copy.
+  return toStereoPlanar(Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c)));
 };
 
 export const runSeparationInWorker = (planar: Float32Array, samples: number, onProgress: (p: SeparationProgress) => void): Promise<SeparationTracks> =>
@@ -30,16 +30,28 @@ export const runSeparationInWorker = (planar: Float32Array, samples: number, onP
     worker.postMessage({ type: 'separate', planar, samples }, [planar.buffer]);
   });
 
+type GpuLike = { requestAdapter?: () => Promise<unknown> };
+export const SEM_ESPACO = 'Sem espaço no aparelho para guardar as faixas. Libere espaço ou apague as faixas de outras músicas.';
+
+/** A GPU object is not enough: blocklisted GPUs return no adapter. */
+export const hasUsableWebGpu = async (gpu: GpuLike | undefined): Promise<boolean> => {
+  try {
+    return !!(await gpu?.requestAdapter?.());
+  } catch {
+    return false;
+  }
+};
+
 type Deps = {
-  gpu?: unknown;
+  gpu?: GpuLike;
   decode?: (blob: Blob) => Promise<{ planar: Float32Array; samples: number }>;
   run?: (planar: Float32Array, samples: number, onProgress: (p: SeparationProgress) => void) => Promise<SeparationTracks>;
 };
 
 /** Separates a song into instrumental, lead and backing and stores them together; on failure nothing is written. */
 export const separateSong = async (songId: string, onProgress: (p: SeparationProgress) => void, deps: Deps = {}): Promise<void> => {
-  const gpu = 'gpu' in deps ? deps.gpu : (navigator as Navigator & { gpu?: unknown }).gpu;
-  if (!gpu) throw new Error(NO_WEBGPU);
+  const gpu = 'gpu' in deps ? deps.gpu : (navigator as Navigator & { gpu?: GpuLike }).gpu;
+  if (!(await hasUsableWebGpu(gpu))) throw new Error(NO_WEBGPU);
   const audio = await db.audio.get(songId);
   if (!audio) throw new Error('Esta música não tem áudio para separar.');
   const { planar, samples } = await (deps.decode ?? decodeForSeparation)(audio.blob);
@@ -50,13 +62,18 @@ export const separateSong = async (songId: string, onProgress: (p: SeparationPro
     model: modelVersion('kara2Core'),
     sampleRate: rate,
     tracks: [
-      { name: 'instrumental', blob: encodeWav16(tracks.instrumental, 2, rate) },
-      { name: 'lead', blob: encodeWav16(tracks.lead, 2, rate) },
-      { name: 'backing', blob: encodeWav16(tracks.backing, 2, rate) },
+      { name: 'instrumental', blob: new Blob([tracks.instrumental], { type: 'audio/wav' }) },
+      { name: 'lead', blob: new Blob([tracks.lead], { type: 'audio/wav' }) },
+      { name: 'backing', blob: new Blob([tracks.backing], { type: 'audio/wav' }) },
     ],
     createdAt: now(),
   };
-  await db.stems.put(record);
+  try {
+    await db.stems.put(record);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'QuotaExceededError') throw new Error(SEM_ESPACO);
+    throw error;
+  }
 };
 
 export const getStems = (songId: string): Promise<StemsRecord | undefined> => db.stems.get(songId);

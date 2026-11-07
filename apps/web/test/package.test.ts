@@ -101,3 +101,13 @@ describe('review fixes: packages', () => {
     expect(await db.setlists.count()).toBe(4);
   });
 });
+
+describe('review fixes: package replace and stems', () => {
+  it('drops old stems when a song is replaced', async () => {
+    const song = await seed();
+    const zip = await exportSongs([song.id], { includeAudio: false, kind: 'song' });
+    await db.stems.put({ songId: song.id, model: 'x', sampleRate: 44100, tracks: [], createdAt: '' });
+    await importPackage(await readPackage(zip), async () => 'replace');
+    expect(await db.stems.get(song.id)).toBeUndefined();
+  });
+});

@@ -31,4 +31,9 @@ export const transcriptToLines = (chunks: readonly WhisperChunk[]): LyricLine[] 
   return lines;
 };
 
-export const isUsefulTranscript = (lines: readonly LyricLine[]): boolean => lines.filter((l) => /\p{L}/u.test(l.text)).length >= 3;
+/** Needs 3+ distinct lines with letters, mostly not repeats (Whisper repeats phrases like "Obrigado." over instrumentals). */
+export const isUsefulTranscript = (lines: readonly LyricLine[]): boolean => {
+  const texts = lines.map((l) => l.text.toLowerCase().replace(/[^\p{L}\s]/gu, '').trim()).filter(Boolean);
+  const distinct = new Set(texts);
+  return distinct.size >= 3 && distinct.size / texts.length >= 0.5;
+};

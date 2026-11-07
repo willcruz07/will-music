@@ -22,3 +22,10 @@ describe('whisper transcript', () => {
     expect(isUsefulTranscript([{ start: 0, text: 'um' }, { start: 1, text: 'dois' }, { start: 2, text: 'três' }])).toBe(true);
   });
 });
+
+describe('review fixes: whisper hallucinations', () => {
+  it('rejects transcripts made of a repeated phrase', () => {
+    const lines = Array.from({ length: 6 }, (_, i) => ({ start: i * 30, text: i % 2 ? 'Obrigado.' : 'Legendas pela comunidade Amara.org' }));
+    expect(isUsefulTranscript(lines)).toBe(false);
+  });
+});

@@ -7,5 +7,6 @@ export const mixVolumes = (tracks: readonly MixTrack[]): Record<string, number> 
 };
 
 /** New currentTime for tracks that drifted from the master by more than `tolerance` seconds, else null. */
-export const driftCorrections = (masterTime: number, others: readonly number[], tolerance = 0.04): (number | null)[] =>
+// 150 ms: tighter seeks would click repeatedly at 50–150% speed.
+export const driftCorrections = (masterTime: number, others: readonly number[], tolerance = 0.15): (number | null)[] =>
   others.map((t) => (Math.abs(t - masterTime) > tolerance ? masterTime : null));

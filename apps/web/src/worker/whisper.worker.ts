@@ -13,10 +13,12 @@ const post = (m: WhisperResponse) => (self as DedicatedWorkerGlobalScope).postMe
 self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
   if (event.data.type !== 'transcribe') return;
   try {
-    const device = (navigator as Navigator & { gpu?: unknown }).gpu ? 'webgpu' : 'wasm';
+    // A GPU object is not enough (blocklisted GPUs return no adapter); fall back to wasm on any WebGPU failure.
+    const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
+    let device: 'webgpu' | 'wasm' = (await gpu?.requestAdapter().catch(() => null)) ? 'webgpu' : 'wasm';
     const files = new Map<string, { loaded: number; total: number }>();
-    const asr = await pipeline('automatic-speech-recognition', 'onnx-community/whisper-small_timestamped', {
-      device,
+    const load = (dev: 'webgpu' | 'wasm') => pipeline('automatic-speech-recognition', 'onnx-community/whisper-small_timestamped', {
+      device: dev,
       dtype: { encoder_model: 'q4', decoder_model_merged: 'q4' },
       progress_callback: (p: { status: string; file?: string; loaded?: number; total?: number }) => {
         if (p.status !== 'progress' || !p.file) return;
@@ -30,6 +32,14 @@ self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
         post({ type: 'progress', loaded, total });
       },
     });
+    let asr;
+    try {
+      asr = await load(device);
+    } catch (error) {
+      if (device !== 'webgpu') throw error;
+      device = 'wasm';
+      asr = await load(device);
+    }
     const output = (await asr(event.data.audio, {
       language: 'portuguese',
       task: 'transcribe',

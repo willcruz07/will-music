@@ -28,8 +28,9 @@ export const sliceChunk = (planar: Float32Array, totalSamples: number, start: nu
  * weighted average, so an identity model reproduces the input exactly.
  */
 export const createStemAccumulator = (totalSamples: number, stems: number, channels = 2) => {
-  const sums = Array.from({ length: stems }, () => new Float64Array(channels * totalSamples));
-  const weights = new Float64Array(totalSamples);
+  // Float32 keeps a 5-minute song within a phone's memory (Float64 doubled every buffer).
+  const sums = Array.from({ length: stems }, () => new Float32Array(channels * totalSamples));
+  const weights = new Float32Array(totalSamples);
   return {
     add(index: number, plan: ChunkPlan, outputs: Float32Array[]) {
       const { start, length } = plan[index]!;
@@ -48,24 +49,30 @@ export const createStemAccumulator = (totalSamples: number, stems: number, chann
         }
       }
     },
+    /** Normalizes in place and returns the accumulation buffers themselves (no copies). */
     finish(): Float32Array[] {
-      return sums.map((sum) => {
-        const out = new Float32Array(sum.length);
-        for (let i = 0; i < sum.length; i++) out[i] = sum[i]! / Math.max(weights[i % totalSamples]!, 1e-12);
-        return out;
-      });
+      for (const sum of sums) for (let i = 0; i < sum.length; i++) sum[i] = sum[i]! / Math.max(weights[i % totalSamples]!, 1e-12);
+      return sums;
     },
   };
 };
 
+/** In place: the mix buffer becomes the instrumental and the vocals buffer becomes the lead vocals. */
 export const deriveStems = (mix: Float32Array, vocals: Float32Array, backing: Float32Array) => {
-  const instrumental = new Float32Array(mix.length);
-  const lead = new Float32Array(mix.length);
   for (let i = 0; i < mix.length; i++) {
-    instrumental[i] = mix[i]! - vocals[i]!;
-    lead[i] = vocals[i]! - backing[i]!;
+    mix[i] = mix[i]! - vocals[i]!;
+    vocals[i] = vocals[i]! - backing[i]!;
   }
-  return { instrumental, lead, backing };
+  return { instrumental: mix, lead: vocals, backing };
+};
+
+/** Scales every track by the same factor when any peak exceeds max (keeps the mix balance, avoids clipping). */
+export const limitPeak = (tracks: Float32Array[], max = 0.99): void => {
+  let peak = 0;
+  for (const t of tracks) for (const v of t) peak = Math.max(peak, Math.abs(v));
+  if (peak <= max) return;
+  const scale = max / peak;
+  for (const t of tracks) for (let i = 0; i < t.length; i++) t[i] = t[i]! * scale;
 };
 
 /** Decoded channels → planar stereo (mono is duplicated; extra channels are dropped). */

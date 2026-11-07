@@ -23,7 +23,7 @@ export const TranscribeLyrics = ({ songId, hasStems, onApply }: { songId: string
         onClick={() => {
           setBusy(true);
           setStatus('Preparando o áudio');
-          void transcribeSong(songId, (loaded, total) => setStatus(total ? `Baixando o Whisper (${Math.round(loaded / 1e6)} MB de ${Math.round(total / 1e6)} MB)` : 'Transcrevendo…'))
+          void transcribeSong(songId, (loaded, total) => setStatus(total && loaded < total ? `Baixando o Whisper (${Math.round(loaded / 1e6)} MB de ${Math.round(total / 1e6)} MB)` : 'Transcrevendo… pode levar alguns minutos.'))
             .then(({ lines }) => {
               setStatus(null);
               onApply({ source: 'manual', lines });

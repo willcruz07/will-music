@@ -1,5 +1,5 @@
 /** Planar float audio → 16-bit PCM WAV (clipped to ±1). */
-export const encodeWav16 = (planar: Float32Array, channels: number, sampleRate: number): Blob => {
+export const encodeWav16Buffer = (planar: Float32Array, channels: number, sampleRate: number): ArrayBuffer => {
   const samples = planar.length / channels;
   const dataBytes = samples * channels * 2;
   const buffer = new ArrayBuffer(44 + dataBytes);
@@ -26,5 +26,8 @@ export const encodeWav16 = (planar: Float32Array, channels: number, sampleRate: 
       o += 2;
     }
   }
-  return new Blob([buffer], { type: 'audio/wav' });
+  return buffer;
 };
+
+export const encodeWav16 = (planar: Float32Array, channels: number, sampleRate: number): Blob =>
+  new Blob([encodeWav16Buffer(planar, channels, sampleRate)], { type: 'audio/wav' });
