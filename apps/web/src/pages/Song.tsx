@@ -19,6 +19,7 @@ import { AddToSetlist } from '../components/AddToSetlist.tsx';
 import { ExportButton } from '../components/PackageButtons.tsx';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
 import { TracksSection } from '../components/TracksSection.tsx';
+import { TranscribeLyrics } from '../components/TranscribeLyrics.tsx';
 import { useStems } from '../lib/useStems.ts';
 import { ChordPanel, readInstrument } from '../components/ChordPanel.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
@@ -270,17 +271,31 @@ export const Song = () => {
         <p className="mt-4 text-sm text-muted-foreground">Não encontramos a letra desta música. A cifra mostra só os acordes; busque ou cole a letra abaixo.</p>
       )}
       {!progress && analysis && (showLyrics || !analysis.lyrics) && (
-        <LyricsPanel
-          title={song.title}
-          artist={song.artist}
-          durationSec={song.durationSec}
-          onApply={(lyrics) =>
-            void applyLyrics(song.id, lyrics).then(async () => {
-              setShowLyrics(false);
-              await load();
-            })
-          }
-        />
+        <>
+          <LyricsPanel
+            title={song.title}
+            artist={song.artist}
+            durationSec={song.durationSec}
+            onApply={(lyrics) =>
+              void applyLyrics(song.id, lyrics).then(async () => {
+                setShowLyrics(false);
+                await load();
+              })
+            }
+          />
+          {audioUrl && (
+            <TranscribeLyrics
+              songId={song.id}
+              hasStems={stems.hasStems}
+              onApply={(lyrics) =>
+                void applyLyrics(song.id, lyrics).then(async () => {
+                  setShowLyrics(false);
+                  await load();
+                })
+              }
+            />
+          )}
+        </>
       )}
 
       {syncing && (
