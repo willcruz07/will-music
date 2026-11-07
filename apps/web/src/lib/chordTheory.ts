@@ -151,9 +151,22 @@ const HARMONIC_MINOR_FIELD = [
 
 export type FieldMode = 'major' | 'minor' | 'harmonicMinor';
 
-/** The seven chords built on each degree of the key (triads and four-note chords). */
-export const harmonicField = (root: string, mode: FieldMode): { roman: string; triad: string; tetrad: string; note: string }[] => {
+/**
+ * Roman numeral of the four-note chord: the triad's numeral plus its seventh. The triad on vii is
+ * diminished (vii°), but with its seventh it is half-diminished (viiø7, m7(b5)), not a diminished seventh.
+ */
+const tetradNumeral = (roman: string, t4: string): string => {
+  const base = roman.replace(/[°+]$/u, '');
+  if (t4 === 'm7(b5)') return `${base}ø7`;
+  if (t4 === '°7') return `${base}°7`;
+  if (t4 === '7M' || t4 === '7M(#5)') return `${base}${t4 === '7M(#5)' ? '+' : ''}7M`;
+  if (t4 === 'm(7M)') return `${base}(7M)`;
+  return `${base}7`;
+};
+
+/** The seven chords built on each degree of the key (triads and four-note chords, each with its numeral). */
+export const harmonicField = (root: string, mode: FieldMode): { roman: string; tetradRoman: string; triad: string; tetrad: string; note: string }[] => {
   const notes = scaleNotes(root, mode);
   const field = mode === 'major' ? MAJOR_FIELD : mode === 'minor' ? MINOR_FIELD : HARMONIC_MINOR_FIELD;
-  return field.map(([roman, t3, t4], i) => ({ roman, note: notes[i]!, triad: `${notes[i]}${t3}`, tetrad: `${notes[i]}${t4}` }));
+  return field.map(([roman, t3, t4], i) => ({ roman, tetradRoman: tetradNumeral(roman, t4), note: notes[i]!, triad: `${notes[i]}${t3}`, tetrad: `${notes[i]}${t4}` }));
 };

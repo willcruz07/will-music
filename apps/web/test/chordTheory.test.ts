@@ -77,3 +77,13 @@ describe('pending fixes: theory', () => {
     expect(scaleNotes('G#', 'minor')).toEqual(['G#', 'A#', 'B', 'C#', 'D#', 'E', 'F#']);
   });
 });
+
+describe('fix: half-diminished seventh degree', () => {
+  it('names the four-note chord of the seventh degree as half-diminished (viiø7)', () => {
+    const vii = harmonicField('C', 'major')[6]!;
+    expect(vii).toMatchObject({ roman: 'vii°', triad: 'B°', tetrad: 'Bm7(b5)', tetradRoman: 'viiø7' });
+    expect(harmonicField('A', 'minor')[1]!.tetradRoman).toBe('iiø7');
+    expect(harmonicField('A', 'harmonicMinor')[6]!.tetradRoman).toBe('vii°7');
+    expect(harmonicField('C', 'major')[4]!.tetradRoman).toBe('V7');
+  });
+});

@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, Mic } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { useRevealSelected } from '../lib/reveal.ts';
+import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { Link, useSearchParams } from 'react-router';
 import { ChordDiagram, type Instrument } from '../components/ChordDiagram.tsx';
 import { InstrumentToggle, readInstrument } from '../components/ChordPanel.tsx';
@@ -362,11 +362,14 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
         <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2" aria-label="Campo harmônico">
           {field.map((d) => (
             <li key={d.roman} className="rounded-xl border border-border p-3 text-center">
-              <span className="block text-xs text-muted-foreground">{d.roman}</span>
-              <button type="button" onClick={() => onChord(d.triad)} className="font-[family-name:var(--font-display)] text-2xl font-semibold text-chord hover:underline">
+              <span className="block text-xs text-muted-foreground">Tríade · {d.roman}</span>
+              <button type="button" aria-label={`Tríade ${d.triad}`} onClick={() => onChord(d.triad)} className="font-[family-name:var(--font-display)] text-2xl font-semibold text-chord hover:underline">
                 {d.triad}
               </button>
-              <span className="block text-xs text-muted-foreground">{d.tetrad}</span>
+              <span className="mt-2 block border-t border-border pt-2 text-xs text-muted-foreground">Tétrade · {d.tetradRoman}</span>
+              <button type="button" aria-label={`Tétrade ${d.tetrad}`} onClick={() => onChord(d.tetrad)} className="text-sm font-semibold text-chord hover:underline">
+                {d.tetrad}
+              </button>
             </li>
           ))}
         </ul>
@@ -404,8 +407,6 @@ export const StudyPage = () => {
   const [tab, setTab] = useState<Tab>('chords');
   const [chordKey, setChordKey] = useState(0);
   const [initial, setInitial] = useState(asked);
-  const tabStrip = useRef<HTMLDivElement>(null);
-  useRevealSelected(tabStrip, tab);
 
   const openChord = (chord: string) => {
     setInitial(parseChord(chord));
@@ -424,8 +425,7 @@ export const StudyPage = () => {
         </Link>
       </div>
       <p className="mt-2 max-w-2xl text-muted-foreground">Todos os acordes no violão, no teclado e no cavaquinho, como eles são formados, as escalas e o campo harmônico de cada tom.</p>
-      <div ref={tabStrip} className="no-scrollbar -mx-4 mt-4 overflow-x-auto px-4">
-        <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="tablist" onKeyDown={rovingKeys} aria-label="Assunto">
+      <ScrollStrip className="mt-4" role="tablist" label="Assunto" selected={tab} onKeyDown={rovingKeys} innerClassName="rounded-xl border border-border bg-surface p-1">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -438,8 +438,7 @@ export const StudyPage = () => {
               {t.label}
             </button>
           ))}
-        </div>
-      </div>
+      </ScrollStrip>
       {tab === 'chords' && <ChordsTab key={chordKey} initial={initial} />}
       {tab === 'theory' && <TheoryTab />}
       {tab === 'scales' && <ScalesTab onChord={openChord} />}

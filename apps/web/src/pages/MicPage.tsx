@@ -1,5 +1,6 @@
 import { detectPitch, midiName, voiceType } from '@will-music/engine';
 import { Mic, MicOff, RotateCcw } from 'lucide-react';
+import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { useEffect, useRef, useState } from 'react';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
 import { readInstrument } from '../components/ChordPanel.tsx';
@@ -261,7 +262,7 @@ export const MicPage = () => {
         </p>
       )}
 
-      <div className="mt-4 inline-flex rounded-xl border border-border bg-surface p-1" role="tablist" onKeyDown={rovingKeys} aria-label="Ferramenta">
+      <ScrollStrip className="mt-4" role="tablist" label="Ferramenta" selected={tab} onKeyDown={rovingKeys} innerClassName="rounded-xl border border-border bg-surface p-1">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -274,7 +275,7 @@ export const MicPage = () => {
             {t.label}
           </button>
         ))}
-      </div>
+      </ScrollStrip>
 
       {tab === 'tuner' && (
         <div className="mt-6">

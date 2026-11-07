@@ -1,5 +1,6 @@
 import { ArrowLeft, Download, Music4, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { Link, useParams } from 'react-router';
 import { Player, type PlayerControls } from '../components/Player.tsx';
 import { ScoreView } from '../components/ScoreView.tsx';
@@ -22,7 +23,6 @@ import {
 } from '../lib/score.ts';
 import { createScoreSynth, toSynthEvents } from '../lib/synth.ts';
 import { useStems } from '../lib/useStems.ts';
-import { useRevealSelected } from '../lib/reveal.ts';
 import { Button } from '../ui/Button.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
 
@@ -79,8 +79,6 @@ const SongScorePage = ({ id }: { id: string }) => {
   const lyricSink = useRef<((t: number) => void) | null>(null);
   const synth = useRef<ReturnType<typeof createScoreSynth> | null>(null);
   const player = useRef<PlayerControls | null>(null);
-  const typeStrip = useRef<HTMLDivElement>(null);
-  useRevealSelected(typeStrip, `${type}:${song ? 1 : 0}`);
   const stems = useStems(id, audioUrl);
 
   useEffect(() => {
@@ -244,8 +242,7 @@ const SongScorePage = ({ id }: { id: string }) => {
       </Link>
       <h1 className="mt-2 text-3xl font-bold tracking-tight">Partitura</h1>
 
-      <div ref={typeStrip} className="no-scrollbar -mx-4 mt-4 overflow-x-auto px-4">
-        <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="radiogroup" onKeyDown={rovingKeys} aria-label="Tipo de partitura">
+      <ScrollStrip className="mt-4" role="radiogroup" label="Tipo de partitura" selected={`${type}:${song ? 1 : 0}`} onKeyDown={rovingKeys} innerClassName="rounded-xl border border-border bg-surface p-1">
           {SCORE_TYPES.map((t) => (
             <button
               key={t.type}
@@ -259,8 +256,7 @@ const SongScorePage = ({ id }: { id: string }) => {
               {hasScoreType(score, t.type) && type !== t.type && <span className="ml-1.5 inline-block size-1.5 rounded-full bg-primary align-middle" aria-label="pronta" />}
             </button>
           ))}
-        </div>
-      </div>
+      </ScrollStrip>
       <p className="mt-2 text-sm text-muted-foreground">{info.hint}</p>
 
       {!ready && (
