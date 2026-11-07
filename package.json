@@ -4,11 +4,13 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "tools/*"
+    "tools/*",
+    "apps/*"
   ],
   "scripts": {
     "test": "npm test --workspaces --if-present",
-    "typecheck": "tsc -p packages/engine && tsc -p tools/phase0"
+    "typecheck": "tsc -p packages/engine && tsc -p tools/phase0 && tsc -p apps/web",
+    "dev": "npm run dev -w @will-music/web"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
