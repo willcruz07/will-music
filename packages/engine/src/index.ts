@@ -14,3 +14,7 @@ export * from './separation/stft.ts';
 export * from './separation/chunks.ts';
 export * from './score/basicPitch.ts';
 export * from './score/notes.ts';
+export * from './score/tempo.ts';
+export * from './score/quantize.ts';
+export * from './score/tab.ts';
+export * from './score/musicxml.ts';
