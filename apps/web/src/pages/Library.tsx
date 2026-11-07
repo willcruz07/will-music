@@ -74,8 +74,8 @@ export const Library = () => {
       <ul className="mt-4 divide-y divide-border">
         {visible.map((song) => (
           <li key={song.id}>
-            <Link to={`/musica/${song.id}`} className="-mx-3 flex items-center gap-4 rounded-lg px-3 py-4 hover:bg-muted">
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-lg font-bold text-chord">
+            <Link to={`/musica/${song.id}`} className="-mx-3 flex items-center gap-4 rounded-xl px-3 py-3.5 transition-colors hover:bg-surface-2 active:bg-surface-2">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 font-[family-name:var(--font-display)] text-base font-semibold text-chord">
                 {song.key ?? '–'}
               </span>
               <span className="min-w-0 flex-1">

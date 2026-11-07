@@ -162,7 +162,7 @@ export const Player = ({ src, sources, onTime, autoScroll = true, onAutoScrollCh
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+    <div className="glass fixed inset-x-3 z-30 rounded-2xl border border-border shadow-[0_12px_40px_-16px_rgb(0_0_0/0.45)] bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+1.25rem)] md:inset-x-0 md:bottom-0 md:rounded-none md:border-x-0 md:border-b-0 md:pb-[env(safe-area-inset-bottom)]">
       <audio
         ref={audioRef}
         src={tracks[0]?.src}

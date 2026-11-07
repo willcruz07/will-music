@@ -200,7 +200,7 @@ export const Song = () => {
       )}
 
       {chart && (
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-y border-border py-2">
+        <div className="-mx-4 mt-5 flex items-center gap-2 overflow-x-auto border-y border-border px-4 py-2 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&>*]:shrink-0">
           <span className="text-sm text-muted-foreground">Transpor</span>
           <IconButton label="Meio tom abaixo" onClick={() => void saveChart({ transpose: chart.transpose - 1 })}>
             <Minus className="size-4" />
@@ -330,7 +330,7 @@ export const Song = () => {
       {chart && !progress && <ChordPanel chordPro={chart.chordPro} transpose={chart.transpose} spellKey={shownKey} />}
 
       {audioUrl && currentRaw && showCurrent && (
-        <div className="fixed bottom-24 right-4 z-30 rounded-lg border border-border bg-surface p-3 shadow-sm">
+        <div className="glass fixed right-4 z-30 rounded-xl border border-border p-3 shadow-sm bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+9rem)] md:bottom-28">
           <button type="button" onClick={() => setShowCurrent(false)} className="absolute right-1 top-1 rounded px-1 text-xs text-muted-foreground hover:bg-muted" aria-label="Esconder acorde atual">
             ×
           </button>
@@ -341,6 +341,7 @@ export const Song = () => {
       {audioUrl && !progress && <TracksSection stems={stems} />}
 
       {stems.sources && <Player sources={stems.sources} onTime={onTime} autoScroll={autoScroll} onAutoScrollChange={setAutoScroll} controls={player} />}
+      {stems.sources && <div className="h-32 md:h-24" aria-hidden />}
     </section>
   );
 };
