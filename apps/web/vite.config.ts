@@ -47,6 +47,8 @@ export default defineConfig({
       },
     }),
   ],
+  // Hosts that look for the build in a fixed folder (Vercel) pass it as an absolute path.
+  build: process.env.WM_OUT_DIR ? { outDir: process.env.WM_OUT_DIR, emptyOutDir: true } : {},
   optimizeDeps: { exclude: ['onnxruntime-web'] },
   worker: { format: 'es' },
   test: { environment: 'jsdom', setupFiles: ['./test/setup.ts'] },
