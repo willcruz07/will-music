@@ -6,6 +6,7 @@ import { StudyPage } from '../src/pages/StudyPage.tsx';
 import { LessonPage, StudyHome, TrackPage } from '../src/pages/StudyHome.tsx';
 import { trackLessons } from '../src/study/catalog.ts';
 import { IntervalTrainer } from '../src/study/tools.tsx';
+import { choose } from './choose.ts';
 
 const Where = () => <output data-testid="where">{useLocation().pathname + useLocation().search}</output>;
 
@@ -84,7 +85,7 @@ describe('lesson page', () => {
   it('shows a progression in the chosen key', async () => {
     open('/estudo/aula/h-251');
     const select = screen.getAllByLabelText('Tom')[0]!;
-    await userEvent.selectOptions(select, 'C');
+    await choose(select, 'C');
     expect(screen.getAllByRole('button', { name: 'Como tocar Dm7' }).length).toBeGreaterThan(0);
   });
 
@@ -116,7 +117,7 @@ describe('study tools', () => {
 
   it('shows any scale on the fretboard', async () => {
     open('/estudo/ferramentas?aba=braco');
-    await userEvent.selectOptions(screen.getByLabelText('Escala'), 'hirajoshi');
+    await choose('Escala', /Hirajoshi/u);
     expect(screen.getByText('C · D · Eb · G · Ab')).toBeInTheDocument();
   });
 

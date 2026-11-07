@@ -8,6 +8,7 @@ import { type Setlist, type SetlistItem, type Song, db, listSongs } from '../lib
 import { deleteSetlist, keyOptions, moveItem, updateSetlist } from '../lib/setlists.ts';
 import { ExportButton } from '../components/PackageButtons.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
+import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 const fold = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
@@ -29,19 +30,13 @@ const ItemRow = ({ row, count, onChange, onMove, onRemove }: { row: Row; count: 
       {row.song?.key && (
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Tom</span>
-          <select
-            aria-label={`Tom de ${title}`}
+          <SheetSelect
+            label={`Tom de ${title}`}
             value={row.item.targetKey ?? ''}
-            onChange={(e) => onChange({ targetKey: e.target.value || undefined })}
-            className="h-10 rounded-lg border border-border bg-surface px-2 font-bold text-chord"
-          >
-            <option value="">{row.song.key} (original)</option>
-            {keyOptions(row.song.key).slice(1).map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onChange({ targetKey: v || undefined })}
+            valueClassName="font-bold text-chord"
+            options={[{ value: '', label: `${row.song.key} (original)` }, ...keyOptions(row.song.key).slice(1).map((k) => ({ value: k, label: k }))]}
+          />
         </label>
       )}
       <input

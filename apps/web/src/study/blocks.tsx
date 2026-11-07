@@ -5,6 +5,7 @@ import { KEYS, SOLFEGE, pcOf, spellNote } from '../lib/chordTheory.ts';
 import { SCALE_LIBRARY, boxTab, fretboardBox, firstBoxFret, rhythmEvents, romanToChord, spellScale, tabEvents } from './theory.ts';
 import type { Block } from './types.ts';
 import { Fretboard, PlayButton, ScaleKeyboard, chordEvents, useStudySynth } from './widgets.tsx';
+import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 /** **bold** and *italic* inside lesson text. */
 export const Rich = ({ text }: { text: string }) => (
@@ -49,17 +50,13 @@ const Card = ({ children, title }: { children: ReactNode; title?: string }) => (
   </figure>
 );
 
+const solfege = (k: string) => `${SOLFEGE[k[0]!]}${k.length > 1 ? (k[1] === 'b' ? '♭' : '♯') : ''}`;
+
 const KeySelect = ({ value, onChange, label = 'Tom' }: { value: string; onChange: (k: string) => void; label?: string }) => (
-  <label className="inline-flex items-center gap-2 text-sm">
-    {label}
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="h-9 rounded-lg border border-border bg-background px-2" aria-label={label}>
-      {KEYS.map((k) => (
-        <option key={k} value={k}>
-          {k}
-        </option>
-      ))}
-    </select>
-  </label>
+  <span className="inline-flex items-center gap-2 text-sm">
+    <span aria-hidden>{label}</span>
+    <SheetSelect label={label} value={value} onChange={onChange} options={KEYS.map((k) => ({ value: k, label: k, hint: solfege(k) }))} className="h-9 min-w-16 font-semibold" />
+  </span>
 );
 
 type Synth = ReturnType<typeof useStudySynth>;
@@ -121,7 +118,7 @@ const ScaleBlock = ({ block, id, synth }: { block: Extract<Block, { kind: 'scale
       <p className="mt-3 text-xs text-muted-foreground">No braço (a tônica em verde; o quadro mostra uma posição para começar):</p>
       <Fretboard pcs={pcs} root={rootPc} box={start} />
       <p className="mt-3 text-xs text-muted-foreground">Digitação da posição em tablatura, da corda mais grave para a mais aguda:</p>
-      <pre className="no-scrollbar mt-1 overflow-x-auto rounded-lg bg-background p-3 font-mono text-xs leading-5">{tabText}</pre>
+      <pre className="thin-scrollbar mt-1 overflow-x-auto rounded-lg bg-background p-3 font-mono text-xs leading-5">{tabText}</pre>
       {block.caption && (
         <p className="mt-2 text-sm text-muted-foreground">
           <Rich text={block.caption} />
@@ -175,7 +172,7 @@ const RhythmBlock = ({ block, id, synth }: { block: Extract<Block, { kind: 'rhyt
         <PlayButton active={synth.playing === id} onClick={() => synth.play(id, rhythmEvents(p, 4))} label={block.caption ?? 'ritmo'} />
         <span className="text-sm text-muted-foreground">{p.bpm} BPM</span>
       </div>
-      <div className="no-scrollbar mt-3 overflow-x-auto">
+      <div className="thin-scrollbar mt-3 overflow-x-auto">
         <table className="text-xs">
           <tbody>
             {p.tracks.map((t, r) => (
@@ -262,7 +259,7 @@ export const LessonBlocks = ({ blocks, lessonId }: { blocks: Block[]; lessonId: 
             return (
               <Card key={i} title={b.caption}>
                 <PlayButton active={synth.playing === id} onClick={() => synth.play(id, tabEvents(b.tab, b.bpm ?? 90))} label={b.caption ?? 'frase'} />
-                <pre className="no-scrollbar mt-3 overflow-x-auto rounded-lg bg-background p-3 font-mono text-xs leading-5">{b.tab}</pre>
+                <pre className="thin-scrollbar mt-3 overflow-x-auto rounded-lg bg-background p-3 font-mono text-xs leading-5">{b.tab}</pre>
               </Card>
             );
           case 'exercise':

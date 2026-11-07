@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { StudyPage } from '../src/pages/StudyPage.tsx';
+import { choose } from './choose.ts';
 
 const open = (url = '/estudo') =>
   render(
@@ -38,7 +39,7 @@ describe('study section', () => {
   it('builds the harmonic field of the chosen key', async () => {
     open();
     await userEvent.click(screen.getByRole('tab', { name: 'Escalas e campo harmônico' }));
-    await userEvent.selectOptions(screen.getByLabelText('Tom'), 'G');
+    await choose('Tom', 'G');
     const field = screen.getByRole('list', { name: 'Campo harmônico' });
     expect(within(field).getAllByRole('button', { name: /^Tríade/ }).map((b) => b.textContent)).toEqual(['G', 'Am', 'Bm', 'C', 'D', 'Em', 'F#°']);
     expect(within(field).getByRole('button', { name: 'Tétrade F#m7(b5)' })).toBeInTheDocument();

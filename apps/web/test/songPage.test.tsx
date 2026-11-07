@@ -25,3 +25,18 @@ describe('song page without audio', () => {
     expect(screen.queryByRole('button', { name: 'Tocar' })).toBeNull();
   });
 });
+
+describe('song page toolbar on mobile', () => {
+  it('is a sideways strip, so every tool can be reached on a narrow screen', async () => {
+    const song = await createManualSong('Hino', '');
+    render(
+      <MemoryRouter initialEntries={[`/musica/${song.id}`]}>
+        <Routes>
+          <Route path="/musica/:id" element={<Song />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const toolbar = await screen.findByRole('toolbar', { name: 'Ferramentas da música' });
+    expect(toolbar.closest('[data-testid="scroll-strip"]')).not.toBeNull();
+  });
+});

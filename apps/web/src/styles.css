@@ -192,3 +192,40 @@ h1 {
     animation: none !important;
   }
 }
+
+/* Bottom sheet (SheetSelect): the page dims and blurs, the panel slides up from the bottom. */
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+.sheet-backdrop {
+  animation: sheet-fade 200ms ease-out;
+}
+.sheet-panel {
+  animation: sheet-up 280ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-backdrop,
+  .sheet-panel {
+    animation: none;
+  }
+}
+
+/* Wide content (fretboard, tab, rhythm grid) that scrolls sideways keeps a slim visible bar as the cue. */
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent) transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  height: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+}
