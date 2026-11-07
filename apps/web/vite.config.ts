@@ -2,9 +2,12 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
+import { fileURLToPath } from 'node:url';
 
 
 export default defineConfig({
+  // Fixed root, so the app also starts when Vite is launched from the repository root (see ../../vite.config.ts).
+  root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [
     react(),
     tailwindcss(),
