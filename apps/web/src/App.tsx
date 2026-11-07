@@ -22,6 +22,9 @@ const SongScore = named(() => import('./pages/SongScore.tsx'), 'SongScore');
 const FolderPage = named(() => import('./pages/FolderPage.tsx'), 'FolderPage');
 const StoragePage = named(() => import('./pages/StoragePage.tsx'), 'StoragePage');
 const StudyPage = named(() => import('./pages/StudyPage.tsx'), 'StudyPage');
+const StudyHome = named(() => import('./pages/StudyHome.tsx'), 'StudyHome');
+const TrackPage = named(() => import('./pages/StudyHome.tsx'), 'TrackPage');
+const LessonPage = named(() => import('./pages/StudyHome.tsx'), 'LessonPage');
 const MicPage = named(() => import('./pages/MicPage.tsx'), 'MicPage');
 const Stage = named(() => import('./pages/Stage.tsx'), 'Stage');
 
@@ -81,7 +84,10 @@ const Layout = () => {
           <Route path="/partituras" element={<Scores />} />
           <Route path="/pasta" element={<FolderPage />} />
           <Route path="/microfone" element={<MicPage />} />
-          <Route path="/estudo" element={<StudyPage />} />
+          <Route path="/estudo" element={<StudyHome />} />
+          <Route path="/estudo/ferramentas" element={<StudyPage />} />
+          <Route path="/estudo/trilha/:id" element={<TrackPage />} />
+          <Route path="/estudo/aula/:id" element={<LessonPage />} />
           <Route path="/armazenamento" element={<StoragePage />} />
           <Route path="/listas" element={<Setlists />} />
           <Route path="/listas/:id" element={<SetlistEdit />} />

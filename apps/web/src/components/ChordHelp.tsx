@@ -87,7 +87,7 @@ export const ChordHelp = ({ chord, anchor, onClose }: { chord: string; anchor?: 
           </button>
         </div>
       )}
-      <Link to={`/estudo?acorde=${encodeURIComponent(chord)}`} className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-chord underline-offset-2 hover:underline">
+      <Link to={`/estudo/ferramentas?acorde=${encodeURIComponent(chord)}`} className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-chord underline-offset-2 hover:underline">
         <GraduationCap className="size-4" /> Entender este acorde
       </Link>
     </div>

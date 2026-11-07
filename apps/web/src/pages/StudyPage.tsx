@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Mic } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Mic } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { Link, useSearchParams } from 'react-router';
@@ -6,12 +6,18 @@ import { ChordDiagram, type Instrument } from '../components/ChordDiagram.tsx';
 import { InstrumentToggle, readInstrument } from '../components/ChordPanel.tsx';
 import { CHORD_TYPES, INTERVAL_NAMES, KEYS, ROOTS, SCALES, type ScaleKind, SOLFEGE, chordFormation, harmonicField, pcOf, scaleNotes } from '../lib/chordTheory.ts';
 import { rovingKeys } from '../lib/a11y.ts';
+import { CircleOfFifths, IntervalTrainer, ProgressionCatalog, ScaleExplorer } from '../study/tools.tsx';
 
-type Tab = 'chords' | 'theory' | 'scales';
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'chords', label: 'Acordes' },
-  { id: 'theory', label: 'Formação' },
-  { id: 'scales', label: 'Escalas e campo harmônico' },
+type Tab = 'chords' | 'theory' | 'scales' | 'circle' | 'progressions' | 'fretboard' | 'ear';
+/** The tabs, with the name each one has in links (?aba=). */
+const TABS: { id: Tab; aba: string; label: string }[] = [
+  { id: 'chords', aba: 'acordes', label: 'Acordes' },
+  { id: 'theory', aba: 'formacao', label: 'Formação' },
+  { id: 'scales', aba: 'escalas', label: 'Escalas e campo harmônico' },
+  { id: 'circle', aba: 'ciclo', label: 'Ciclo de quintas' },
+  { id: 'progressions', aba: 'progressoes', label: 'Progressões' },
+  { id: 'fretboard', aba: 'braco', label: 'Escalas no braço' },
+  { id: 'ear', aba: 'intervalos', label: 'Treino de ouvido' },
 ];
 
 const solfege = (root: string) => `${SOLFEGE[root[0]!]}${root.length > 1 ? (root[1] === 'b' ? '♭' : '♯') : ''}`;
@@ -404,14 +410,19 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
 export const StudyPage = () => {
   const [params, setParams] = useSearchParams();
   const asked = parseChord(params.get('acorde'));
-  const [tab, setTab] = useState<Tab>('chords');
+  const [tab, setTabState] = useState<Tab>(() => TABS.find((t) => t.aba === params.get('aba'))?.id ?? 'chords');
+  const setTab = (t: Tab) => {
+    setTabState(t);
+    const aba = TABS.find((x) => x.id === t)!.aba;
+    setParams(t === 'chords' && params.get('acorde') ? { acorde: params.get('acorde')! } : { aba }, { replace: true });
+  };
   const [chordKey, setChordKey] = useState(0);
   const [initial, setInitial] = useState(asked);
 
   const openChord = (chord: string) => {
     setInitial(parseChord(chord));
     setChordKey((k) => k + 1);
-    setTab('chords');
+    setTabState('chords');
     setParams({ acorde: chord }, { replace: true });
     window.scrollTo?.({ top: 0 });
   };
@@ -419,12 +430,17 @@ export const StudyPage = () => {
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold tracking-tight">Estudo</h1>
+        <div>
+          <Link to="/estudo" className="inline-flex min-h-10 items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="size-4" /> Trilhas de estudo
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight">Ferramentas</h1>
+        </div>
         <Link to="/microfone" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm hover:bg-muted">
           <Mic className="size-4" /> Afinador e microfone
         </Link>
       </div>
-      <p className="mt-2 max-w-2xl text-muted-foreground">Todos os acordes no violão, no teclado e no cavaquinho, como eles são formados, as escalas e o campo harmônico de cada tom.</p>
+      <p className="mt-2 max-w-2xl text-muted-foreground">Acordes no violão, no teclado e no cavaquinho, formação, campo harmônico, ciclo de quintas, progressões, escalas no braço e treino de ouvido.</p>
       <ScrollStrip className="mt-4" role="tablist" label="Assunto" selected={tab} onKeyDown={rovingKeys} innerClassName="rounded-xl border border-border bg-surface p-1">
           {TABS.map((t) => (
             <button
@@ -442,6 +458,10 @@ export const StudyPage = () => {
       {tab === 'chords' && <ChordsTab key={chordKey} initial={initial} />}
       {tab === 'theory' && <TheoryTab />}
       {tab === 'scales' && <ScalesTab onChord={openChord} />}
+      {tab === 'circle' && <CircleOfFifths onChord={openChord} />}
+      {tab === 'progressions' && <ProgressionCatalog />}
+      {tab === 'fretboard' && <ScaleExplorer />}
+      {tab === 'ear' && <IntervalTrainer />}
     </section>
   );
 };
