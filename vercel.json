@@ -1,7 +1,7 @@
 {
   "framework": null,
   "installCommand": "npm ci -w @will-music/web",
-  "buildCommand": "npm run build -w @will-music/web && rm -rf dist && cp -r apps/web/dist dist",
+  "buildCommand": "echo \"build em $PWD\" && WM_OUT_DIR=\"$PWD/dist\" npm run build -w @will-music/web",
   "outputDirectory": "dist",
   "rewrites": [{ "source": "/((?!assets/|icons/|.*\\.[a-z0-9]+$).*)", "destination": "/index.html" }],
   "headers": [
