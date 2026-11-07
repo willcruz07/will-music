@@ -11,6 +11,7 @@ export type Song = {
   key?: string;
   tempo?: number;
   capo?: number;
+  timeSignature?: string;
   favorite: boolean;
   analysisStatus: AnalysisStatus;
   analysisError?: string;

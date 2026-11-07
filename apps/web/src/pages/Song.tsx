@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Minus, Pencil, Plus, RefreshCw, Timer, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, Info, Minus, Pencil, Plus, RefreshCw, Timer, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { AnalysisProgress } from '../components/AnalysisProgress.tsx';
@@ -8,7 +8,9 @@ import { chartLineStarts, lyricTexts } from '../lib/lineTimes.ts';
 import { createSyncSession } from '../lib/syncSession.ts';
 import { applyLyrics } from '../lib/lyricsApply.ts';
 import { Player, type PlayerControls, activeIndexAt } from '../components/Player.tsx';
-import { type Analysis, type Chart, type Song as SongRecord, db, deleteSong } from '../lib/db.ts';
+import { SongInfoForm } from '../components/SongInfoForm.tsx';
+import { setChordProMeta } from '../lib/chordProEdit.ts';
+import { type Analysis, type Chart, type Song as SongRecord, db, deleteSong, updateSong } from '../lib/db.ts';
 import { isRunning, startAnalysis, subscribeAnalysis } from '../lib/jobs.ts';
 import { type PipelineProgress, runPipeline } from '../lib/pipeline.ts';
 import { prefersFlats, transposeKey } from '../lib/transpose.ts';
@@ -25,6 +27,7 @@ export const Song = () => {
   const [activeLine, setActiveLine] = useState(-1);
   const [autoScroll, setAutoScroll] = useState(true);
   const [showLyrics, setShowLyrics] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
   const lineStarts = useRef<number[]>([]);
   const player = useRef<PlayerControls | null>(null);
   const sync = useRef<ReturnType<typeof createSyncSession> | null>(null);
@@ -165,11 +168,31 @@ export const Song = () => {
         </div>
         {shownKey && (
           <div className="text-right">
-            <span className="block text-sm text-muted-foreground">Tom</span>
+            <span className="block text-sm text-muted-foreground">
+              Tom{song.capo ? ` · Capo ${song.capo}` : ''}
+              {song.tempo ? ` · ${song.tempo} BPM` : ''}
+            </span>
             <span className="text-4xl font-bold text-chord">{shownKey}</span>
           </div>
         )}
       </div>
+
+      {editingInfo && (
+        <SongInfoForm
+          song={song}
+          onSave={(info) =>
+            void (async () => {
+              await updateSong(song.id, info);
+              if (chart) {
+                const chordPro = setChordProMeta(chart.chordPro, { title: info.title, artist: info.artist });
+                await db.charts.update(chart.id, { chordPro, updatedAt: new Date().toISOString() });
+              }
+              setEditingInfo(false);
+              await load();
+            })()
+          }
+        />
+      )}
 
       {chart && (
         <div className="mt-5 flex flex-wrap items-center gap-2 border-y border-border py-2">
@@ -197,6 +220,9 @@ export const Song = () => {
           <Link to={`/musica/${song.id}/editar`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
             <Pencil className="size-4" /> Editar cifra
           </Link>
+          <Button variant="ghost" onClick={() => setEditingInfo((v) => !v)} aria-pressed={editingInfo}>
+            <Info className="size-4" /> Dados
+          </Button>
           {analysis?.lyrics && (
             <Button variant="ghost" onClick={() => setShowLyrics((v) => !v)} aria-pressed={showLyrics}>
               <FileText className="size-4" /> Trocar letra
