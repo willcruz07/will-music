@@ -2,6 +2,7 @@ import { AudioLines, Moon, Sun } from 'lucide-react';
 import { Suspense, lazy, useEffect } from 'react';
 import { Link, Route, Routes } from 'react-router';
 import { BottomNav, TopNav } from './components/AppNav.tsx';
+import { UpdateBanner } from './components/PwaPrompts.tsx';
 import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
 import { Library } from './pages/Library.tsx';
 import { IconButton } from './ui/Button.tsx';
@@ -75,5 +76,6 @@ const Layout = () => (
       </Suspense>
     </main>
     <BottomNav />
+    <UpdateBanner />
   </div>
 );

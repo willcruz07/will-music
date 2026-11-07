@@ -6,7 +6,7 @@ import { type Chart, type Setlist, type Song, db } from '../lib/db.ts';
 import { resolveItems, updateSetlist } from '../lib/setlists.ts';
 import { semitonesTo, stageAction } from '../lib/stage.ts';
 import { transposeKey } from '../lib/transpose.ts';
-import { applyThemePref } from '../lib/theme.ts';
+import { applyThemePref, paintBrowserBar } from '../lib/theme.ts';
 import { useWakeLock } from '../lib/wakeLock.ts';
 
 const FONT_KEY = 'wm-stage-font';
@@ -36,6 +36,7 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
+    paintBrowserBar(true);
     // On exit, re-apply the saved preference instead of a class snapshot.
     return () => applyThemePref();
   }, []);

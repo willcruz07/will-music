@@ -67,6 +67,23 @@ html {
   text-rendering: optimizeLegibility;
 }
 
+/* No double-tap zoom delay on controls. */
+a,
+button,
+label,
+[role='button'] {
+  touch-action: manipulation;
+}
+
+/* iOS zooms into form fields under 16px: keep them at 16px on phones. */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
 body {
   margin: 0;
   min-height: 100dvh;

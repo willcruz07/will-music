@@ -38,12 +38,6 @@ export const Library = () => {
             void listSongs().then(setSongs);
           }}
         />
-        <Link
-          to="/nova"
-          className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:brightness-105"
-        >
-          <Plus className="size-4" /> Adicionar música
-        </Link>
         </div>
       </div>
       {notice && <p className="mt-3 text-sm" role="status">{notice}</p>}
@@ -68,6 +62,9 @@ export const Library = () => {
           <p className="mt-2 text-muted-foreground">
             Adicione um MP3 e o will-music encontra o tom, os acordes e a letra para montar a cifra.
           </p>
+          <Link to="/nova" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 font-semibold text-primary-foreground hover:brightness-105">
+            <Plus className="size-4" /> Adicionar a primeira música
+          </Link>
         </div>
       )}
 
