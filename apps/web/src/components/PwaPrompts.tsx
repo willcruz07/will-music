@@ -1,5 +1,6 @@
-import { Download, RefreshCw, Share, WifiOff, X } from 'lucide-react';
-import { dismissPwaNotice, isIosBrowser, useInstallPrompt, usePwaState } from '../lib/pwa.ts';
+import { Download, MonitorDown, RefreshCw, Share, WifiOff, X } from 'lucide-react';
+import { useState } from 'react';
+import { dismissInstall, dismissPwaNotice, installDismissed, isIosBrowser, isStandalone, useInstallPrompt, usePwaState } from '../lib/pwa.ts';
 import { Button } from '../ui/Button.tsx';
 
 /** Floating notice above the bottom bar: a new version is ready, or the app now works offline. */
@@ -45,4 +46,52 @@ export const InstallApp = () => {
   }
   const installed = typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches;
   return <p className="text-sm text-muted-foreground">{installed ? 'Você já está usando o app instalado.' : 'Para instalar, use a opção “Instalar app” ou “Adicionar à tela inicial” no menu do navegador.'}</p>;
+};
+
+/** One-time invitation to install, under the header. Dismissing it is remembered on this device. */
+export const InstallBanner = () => {
+  const { canInstall, install } = useInstallPrompt();
+  const [hidden, setHidden] = useState(installDismissed);
+  const ios = isIosBrowser();
+  if (hidden || isStandalone() || (!canInstall && !ios)) return null;
+  const close = () => {
+    dismissInstall();
+    setHidden(true);
+  };
+  return (
+    <div className="mx-auto mt-3 flex max-w-5xl items-start gap-3 px-4">
+      <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3">
+        <MonitorDown className="size-5 shrink-0 text-primary" />
+        <p className="min-w-48 flex-1 text-sm">
+          <span className="font-semibold">Instale o will-music.</span> Abre em tela cheia, funciona sem internet e o navegador passa a proteger suas músicas, faixas e modelos no aparelho.
+          {ios && !canInstall && (
+            <span className="mt-1 block text-muted-foreground">
+              Toque em <Share className="inline size-4 align-text-bottom" aria-label="Compartilhar" /> e depois em “Adicionar à Tela de Início”.
+            </span>
+          )}
+        </p>
+        <span className="flex gap-2">
+          {canInstall && (
+            <Button className="min-h-9 px-3" onClick={() => void install()}>
+              <Download className="size-4" /> Instalar
+            </Button>
+          )}
+          <Button variant="ghost" className="min-h-9 px-3" onClick={close}>
+            Agora não
+          </Button>
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/** Compact install button for the top bar (computers), shown only when the browser offers installation. */
+export const InstallButton = () => {
+  const { canInstall, install } = useInstallPrompt();
+  if (!canInstall) return null;
+  return (
+    <button type="button" onClick={() => void install()} className="hidden min-h-9 items-center gap-1.5 rounded-full border border-border px-3 text-sm hover:bg-muted md:inline-flex">
+      <MonitorDown className="size-4" /> Instalar app
+    </button>
+  );
 };

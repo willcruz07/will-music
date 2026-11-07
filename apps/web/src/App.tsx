@@ -2,7 +2,7 @@ import { AudioLines, Moon, Sun } from 'lucide-react';
 import { Suspense, lazy, useEffect } from 'react';
 import { Link, Route, Routes } from 'react-router';
 import { BottomNav, TopNav } from './components/AppNav.tsx';
-import { UpdateBanner } from './components/PwaPrompts.tsx';
+import { InstallBanner, InstallButton, UpdateBanner } from './components/PwaPrompts.tsx';
 import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
 import { Library } from './pages/Library.tsx';
 import { IconButton } from './ui/Button.tsx';
@@ -55,11 +55,13 @@ const Layout = () => (
           will-music
         </Link>
         <div className="flex items-center gap-2">
+          <InstallButton />
           <TopNav />
           <ThemeToggle />
         </div>
       </div>
     </header>
+    <InstallBanner />
     <main className="pb-nav mx-auto w-full max-w-5xl flex-1 px-4 pt-6">
       <Suspense fallback={<Loading />}>
         <Routes>

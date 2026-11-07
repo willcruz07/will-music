@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { requestPersistence } from './storage.ts';
 
 /** Service-worker state shared between main.tsx (which registers it) and the banner. */
 type PwaState = { needRefresh: boolean; offlineReady: boolean; update?: () => Promise<void> };
@@ -40,6 +41,8 @@ if (typeof window !== 'undefined') {
     for (const l of installListeners) l();
   });
   window.addEventListener('appinstalled', () => {
+    // Installed apps get their data kept by the browser: ask right away.
+    void requestPersistence();
     installEvent = null;
     for (const l of installListeners) l();
   });
@@ -71,3 +74,22 @@ export const isIosBrowser = (): boolean => {
   const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
   return /iphone|ipad|ipod/i.test(navigator.userAgent) && !standalone;
 };
+
+const DISMISS_KEY = 'wm-install-dismissed';
+export const installDismissed = (): boolean => {
+  try {
+    return localStorage.getItem(DISMISS_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+export const dismissInstall = (): void => {
+  try {
+    localStorage.setItem(DISMISS_KEY, '1');
+  } catch {
+    /* per-device convenience only */
+  }
+};
+
+export const isStandalone = (): boolean =>
+  (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) || (navigator as Navigator & { standalone?: boolean }).standalone === true;
