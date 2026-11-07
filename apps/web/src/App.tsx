@@ -1,5 +1,5 @@
 import { Moon, Sun } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link, Route, Routes } from 'react-router';
 import { BottomNav, TopNav } from './components/AppNav.tsx';
 import { EditChart } from './pages/EditChart.tsx';
@@ -10,32 +10,16 @@ import { Stage } from './pages/Stage.tsx';
 import { Library } from './pages/Library.tsx';
 import { NewSong } from './pages/NewSong.tsx';
 import { Song } from './pages/Song.tsx';
+import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
 import { IconButton } from './ui/Button.tsx';
 
-const THEME_KEY = 'wm-theme';
-
-const initialDark = (): boolean => {
-  try {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved) return saved === 'dark';
-  } catch {
-    // storage unavailable
-  }
-  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
-};
-
+// Reads the saved preference, never the <html> class (the stage forces dark while it is open).
 export const ThemeToggle = () => {
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark') || initialDark());
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark);
-    try {
-      localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light');
-    } catch {
-      // storage unavailable
-    }
-  }, [dark]);
+  const [pref, setPref] = useThemePref();
+  const dark = isDark(pref);
+  useEffect(() => applyThemePref(), [pref]);
   return (
-    <IconButton label={dark ? 'Usar tema claro' : 'Usar tema escuro'} onClick={() => setDark((d) => !d)}>
+    <IconButton label={dark ? 'Usar tema claro' : 'Usar tema escuro'} onClick={() => setPref(dark ? 'light' : 'dark')}>
       {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
     </IconButton>
   );

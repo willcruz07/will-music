@@ -59,3 +59,45 @@ describe('packages', () => {
     expect(safeFileName('Ninguém Explica Deus: Ao Vivo?')).toBe('ninguem-explica-deus-ao-vivo');
   });
 });
+
+describe('review fixes: packages', () => {
+  it('rejects corrupted contents with the friendly message', async () => {
+    const bad = (files: Record<string, string>) => new Blob([zipSync(Object.fromEntries(Object.entries(files).map(([k, v]) => [k, strToU8(v)])))]);
+    const manifest = (extra: object) => JSON.stringify({ format: 'will-music', kind: 'song', songIds: ['s'], ...extra });
+    await expect(readPackage(bad({ 'manifest.json': manifest({}) }))).rejects.toThrow('Este arquivo não é um pacote do will-music.');
+    await expect(readPackage(bad({ 'manifest.json': manifest({ version: 1, songIds: 'x' }) }))).rejects.toThrow('Este arquivo não é um pacote do will-music.');
+    await expect(readPackage(bad({ 'manifest.json': manifest({ version: 1 }), 'songs/s/song.json': '{quebrado' }))).rejects.toThrow('Este arquivo não é um pacote do will-music.');
+    await expect(readPackage(bad({ 'manifest.json': manifest({ version: 1 }), 'songs/s/song.json': '{"title":"sem id"}' }))).rejects.toThrow('Este arquivo não é um pacote do will-music.');
+  });
+
+  it('writes nothing when a write fails, keeping the song it would replace', async () => {
+    const song = await seed();
+    const zip = await exportSongs([song.id], { includeAudio: true, kind: 'song' });
+    const contents = await readPackage(zip);
+    const original = db.audio.put.bind(db.audio);
+    db.audio.put = (() => Promise.reject(new Error("quota"))) as unknown as typeof db.audio.put;
+    await expect(importPackage(contents, async () => 'replace')).rejects.toThrow();
+    db.audio.put = original;
+    expect(await db.songs.get(song.id)).toBeTruthy();
+    expect((await db.charts.where('songId').equals(song.id).first())!.chordPro).toBe('[G]Ninguém');
+  });
+
+  it('backs up every setlist and asks about conflicts once', async () => {
+    const a = await seed();
+    const b = await createSong({ title: 'Outra', artist: '', durationSec: 1 }, new Blob());
+    const l1 = await createSetlist('Domingo');
+    const l2 = await createSetlist('Quarta');
+    await updateSetlist(l1.id, { items: [{ songId: a.id }] });
+    await updateSetlist(l2.id, { items: [{ songId: b.id }] });
+    const zip = await exportSongs([a.id, b.id], { includeAudio: false, kind: 'backup', setlists: await db.setlists.toArray() });
+    let asked = 0;
+    const result = await importPackage(await readPackage(zip), async (conflicts) => {
+      asked += 1;
+      expect(conflicts).toHaveLength(2);
+      return 'keep-both';
+    });
+    expect(asked).toBe(1);
+    expect(result.setlists.map((s) => s.name).sort()).toEqual(['Domingo', 'Quarta']);
+    expect(await db.setlists.count()).toBe(4);
+  });
+});

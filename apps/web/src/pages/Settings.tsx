@@ -3,30 +3,10 @@ import { ExportButton, ImportButton } from '../components/PackageButtons.tsx';
 import { db } from '../lib/db.ts';
 import { deleteCachedModels, listCachedModels } from '../lib/models.ts';
 import { formatBytes, requestPersistence, storageStatus } from '../lib/storage.ts';
+import { useThemePref } from '../lib/theme.ts';
 import { Button } from '../ui/Button.tsx';
 
 const MODEL_NAMES: Record<string, string> = { chordnet: 'Acordes (ChordMini)', cqtPlan: 'Plano de frequências dos acordes', skey: 'Tom (S-KEY)' };
-type Theme = 'light' | 'dark' | 'system';
-
-const readTheme = (): Theme => {
-  try {
-    const t = localStorage.getItem('wm-theme');
-    return t === 'light' || t === 'dark' ? t : 'system';
-  } catch {
-    return 'system';
-  }
-};
-
-const applyTheme = (theme: Theme) => {
-  const dark = theme === 'dark' || (theme === 'system' && matchMedia?.('(prefers-color-scheme: dark)').matches);
-  document.documentElement.classList.toggle('dark', !!dark);
-  try {
-    if (theme === 'system') localStorage.removeItem('wm-theme');
-    else localStorage.setItem('wm-theme', theme);
-  } catch {
-    // storage unavailable
-  }
-};
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section className="border-t border-border py-6">
@@ -36,7 +16,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 );
 
 export const Settings = () => {
-  const [theme, setTheme] = useState<Theme>(readTheme);
+  const [theme, setTheme] = useThemePref();
   const [models, setModels] = useState<{ id: string; bytes: number }[] | null>(null);
   const [storage, setStorage] = useState<{ usage?: number; quota?: number; persisted: boolean } | null>(null);
   const [songIds, setSongIds] = useState<string[]>([]);
@@ -63,7 +43,6 @@ export const Settings = () => {
               aria-checked={theme === t}
               onClick={() => {
                 setTheme(t);
-                applyTheme(t);
               }}
               className={`rounded-md px-4 py-2 text-sm ${theme === t ? 'bg-muted font-semibold' : 'text-muted-foreground'}`}
             >
@@ -112,7 +91,7 @@ export const Settings = () => {
       <Section title="Backup">
         <p className="text-sm text-muted-foreground">Exporte tudo para guardar ou levar para outro aparelho. O pacote abre em qualquer navegador com o will-music.</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <ExportButton songIds={songIds} title="will-music-backup" label="Exportar tudo" />
+          <ExportButton songIds={songIds} title="will-music-backup" backup label="Exportar tudo" onError={setNotice} />
           <ImportButton
             onImported={(message) => {
               setNotice(message);

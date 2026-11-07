@@ -1,11 +1,12 @@
 const PC: Record<string, number> = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
-const FIELD_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 
 export type StageAction = 'next' | 'prev' | 'scroll-down' | 'scroll-up';
 
 /** Keyboard and Bluetooth page-turner pedals (they send arrows, PageUp/PageDown or space). */
-export const stageAction = (e: { key: string; code: string; targetTag?: string }): StageAction | null => {
-  if (e.targetTag && FIELD_TAGS.has(e.targetTag)) return null;
+/** Text entry keeps its keys; sliders and buttons don't (a pedal must still turn the page after the speed slider is touched). */
+export const stageAction = (e: { key: string; code: string; targetTag?: string; targetType?: string }): StageAction | null => {
+  const textEntry = e.targetTag === 'TEXTAREA' || e.targetTag === 'SELECT' || (e.targetTag === 'INPUT' && !['range', 'button', 'checkbox', 'radio'].includes(e.targetType ?? 'text'));
+  if (textEntry) return null;
   switch (e.key) {
     case 'ArrowRight':
     case 'PageDown':

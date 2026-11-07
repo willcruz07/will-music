@@ -37,3 +37,11 @@ describe('wake lock', () => {
     expect(() => renderHook(() => useWakeLock(true))).not.toThrow();
   });
 });
+
+describe('review fixes: stage keys and sliders', () => {
+  it('keeps turning pages when a range slider has focus', () => {
+    expect(stageAction({ key: 'PageDown', code: 'PageDown', targetTag: 'INPUT', targetType: 'range' })).toBe('next');
+    expect(stageAction({ key: 'ArrowLeft', code: 'ArrowLeft', targetTag: 'INPUT', targetType: 'range' })).toBe('prev');
+    expect(stageAction({ key: 'PageDown', code: 'PageDown', targetTag: 'INPUT', targetType: 'text' })).toBeNull();
+  });
+});

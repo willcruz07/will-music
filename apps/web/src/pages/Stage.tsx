@@ -6,6 +6,7 @@ import { type Chart, type Setlist, type Song, db } from '../lib/db.ts';
 import { resolveItems, updateSetlist } from '../lib/setlists.ts';
 import { semitonesTo, stageAction } from '../lib/stage.ts';
 import { transposeKey } from '../lib/transpose.ts';
+import { applyThemePref } from '../lib/theme.ts';
 import { useWakeLock } from '../lib/wakeLock.ts';
 
 const FONT_KEY = 'wm-stage-font';
@@ -34,12 +35,9 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
   useWakeLock(true);
 
   useEffect(() => {
-    const html = document.documentElement;
-    const wasDark = html.classList.contains('dark');
-    html.classList.add('dark');
-    return () => {
-      html.classList.toggle('dark', wasDark);
-    };
+    document.documentElement.classList.add('dark');
+    // On exit, re-apply the saved preference instead of a class snapshot.
+    return () => applyThemePref();
   }, []);
 
   useEffect(() => {
@@ -94,7 +92,8 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const action = stageAction({ key: e.key, code: e.code, targetTag: (e.target as HTMLElement | null)?.tagName });
+      const target = e.target as HTMLInputElement | null;
+      const action = stageAction({ key: e.key, code: e.code, targetTag: target?.tagName, targetType: target?.type });
       if (!action) return;
       e.preventDefault();
       if (action === 'next') go(1);
@@ -136,7 +135,11 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
   return (
     <main
       className="min-h-dvh bg-background pb-28 text-foreground"
-      onTouchStart={(e) => (touchX.current = e.touches[0]?.clientX ?? null)}
+      onTouchStart={(e) => {
+        // Dragging the controls (speed slider, footer) must not count as a swipe.
+        const fromControls = (e.target as HTMLElement).closest('footer, header, input');
+        touchX.current = fromControls ? null : (e.touches[0]?.clientX ?? null);
+      }}
       onTouchEnd={(e) => {
         const start = touchX.current;
         const end = e.changedTouches[0]?.clientX;
