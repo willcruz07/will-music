@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ExportButton, ImportButton } from '../components/PackageButtons.tsx';
+import { AboutButton } from '../components/About.tsx';
 import { InstallApp } from '../components/PwaPrompts.tsx';
 import { db } from '../lib/db.ts';
 import { deleteCachedModel, deleteCachedModels, downloadAllModels, listCachedModels } from '../lib/models.ts';
@@ -145,6 +146,10 @@ export const Settings = () => {
             {notice}
           </p>
         )}
+      </Section>
+
+      <Section title="Sobre">
+        <AboutButton variant="row" />
       </Section>
     </section>
   );
