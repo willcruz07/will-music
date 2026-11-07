@@ -2,6 +2,8 @@ import { ArrowLeft, Redo2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ChartView } from '../components/ChartView.tsx';
+import { ChordPicker } from '../components/ChordPicker.tsx';
+import { setChordAt } from '../lib/chordProEdit.ts';
 import { restoreGeneratedChart, saveEditedChart } from '../lib/chartEdit.ts';
 import { type Song, db } from '../lib/db.ts';
 import { createHistory } from '../lib/history.ts';
@@ -16,6 +18,7 @@ export const EditChart = () => {
   const [text, setText] = useState('');
   const [saved, setSaved] = useState('');
   const [tab, setTab] = useState<'texto' | 'ver'>('texto');
+  const [picking, setPicking] = useState<{ line: number; char: number } | null>(null);
   const [, force] = useState(0);
   const dirty = text !== saved;
 
@@ -95,9 +98,23 @@ export const EditChart = () => {
       className="h-[60dvh] w-full resize-y rounded-lg border border-border bg-surface p-3 font-mono text-sm leading-relaxed outline-none focus:border-primary"
     />
   );
+  const usedChords = [...new Set([...text.matchAll(/\[([^\]]+)\]/gu)].map((m) => m[1]!))].slice(0, 12);
   const preview = (
-    <div className="h-[60dvh] overflow-auto rounded-lg border border-border p-4">
-      <ChartView chordPro={text} transpose={0} preferFlats={false} fontSize={16} />
+    <div>
+      <div className="h-[60dvh] overflow-auto rounded-lg border border-border p-4">
+        <p className="mb-3 text-sm text-muted-foreground">Toque numa palavra para pôr, trocar ou tirar o acorde.</p>
+        <ChartView chordPro={text} transpose={0} preferFlats={false} fontSize={16} onPick={(line, char) => setPicking({ line, char })} />
+      </div>
+      {picking && (
+        <ChordPicker
+          suggestions={usedChords}
+          onCancel={() => setPicking(null)}
+          onApply={(chord) => {
+            update(setChordAt(text, picking.line, picking.char, chord));
+            setPicking(null);
+          }}
+        />
+      )}
     </div>
   );
 

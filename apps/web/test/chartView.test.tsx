@@ -42,3 +42,13 @@ describe('ChartView spelling', () => {
     expect(screen.getByText('Bb')).toBeInTheDocument();
   });
 });
+
+describe('ChartView picking', () => {
+  it('reports the lyric line and plain character of a tapped word', () => {
+    const picks: [number, number][] = [];
+    render(<ChartView chordPro={'{comment: Intro}\n[G]Ninguém explica\num [D]dois'} transpose={0} preferFlats={false} fontSize={16} onPick={(l, c) => picks.push([l, c])} />);
+    fireEvent.click(screen.getByText('explica'));
+    fireEvent.click(screen.getByText('dois'));
+    expect(picks).toEqual([[0, 8], [1, 3]]);
+  });
+});

@@ -12,9 +12,29 @@ type Props = {
   /** Key the chart is shown in; when given, chord spelling follows it. */
   spellKey?: string;
   autoScroll?: boolean;
+  /** Editor mode: called with (lyric line index, plain character index) when a word is tapped. */
+  onPick?: (lyricLineIndex: number, charIndex: number) => void;
 };
 
-export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize, activeLineIndex = -1, autoScroll = false }: Props) => {
+const Words = ({ text, offset, onPick }: { text: string; offset: number; onPick: (charIndex: number) => void }) => {
+  let at = offset;
+  return (
+    <>
+      {text.split(/(\s+)/u).map((token, i) => {
+        const start = at;
+        at += token.length;
+        if (!token.trim()) return <span key={i}>{token}</span>;
+        return (
+          <span key={i} role="button" tabIndex={0} onClick={() => onPick(start)} onKeyDown={(e) => e.key === 'Enter' && onPick(start)} className="cursor-pointer rounded hover:bg-muted focus-visible:bg-muted">
+            {token}
+          </span>
+        );
+      })}
+    </>
+  );
+};
+
+export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize, activeLineIndex = -1, autoScroll = false, onPick }: Props) => {
   const { lines } = useMemo(() => parseChordPro(chordPro), [chordPro]);
   const activeRef = useRef<HTMLDivElement | null>(null);
   const t = (chord: string) => transposeChord(chord, transpose, spellKey ?? preferFlats);
@@ -45,6 +65,8 @@ export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize
         }
         lyricIndex += 1;
         const active = lyricIndex === activeLineIndex;
+        const lineIndex = lyricIndex;
+        let offset = 0;
         return (
           <div
             key={i}
@@ -53,12 +75,18 @@ export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize
             ref={active ? activeRef : undefined}
             className={`-ml-3 flex flex-wrap items-end border-l-[3px] py-1 pl-3 transition-colors ${active ? 'border-primary bg-muted' : 'border-transparent'}`}
           >
-            {line.parts.map((part, j) => (
-              <span key={j} className="inline-flex flex-col">
-                <span className="min-h-[1.25em] pr-1 font-bold text-chord">{part.chord ? t(part.chord) : ' '}</span>
-                <span className="whitespace-pre">{part.text}</span>
-              </span>
-            ))}
+            {line.parts.map((part, j) => {
+              const base = offset;
+              offset += part.text.length;
+              return (
+                <span key={j} className="inline-flex flex-col">
+                  <span className="min-h-[1.25em] pr-1 font-bold text-chord">{part.chord ? t(part.chord) : ' '}</span>
+                  <span className="whitespace-pre">
+                    {onPick ? <Words text={part.text} offset={base} onPick={(c) => onPick(lineIndex, c)} /> : part.text}
+                  </span>
+                </span>
+              );
+            })}
           </div>
         );
       })}
