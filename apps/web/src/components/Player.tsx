@@ -1,5 +1,5 @@
 import { Pause, Play, ScrollText } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState } from 'react';
 
 export const activeIndexAt = (starts: readonly number[], t: number): number => {
   let lo = 0;
@@ -25,10 +25,24 @@ type Props = {
   onTime: (t: number) => void;
   autoScroll?: boolean;
   onAutoScrollChange?: (on: boolean) => void;
+  /** Lets the page start playback from a position (sync mode). */
+  controls?: React.RefObject<PlayerControls | null>;
 };
 
-export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange }: Props) => {
+export type PlayerControls = { playFrom: (t: number) => void; pause: () => void; currentTime: () => number };
+
+export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, controls }: Props) => {
   const audioRef = useRef<HTMLAudioElement>(null);
+  useImperativeHandle(controls, () => ({
+    playFrom: (t: number) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      audio.currentTime = t;
+      void audio.play();
+    },
+    pause: () => audioRef.current?.pause(),
+    currentTime: () => audioRef.current?.currentTime ?? 0,
+  }));
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
