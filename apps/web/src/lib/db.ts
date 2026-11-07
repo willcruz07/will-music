@@ -49,6 +49,9 @@ export type Chart = {
 
 export type AudioRecord = { songId: string; blob: Blob; mimeType: string };
 
+export type SetlistItem = { songId: string; targetKey?: string; note?: string };
+export type Setlist = { id: string; name: string; date?: string; items: SetlistItem[]; createdAt: string; updatedAt: string };
+
 // Audio lives in IndexedDB as a Blob (works in every target browser, Safari included);
 // swapping it for OPFS later only touches this file.
 export const db = new Dexie('will-music') as Dexie & {
@@ -56,6 +59,7 @@ export const db = new Dexie('will-music') as Dexie & {
   audio: EntityTable<AudioRecord, 'songId'>;
   analyses: EntityTable<Analysis, 'id'>;
   charts: EntityTable<Chart, 'id'>;
+  setlists: EntityTable<Setlist, 'id'>;
 };
 
 db.version(1).stores({
@@ -64,6 +68,8 @@ db.version(1).stores({
   analyses: 'id, songId',
   charts: 'id, songId',
 });
+
+db.version(2).stores({ setlists: 'id, updatedAt' });
 
 export const now = (): string => new Date().toISOString();
 
