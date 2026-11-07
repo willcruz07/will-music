@@ -6,7 +6,7 @@ import { formatBytes, requestPersistence, storageStatus } from '../lib/storage.t
 import { useThemePref } from '../lib/theme.ts';
 import { Button } from '../ui/Button.tsx';
 
-const MODEL_NAMES: Record<string, string> = { chordnet: 'Acordes (ChordMini)', cqtPlan: 'Plano de frequências dos acordes', skey: 'Tom (S-KEY)' };
+const MODEL_NAMES: Record<string, string> = { chordnet: 'Acordes (ChordMini)', cqtPlan: 'Plano de frequências dos acordes', skey: 'Tom (S-KEY)', kara2Core: 'Separação de faixas (estrutura)', kara2Data: 'Separação de faixas (pesos)' };
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section className="border-t border-border py-6">

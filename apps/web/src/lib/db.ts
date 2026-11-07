@@ -50,6 +50,9 @@ export type Chart = {
 
 export type AudioRecord = { songId: string; blob: Blob; mimeType: string };
 
+export type StemName = 'instrumental' | 'lead' | 'backing';
+export type StemsRecord = { songId: string; model: string; sampleRate: number; tracks: { name: StemName; blob: Blob }[]; createdAt: string };
+
 export type SetlistItem = { songId: string; targetKey?: string; note?: string };
 export type Setlist = { id: string; name: string; date?: string; items: SetlistItem[]; createdAt: string; updatedAt: string };
 
@@ -61,6 +64,7 @@ export const db = new Dexie('will-music') as Dexie & {
   analyses: EntityTable<Analysis, 'id'>;
   charts: EntityTable<Chart, 'id'>;
   setlists: EntityTable<Setlist, 'id'>;
+  stems: EntityTable<StemsRecord, 'songId'>;
 };
 
 db.version(1).stores({
@@ -71,6 +75,7 @@ db.version(1).stores({
 });
 
 db.version(2).stores({ setlists: 'id, updatedAt' });
+db.version(3).stores({ stems: 'songId' });
 
 export const now = (): string => new Date().toISOString();
 
@@ -91,9 +96,10 @@ export const updateSong = async (id: string, patch: Partial<Omit<Song, 'id' | 'c
 };
 
 export const deleteSong = async (id: string): Promise<void> => {
-  await db.transaction('rw', [db.songs, db.audio, db.analyses, db.charts], async () => {
+  await db.transaction('rw', [db.songs, db.audio, db.analyses, db.charts, db.stems], async () => {
     await db.songs.delete(id);
     await db.audio.delete(id);
+    await db.stems.delete(id);
     await db.analyses.where('songId').equals(id).delete();
     await db.charts.where('songId').equals(id).delete();
   });
