@@ -18,6 +18,8 @@ import { toDisplayLabel } from '@will-music/engine';
 import { AddToSetlist } from '../components/AddToSetlist.tsx';
 import { ExportButton } from '../components/PackageButtons.tsx';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
+import { TracksSection } from '../components/TracksSection.tsx';
+import { useStems } from '../lib/useStems.ts';
 import { ChordPanel, readInstrument } from '../components/ChordPanel.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
 
@@ -28,6 +30,7 @@ export const Song = () => {
   const [chart, setChart] = useState<Chart | undefined>();
   const [analysis, setAnalysis] = useState<Analysis | undefined>();
   const [audioUrl, setAudioUrl] = useState<string>();
+  const stems = useStems(id, audioUrl);
   const [progress, setProgress] = useState<PipelineProgress | null>(null);
   const [activeLine, setActiveLine] = useState(-1);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -320,7 +323,9 @@ export const Song = () => {
         </div>
       )}
 
-      {audioUrl && <Player src={audioUrl} onTime={onTime} autoScroll={autoScroll} onAutoScrollChange={setAutoScroll} controls={player} />}
+      {audioUrl && !progress && <TracksSection stems={stems} />}
+
+      {stems.sources && <Player sources={stems.sources} onTime={onTime} autoScroll={autoScroll} onAutoScrollChange={setAutoScroll} controls={player} />}
     </section>
   );
 };

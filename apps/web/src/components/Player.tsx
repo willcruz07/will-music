@@ -1,6 +1,7 @@
 import { Pause, Play, ScrollText } from 'lucide-react';
 import { useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { normalizeLoop } from '../lib/loop.ts';
+import { driftCorrections } from '../lib/mixer.ts';
 
 export const activeIndexAt = (starts: readonly number[], t: number): number => {
   let lo = 0;
@@ -21,8 +22,12 @@ const clock = (sec: number): string => {
   return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 };
 
+export type PlayerSource = { name: string; src: string; volume: number };
+
 type Props = {
-  src: string;
+  /** One file, or several synced tracks (the first is the master clock). */
+  src?: string;
+  sources?: PlayerSource[];
   onTime: (t: number) => void;
   autoScroll?: boolean;
   onAutoScrollChange?: (on: boolean) => void;
@@ -32,16 +37,22 @@ type Props = {
 
 export type PlayerControls = { playFrom: (t: number) => void; pause: () => void; currentTime: () => number };
 
-export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, controls }: Props) => {
+export const Player = ({ src, sources, onTime, autoScroll = true, onAutoScrollChange, controls }: Props) => {
+  const tracks: PlayerSource[] = sources ?? (src ? [{ name: 'mix', src, volume: 1 }] : []);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const followers = useRef<(HTMLAudioElement | null)[]>([]);
+  const all = () => [audioRef.current, ...followers.current].filter((a): a is HTMLAudioElement => !!a);
+  const seekAll = (t: number) => {
+    for (const a of all()) a.currentTime = t;
+  };
   useImperativeHandle(controls, () => ({
     playFrom: (t: number) => {
-      const audio = audioRef.current;
-      if (!audio) return;
-      audio.currentTime = t;
-      void audio.play();
+      seekAll(t);
+      for (const a of all()) void a.play();
     },
-    pause: () => audioRef.current?.pause(),
+    pause: () => {
+      for (const a of all()) a.pause();
+    },
     currentTime: () => audioRef.current?.currentTime ?? 0,
   }));
   const [playing, setPlaying] = useState(false);
@@ -56,11 +67,16 @@ export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, con
 
   // Called on every time update: jumps back to A once playback passes B.
   const follow = (t: number) => {
-    const audio = audioRef.current;
     const l = loopRef.current;
-    if (audio && l && t >= l.b) {
-      audio.currentTime = l.a;
+    if (l && t >= l.b) {
+      seekAll(l.a);
       t = l.a;
+    } else {
+      // Keep the other tracks on the master clock.
+      const others = followers.current.filter((a): a is HTMLAudioElement => !!a);
+      driftCorrections(t, others.map((a) => a.currentTime)).forEach((fix, i) => {
+        if (fix !== null) others[i]!.currentTime = fix;
+      });
     }
     setTime(t);
     onTime(t);
@@ -69,11 +85,15 @@ export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, con
   followRef.current = follow;
 
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.preservesPitch = true;
-    audio.playbackRate = speed / 100;
-  }, [speed]);
+    for (const a of all()) {
+      a.preservesPitch = true;
+      a.playbackRate = speed / 100;
+    }
+  }, [speed, tracks.length]);
+
+  useEffect(() => {
+    all().forEach((a, i) => (a.volume = tracks[i]?.volume ?? 1));
+  });
 
   useEffect(() => {
     if (!playing) return;
@@ -89,21 +109,26 @@ export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, con
   const toggle = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (audio.paused) void audio.play();
-    else audio.pause();
+    if (audio.paused) {
+      seekAll(audio.currentTime);
+      for (const a of all()) void a.play();
+    } else for (const a of all()) a.pause();
   };
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
       <audio
         ref={audioRef}
-        src={src}
+        src={tracks[0]?.src}
         preload="metadata"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onTimeUpdate={(e) => follow(e.currentTarget.currentTime)}
       />
+      {tracks.slice(1).map((t, i) => (
+        <audio key={t.name} ref={(el) => void (followers.current[i] = el)} src={t.src} preload="auto" />
+      ))}
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
         <button
           type="button"
@@ -123,7 +148,7 @@ export const Player = ({ src, onTime, autoScroll = true, onAutoScrollChange, con
             step={0.1}
             value={time}
             onChange={(e) => {
-              if (audioRef.current) audioRef.current.currentTime = Number(e.target.value);
+              seekAll(Number(e.target.value));
             }}
             className="flex-1 accent-[var(--primary)]"
           />
