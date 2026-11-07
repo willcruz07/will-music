@@ -11,8 +11,7 @@ export type LrclibResult = {
 
 export const VERSION_WARNING = 'A letra encontrada pode ser de outra versão da música.';
 
-export const searchLyrics = async (title: string, artist: string, fetchFn: typeof fetch = fetch): Promise<LrclibResult[]> => {
-  const params = new URLSearchParams({ track_name: title, artist_name: artist });
+const query = async (params: URLSearchParams, fetchFn: typeof fetch): Promise<LrclibResult[]> => {
   try {
     const response = await fetchFn(`https://lrclib.net/api/search?${params.toString()}`);
     if (!response.ok) return [];
@@ -23,8 +22,28 @@ export const searchLyrics = async (title: string, artist: string, fetchFn: typeo
   }
 };
 
-export const pickBestLyrics = (results: LrclibResult[], audioDurationSec: number): { result: LrclibResult; warning?: string } | null => {
-  const usable = results.filter((r) => r.syncedLyrics || r.plainLyrics);
+/** Exact title + artist search first; if it finds nothing, a free-text search with both. */
+export const searchLyrics = async (title: string, artist: string, fetchFn: typeof fetch = fetch): Promise<LrclibResult[]> => {
+  const exact = await query(new URLSearchParams({ track_name: title, artist_name: artist }), fetchFn);
+  if (exact.length) return exact;
+  return query(new URLSearchParams({ q: `${title} ${artist}`.trim() }), fetchFn);
+};
+
+const fold = (s: string): string => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+export const sameArtist = (a: string, b: string): boolean => {
+  const x = fold(a);
+  const y = fold(b);
+  return !!x && !!y && (x.includes(y) || y.includes(x));
+};
+
+/** Auto-pick only lyrics from the same artist when one is known; other results stay available for a manual choice. */
+export const pickBestLyrics = (
+  results: LrclibResult[],
+  audioDurationSec: number,
+  artist = '',
+): { result: LrclibResult; warning?: string } | null => {
+  const usable = results.filter((r) => (r.syncedLyrics || r.plainLyrics) && (!artist || sameArtist(r.artistName, artist)));
   if (usable.length === 0) return null;
   const synced = usable.filter((r) => r.syncedLyrics);
   const pool = synced.length ? synced : usable;

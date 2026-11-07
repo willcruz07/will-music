@@ -24,7 +24,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
     });
 
     onProgress({ label: 'Buscando a letra' });
-    const picked = pickBestLyrics(await searchLyrics(song.title, song.artist), durationSec);
+    const picked = pickBestLyrics(await searchLyrics(song.title, song.artist), durationSec, song.artist);
     let lines: LyricLine[] = [];
     if (picked) {
       lines = picked.result.syncedLyrics

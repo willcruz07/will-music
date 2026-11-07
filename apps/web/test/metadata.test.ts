@@ -11,6 +11,11 @@ describe('readTags', () => {
     expect(await readTags(new File(['x'], 'Minha Música.mp3'))).toEqual({ title: 'Minha Música', artist: '', durationSec: 0 });
   });
 
+  it('guesses title and artist from the file name when tags are missing', async () => {
+    parseBlob.mockResolvedValueOnce({ common: {}, format: { duration: 208 } });
+    expect(await readTags(new File(['x'], 'Ton Carfi - Primeiros Passos (DVD Ton Carfi 20 Anos) - Ton Carfi (youtube)-G-118bpm-441hz.mp3'))).toEqual({ title: 'Primeiros Passos', artist: 'Ton Carfi', durationSec: 208 });
+  });
+
   it('uses ID3 title, artist and duration', async () => {
     parseBlob.mockResolvedValueOnce({ common: { title: 'Primeiros Passos', artist: 'Ton Carfi' }, format: { duration: 208.48 } });
     expect(await readTags(new File(['x'], 'arquivo.mp3'))).toEqual({ title: 'Primeiros Passos', artist: 'Ton Carfi', durationSec: 208.48 });

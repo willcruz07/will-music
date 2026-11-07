@@ -1,8 +1,10 @@
-import { ArrowLeft, Minus, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, Minus, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { AnalysisProgress } from '../components/AnalysisProgress.tsx';
 import { ChartView } from '../components/ChartView.tsx';
+import { LyricsPanel } from '../components/LyricsPanel.tsx';
+import { applyLyrics } from '../lib/lyricsApply.ts';
 import { Player, activeIndexAt } from '../components/Player.tsx';
 import { type Analysis, type Chart, type Song as SongRecord, db, deleteSong } from '../lib/db.ts';
 import { type PipelineProgress, runPipeline } from '../lib/pipeline.ts';
@@ -21,6 +23,7 @@ export const Song = () => {
   const [progress, setProgress] = useState<PipelineProgress | null>(null);
   const [activeLine, setActiveLine] = useState(-1);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [showLyrics, setShowLyrics] = useState(false);
   const lineStarts = useRef<number[]>([]);
 
   const load = useCallback(async () => {
@@ -126,6 +129,11 @@ export const Song = () => {
             <span className="text-lg font-bold">A+</span>
           </IconButton>
           <span className="flex-1" />
+          {analysis?.lyrics && (
+            <Button variant="ghost" onClick={() => setShowLyrics((v) => !v)} aria-pressed={showLyrics}>
+              <FileText className="size-4" /> Trocar letra
+            </Button>
+          )}
           <IconButton label="Analisar de novo" onClick={() => void analyze()} disabled={!!progress}>
             <RefreshCw className="size-4" />
           </IconButton>
@@ -154,7 +162,20 @@ export const Song = () => {
 
       {!progress && analysis?.lyrics?.warning && <p className="mt-4 text-sm text-muted-foreground">{analysis.lyrics.warning}</p>}
       {!progress && analysis && !analysis.lyrics && (
-        <p className="mt-4 text-sm text-muted-foreground">Não encontramos a letra desta música. A cifra mostra só os acordes.</p>
+        <p className="mt-4 text-sm text-muted-foreground">Não encontramos a letra desta música. A cifra mostra só os acordes; busque ou cole a letra abaixo.</p>
+      )}
+      {!progress && analysis && (showLyrics || !analysis.lyrics) && (
+        <LyricsPanel
+          title={song.title}
+          artist={song.artist}
+          durationSec={song.durationSec}
+          onApply={(lyrics) =>
+            void applyLyrics(song.id, lyrics).then(async () => {
+              setShowLyrics(false);
+              await load();
+            })
+          }
+        />
       )}
 
       {chart && !progress && (
