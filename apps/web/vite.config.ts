@@ -13,7 +13,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['icons/icon.svg'],
+      includeAssets: ['icons/favicon-48.png', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'will-music',
         short_name: 'will-music',
@@ -23,7 +23,8 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         theme_color: '#0b1220',
-        background_color: '#0b1220',
+        // Black like the icon's backdrop, so the splash screen and the icon read as one.
+        background_color: '#000000',
         display: 'standalone',
         orientation: 'any',
         categories: ['music', 'education', 'productivity'],
@@ -35,11 +36,11 @@ export default defineConfig({
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,jpeg,woff2,wasm}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,jpeg,webp,woff2,wasm}'],
         // The WebGPU runtime is only needed to separate tracks: fetch it on first use, then keep it.
         globIgnores: ['**/ort-wasm-simd-threaded.jsep-*.wasm', '**/ort-wasm-simd-threaded.asyncify-*.wasm', '**/ort-wasm-simd-threaded.jspi-*.wasm'],
         runtimeCaching: [{ urlPattern: /\.wasm$/, handler: 'CacheFirst', options: { cacheName: 'wm-runtime-wasm' } }],
