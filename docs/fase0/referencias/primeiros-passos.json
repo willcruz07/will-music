@@ -1,0 +1,15 @@
+{
+  "id": "primeiros-passos",
+  "title": "Primeiros Passos",
+  "artist": "Ton Carfi",
+  "audio": "Mel/Ton Carfi - Primeiros Passos (DVD Ton Carfi 20 Anos) - Ton Carfi (youtube)-G-118bpm-441hz.mp3",
+  "key": {
+    "root": "G",
+    "mode": "major"
+  },
+  "status": "draft",
+  "sequence": [
+    "N.C."
+  ],
+  "notes": "Tom G maior conforme o nome do arquivo (G, 118 bpm). Sequência de acordes a preencher pelo músico (sites de cifra bloqueiam acesso automático)."
+}

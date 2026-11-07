@@ -282,7 +282,7 @@ Visual: seguir o cifras.app (shadcn/ui, tema claro/escuro, verde esmeralda `hsl(
 - **Dependências:** só licenças permissivas (MIT, Apache-2.0, BSD, ISC). Evitar GPL e LGPL no bundle, por exemplo bibliotecas de time-stretch GPL.
 - **Modelos:** só MIT ou Apache-2.0.
   - Excluídos: `Tsumugi-Chords` (não comercial), `YourMT3+` (dados de treino não comerciais), `musetric/vocal-separation-roformer-onnx` (licença não confirmada).
-  - O modelo "kara2" do Musetric (voz principal / backing) não entra na V1 sem conferir a licença.
+  - O modelo "kara2" do Musetric (voz principal / backing) teve a licença conferida em 07/11/2026: Apache-2.0. Ele é o modelo de separação da V1 (instrumental, voz principal e backing vocals).
 - **Atribuições** de código e modelos de terceiros num `THIRD_PARTY_NOTICES.md`.
 - **Conteúdo:** o app nunca envia áudio do usuário para servidores. A única chamada de rede com dados da música é a busca no LRCLIB (título, artista e duração).
 

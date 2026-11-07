@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+@import '@fontsource/atkinson-hyperlegible-next/400.css';
+@import '@fontsource/atkinson-hyperlegible-next/600.css';
+@import '@fontsource/atkinson-hyperlegible-next/700.css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f6faf8;
+  --surface: #ffffff;
+  --foreground: #13211c;
+  --muted: #e3f3ec;
+  --muted-foreground: #4f6a60;
+  --border: #d3e5dd;
+  --primary: #10b981;
+  --primary-foreground: #ffffff;
+  --chord: #047857;
+  --danger: #b42318;
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: #0b1713;
+  --surface: #12241e;
+  --foreground: #e6f2ed;
+  --muted: #173229;
+  --muted-foreground: #9db8ad;
+  --border: #21403a;
+  --primary: #10b981;
+  --primary-foreground: #04120d;
+  --chord: #34d399;
+  --danger: #f97066;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-chord: var(--chord);
+  --color-danger: var(--danger);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --font-sans: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+}
+
+html {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

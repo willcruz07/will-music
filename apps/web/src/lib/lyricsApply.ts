@@ -1,0 +1,28 @@
+import { buildChart } from './chart.ts';
+import { type Analysis, db, now } from './db.ts';
+
+export type LyricsChoice = NonNullable<Analysis['lyrics']>;
+
+/** Saves the chosen lyrics; rebuilds the chart unless the user has edited it. */
+export const applyLyrics = async (songId: string, lyrics: LyricsChoice): Promise<'rebuilt' | 'kept-edited' | 'no-analysis'> => {
+  return db.transaction('rw', [db.songs, db.analyses, db.charts], async () => {
+    const [song, analysis, chart] = await Promise.all([
+      db.songs.get(songId),
+      db.analyses.where('songId').equals(songId).first(),
+      db.charts.where('songId').equals(songId).first(),
+    ]);
+    if (!song || !analysis) return 'no-analysis';
+    const stamp = now();
+    await db.analyses.update(analysis.id, { lyrics: { ...lyrics, chosenByUser: true }, updatedAt: stamp });
+    if (chart && chart.origin !== 'generated') return 'kept-edited';
+    const chordPro = buildChart({ title: song.title, artist: song.artist, key: analysis.key, chords: analysis.chords, lines: lyrics.lines });
+    const lineTimes = lyrics.lines.map((l) => l.start);
+    if (chart) await db.charts.update(chart.id, { chordPro, lineTimes, generatedFromAnalysisId: analysis.id, updatedAt: stamp });
+    else await db.charts.add({ id: crypto.randomUUID(), songId, chordPro, lineTimes, transpose: 0, fontSize: 18, origin: 'generated', generatedFromAnalysisId: analysis.id, createdAt: stamp, updatedAt: stamp });
+    return 'rebuilt';
+  });
+};
+
+/** Lyrics that must survive a re-analysis: pasted ones and ones the user picked from the search. */
+export const lyricsToKeep = (lyrics: Analysis['lyrics']): Analysis['lyrics'] =>
+  lyrics && (lyrics.source === 'manual' || lyrics.chosenByUser) ? lyrics : undefined;
