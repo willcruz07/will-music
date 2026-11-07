@@ -5,3 +5,6 @@ export * from './cqt/cpuCqt.ts';
 export * from './chords/vocab.ts';
 export * from './chords/labels.ts';
 export * from './chords/decode.ts';
+export * from './inference/runner.ts';
+export * from './key/key.ts';
+export * from './analyze.ts';
