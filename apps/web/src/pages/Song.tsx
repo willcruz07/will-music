@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Minus, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, Minus, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { AnalysisProgress } from '../components/AnalysisProgress.tsx';
@@ -140,6 +140,9 @@ export const Song = () => {
             <span className="text-lg font-bold">A+</span>
           </IconButton>
           <span className="flex-1" />
+          <Link to={`/musica/${song.id}/editar`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
+            <Pencil className="size-4" /> Editar cifra
+          </Link>
           {analysis?.lyrics && (
             <Button variant="ghost" onClick={() => setShowLyrics((v) => !v)} aria-pressed={showLyrics}>
               <FileText className="size-4" /> Trocar letra

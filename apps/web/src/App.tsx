@@ -1,6 +1,7 @@
 import { Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Route, Routes } from 'react-router';
+import { EditChart } from './pages/EditChart.tsx';
 import { Library } from './pages/Library.tsx';
 import { NewSong } from './pages/NewSong.tsx';
 import { Song } from './pages/Song.tsx';
@@ -50,6 +51,7 @@ export const App = () => (
         <Route path="/" element={<Library />} />
         <Route path="/nova" element={<NewSong />} />
         <Route path="/musica/:id" element={<Song />} />
+        <Route path="/musica/:id/editar" element={<EditChart />} />
       </Routes>
     </main>
   </div>

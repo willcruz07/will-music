@@ -1,6 +1,7 @@
 import { FileAudio, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { createManualSong } from '../lib/chartEdit.ts';
 import { createSong } from '../lib/db.ts';
 import { readTags } from '../lib/metadata.ts';
 import { Button } from '../ui/Button.tsx';
@@ -55,6 +56,19 @@ export const NewSong = () => {
         <span className="text-sm text-muted-foreground">{file ? minutes(duration) : 'MP3, WAV, M4A ou OGG'}</span>
         <input type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg" className="sr-only" aria-label="Arquivo de áudio" onChange={(e) => void choose(e.target.files?.[0])} />
       </label>
+
+      {!file && (
+        <p className="mt-6 text-sm text-muted-foreground">
+          Não tem o áudio?{' '}
+          <button
+            type="button"
+            className="font-semibold text-chord underline underline-offset-2"
+            onClick={() => void createManualSong('Nova cifra', '').then((s) => navigate(`/musica/${s.id}/editar`))}
+          >
+            Criar uma cifra sem áudio
+          </button>
+        </p>
+      )}
 
       {file && (
         <div className="mt-6 space-y-4">
