@@ -5,6 +5,7 @@ import { BottomNav, TopNav } from './components/AppNav.tsx';
 import { EditChart } from './pages/EditChart.tsx';
 import { SetlistEdit } from './pages/SetlistEdit.tsx';
 import { Setlists } from './pages/Setlists.tsx';
+import { Stage } from './pages/Stage.tsx';
 import { Library } from './pages/Library.tsx';
 import { NewSong } from './pages/NewSong.tsx';
 import { Song } from './pages/Song.tsx';
@@ -40,6 +41,14 @@ export const ThemeToggle = () => {
 };
 
 export const App = () => (
+  <Routes>
+    <Route path="/palco/lista/:id" element={<Stage mode="list" />} />
+    <Route path="/palco/musica/:id" element={<Stage mode="song" />} />
+    <Route path="*" element={<Layout />} />
+  </Routes>
+);
+
+const Layout = () => (
   <div className="flex min-h-dvh flex-col">
     <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">

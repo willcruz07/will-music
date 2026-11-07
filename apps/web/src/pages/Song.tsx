@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Info, Minus, Pencil, Plus, RefreshCw, Timer, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, Info, Minus, MonitorPlay, Pencil, Plus, RefreshCw, Timer, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { AnalysisProgress } from '../components/AnalysisProgress.tsx';
@@ -219,6 +219,9 @@ export const Song = () => {
           )}
           <Link to={`/musica/${song.id}/editar`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
             <Pencil className="size-4" /> Editar cifra
+          </Link>
+          <Link to={`/palco/musica/${song.id}`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
+            <MonitorPlay className="size-4" /> Palco
           </Link>
           <AddToSetlist songId={song.id} />
           <Button variant="ghost" onClick={() => setEditingInfo((v) => !v)} aria-pressed={editingInfo}>
