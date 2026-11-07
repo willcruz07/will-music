@@ -11,3 +11,4 @@ export * from './analyze.ts';
 export * from './eval/sequence.ts';
 export * from './models.ts';
 export * from './separation/stft.ts';
+export * from './separation/chunks.ts';
