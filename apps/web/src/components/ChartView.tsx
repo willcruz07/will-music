@@ -96,9 +96,9 @@ export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize
               const base = offset;
               offset += part.text.length;
               return (
-                <span key={j} className="inline-flex flex-col">
+                <span key={j} className="inline-flex max-w-full flex-col">
                   <span className="min-h-[1.25em] pr-1 font-bold text-chord">{part.chord ? <Chord name={t(part.chord)} onTap={onChordTap} /> : ' '}</span>
-                  <span className="whitespace-pre">
+                  <span className="whitespace-pre-wrap break-words">
                     {onPick ? <Words text={part.text} offset={base} onPick={(c) => onPick(lineIndex, c)} /> : part.text}
                   </span>
                 </span>

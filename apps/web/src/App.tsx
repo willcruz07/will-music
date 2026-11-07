@@ -20,6 +20,7 @@ const Scores = named(() => import('./pages/Scores.tsx'), 'Scores');
 const SongScore = named(() => import('./pages/SongScore.tsx'), 'SongScore');
 const FolderPage = named(() => import('./pages/FolderPage.tsx'), 'FolderPage');
 const StoragePage = named(() => import('./pages/StoragePage.tsx'), 'StoragePage');
+const StudyPage = named(() => import('./pages/StudyPage.tsx'), 'StudyPage');
 const MicPage = named(() => import('./pages/MicPage.tsx'), 'MicPage');
 const Stage = named(() => import('./pages/Stage.tsx'), 'Stage');
 
@@ -77,6 +78,7 @@ const Layout = () => (
           <Route path="/partituras" element={<Scores />} />
           <Route path="/pasta" element={<FolderPage />} />
           <Route path="/microfone" element={<MicPage />} />
+          <Route path="/estudo" element={<StudyPage />} />
           <Route path="/armazenamento" element={<StoragePage />} />
           <Route path="/listas" element={<Setlists />} />
           <Route path="/listas/:id" element={<SetlistEdit />} />
