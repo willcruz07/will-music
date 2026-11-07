@@ -1,5 +1,5 @@
 import { ArrowLeft, ChevronLeft, ChevronRight, Mic } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { Link, useSearchParams } from 'react-router';
 import { ChordDiagram, type Instrument } from '../components/ChordDiagram.tsx';
@@ -426,6 +426,25 @@ export const StudyPage = () => {
     setParams({ acorde: chord }, { replace: true });
     window.scrollTo?.({ top: 0 });
   };
+
+  // A link that changes ?acorde= or ?aba= while this page is open (e.g. "Entender este acorde" from a
+  // progression) must take effect, not only change the address.
+  const acorde = params.get('acorde');
+  const aba = params.get('aba');
+  const seen = useRef({ acorde, aba });
+  useEffect(() => {
+    const before = seen.current;
+    seen.current = { acorde, aba };
+    if (acorde && acorde !== before.acorde) {
+      setInitial(parseChord(acorde));
+      setChordKey((k) => k + 1);
+      setTabState('chords');
+      window.scrollTo?.({ top: 0 });
+    } else if (aba && aba !== before.aba) {
+      const t = TABS.find((x) => x.aba === aba);
+      if (t) setTabState(t.id);
+    }
+  }, [acorde, aba]);
 
   return (
     <section>

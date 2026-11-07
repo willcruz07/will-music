@@ -163,7 +163,7 @@ export const BATERIA: Lesson[] = [
       t('Os **rudimentos** são padrões de manulação (D = direita, E = esquerda) que formam toda a linguagem da bateria. A Percussive Arts Society lista 40 rudimentos internacionais; estes três são o começo de tudo:'),
       { kind: 'rhythm', caption: 'Toque simples (single stroke)', sticking: 'D E D E D E D E', pattern: { bpm: 80, steps: 8, tracks: [{ sound: 'snare', pattern: 'xxxxxxxx' }] } },
       { kind: 'rhythm', caption: 'Toque duplo (double stroke)', sticking: 'D D E E D D E E', pattern: { bpm: 80, steps: 8, tracks: [{ sound: 'snare', pattern: 'xxxxxxxx' }] } },
-      { kind: 'rhythm', caption: 'Paradiddle simples', sticking: 'D E D D E D E E', pattern: { bpm: 80, steps: 8, tracks: [{ sound: 'snare', pattern: 'x..x....', label: 'Acento' }, { sound: 'hihat', pattern: 'xxxxxxxx', label: 'Toques' }] } },
+      { kind: 'rhythm', caption: 'Paradiddle simples', sticking: 'D E D D E D E E', pattern: { bpm: 80, steps: 8, tracks: [{ sound: 'snare', pattern: 'x...x...', label: 'Acento' }, { sound: 'hihat', pattern: 'xxxxxxxx', label: 'Toques' }] } },
       { kind: 'tip', text: 'Estude com metrônomo, devagar e com os **acentos bem definidos** (o primeiro toque de cada grupo do paradiddle).' },
     ],
   },
@@ -208,8 +208,8 @@ export const BATERIA: Lesson[] = [
     title: 'Samba e pagode na bateria',
     summary: 'Surdo no 2, caixa em semicolcheias e o balanço do partido.',
     blocks: [
-      t('No samba, a **marcação** do surdo cai no **segundo tempo** do 2/4 (o tempo forte do samba é o 2). A caixa (ou o aro) toca semicolcheias com acentos, e o bumbo imita o surdo com uma nota curta antes do tempo.'),
-      { kind: 'rhythm', caption: 'Samba (2/4 escrito em dois tempos)', pattern: { bpm: 100, steps: 8, tracks: [{ sound: 'hihat', pattern: 'xxxxxxxx', label: 'Aro / chimbal' }, { sound: 'snare', pattern: 'x..x..x.', label: 'Acentos' }, { sound: 'kick', pattern: '...x...x', label: 'Bumbo (surdo)' }] } },
+      t('No samba, a **marcação** do surdo cai no **segundo tempo** do 2/4 (o tempo forte do samba é o 2). A caixa (ou o aro) toca semicolcheias com acentos, e o bumbo imita o surdo: uma nota no tempo e outra curta logo antes do próximo (1, a, 2, a), com a mais forte no 2.'),
+      { kind: 'rhythm', caption: 'Samba (2/4 escrito em dois tempos)', pattern: { bpm: 100, steps: 8, tracks: [{ sound: 'hihat', pattern: 'xxxxxxxx', label: 'Aro / chimbal' }, { sound: 'snare', pattern: 'x..x..x.', label: 'Acentos' }, { sound: 'kick', pattern: 'x..xx..x', label: 'Bumbo (surdo)' }] } },
     ],
   },
   {

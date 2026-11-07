@@ -12,7 +12,7 @@ export const ESTILOS: Lesson[] = [
     blocks: [
       t('O louvor contemporâneo vive de **dinâmica**: começa pequeno (voz e teclado), cresce até o clímax com a banda toda e volta ao íntimo. A harmonia é simples (I, IV, V, vi), e a riqueza vem do **arranjo**: pads de teclado, guitarras com delay e baixo que sustenta.'),
       { kind: 'progression', name: 'Base do louvor', degrees: ['I', 'V', 'vi', 'IV'], key: 'E' },
-      { kind: 'progression', name: 'Com baixos caminhando', degrees: ['IV', 'I', 'V', 'vi7'], key: 'E' },
+      { kind: 'progression', name: 'Começando no IV', degrees: ['IV', 'I', 'V', 'vi7'], key: 'E' },
       { kind: 'tip', text: 'Use **sus2 e sus4** e o **I/3** (com a terça no baixo) para dar movimento sem trocar de acorde.' },
     ],
   },
@@ -38,7 +38,7 @@ export const ESTILOS: Lesson[] = [
     blocks: [
       t('No samba o pulso é em **2/4**, com o **surdo marcando o segundo tempo**. O **cavaquinho** faz a "levada" em semicolcheias com acentos sincopados, e o violão de 7 cordas faz as **baixarias** (linhas de baixo melódicas que ligam os acordes). No pagode a harmonia usa muito **dominantes secundários** e **diminutos de passagem**.'),
       { kind: 'rhythm', caption: 'Levada de cavaco (acentos)', pattern: { bpm: 96, steps: 16, tracks: [{ sound: 'snare', pattern: 'x.xx.x.xx.xx.x.x', label: 'Cavaco' }, { sound: 'kick', pattern: '....x.......x...', label: 'Surdo (no 2)' }] } },
-      { kind: 'progression', name: 'Progressão de samba (com V7 secundário e diminuto)', degrees: ['I', 'V7/ii', 'ii7', 'V7', 'I', 'V7/IV', 'IV', 'iv6', 'I'], key: 'D' },
+      { kind: 'progression', name: 'Progressão de samba (com V7 secundário e diminuto)', degrees: ['I', 'V7/ii', 'ii7', 'V7', 'I', 'V7/IV', 'IV', '#iv°7', 'I'], key: 'D' },
     ],
   },
   {
@@ -101,7 +101,7 @@ export const ESTILOS: Lesson[] = [
       t('O gospel americano (black gospel) tem uma linguagem própria, construída na igreja: a banda **acompanha o momento** (pregação, oração, celebração) e responde ao líder. Elementos principais:'),
       { kind: 'list', items: ['**Shout / praise break:** trecho rápido e intenso em semicolcheias, geralmente sobre uma progressão curta, para celebração.', '**Rearmonização constante:** passing chords, 2-5 em cadeia, diminutos e trítonos (veja **Gospel chords** em Teclado).', '**Bateria com chops** e viradas lineares nos espaços (veja **Gospel chops** em Bateria).', '**Órgão Hammond** com drawbars e alavanca do Leslie para crescer a intensidade.', '**Modulações** de meio tom ou um tom subindo no final da música para dar o clímax.'] },
       { kind: 'progression', name: 'Progressão de shout', degrees: ['i7', 'iv7', 'V7(#9)', 'i7'], mode: 'minor', key: 'F' },
-      { kind: 'progression', name: 'Final com IV – iv – I', degrees: ['IV7M', 'iv6', 'iii7', 'V7/ii', 'ii7', 'V7sus4', 'I6(9)'], key: 'Db' },
+      { kind: 'progression', name: 'Final gospel: IV – iv e a volta pelo ii–V', degrees: ['IV7M', 'iv6', 'iii7', 'V7/ii', 'ii7', 'V7sus4', 'I6(9)'], key: 'Db' },
     ],
   },
 ];

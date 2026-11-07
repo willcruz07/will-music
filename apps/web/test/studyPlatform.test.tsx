@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { StudyPage } from '../src/pages/StudyPage.tsx';
 import { LessonPage, StudyHome, TrackPage } from '../src/pages/StudyHome.tsx';
@@ -130,5 +130,24 @@ describe('study tools', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Oitava' }));
     expect(screen.getByRole('status')).toHaveTextContent(/Era terça menor/);
     expect(screen.getByText('1 de 2')).toBeInTheDocument();
+  });
+});
+
+describe('review fixes: tools page follows the link it is sent to', () => {
+  it('opens the chord when a link changes ?acorde= while the page is open', async () => {
+    const Go = () => {
+      const nav = useNavigate();
+      return <button type="button" onClick={() => nav('/estudo/ferramentas?acorde=Dm7')}>ir</button>;
+    };
+    render(
+      <MemoryRouter initialEntries={['/estudo/ferramentas?aba=progressoes']}>
+        <Routes>
+          <Route path="/estudo/ferramentas" element={<><StudyPage /><Go /></>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'ir' }));
+    expect(screen.getByRole('tab', { name: 'Acordes' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('region', { name: 'Formação de Dm7' })).toBeInTheDocument();
   });
 });

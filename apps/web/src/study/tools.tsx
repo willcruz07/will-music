@@ -32,7 +32,7 @@ export const IntervalTrainer = ({ random = Math.random }: { random?: () => numbe
   const [score, setScore] = useState({ right: 0, total: 0 });
 
   const play = (harmonic = false) =>
-    synth.play('intervalo', harmonic ? [{ time: 0, dur: 1.2, pitch: q.root }, { time: 0, dur: 1.2, pitch: q.root + q.semis }] : [{ time: 0, dur: 0.7, pitch: q.root }, { time: 0.75, dur: 0.9, pitch: q.root + q.semis }]);
+    synth.play(harmonic ? 'intervalo-juntas' : 'intervalo', harmonic ? [{ time: 0, dur: 1.2, pitch: q.root }, { time: 0, dur: 1.2, pitch: q.root + q.semis }] : [{ time: 0, dur: 0.7, pitch: q.root }, { time: 0.75, dur: 0.9, pitch: q.root + q.semis }]);
   const next = (s: SetId = set) => {
     synth.stop();
     setQ(newQuestion(s, random));
@@ -220,7 +220,7 @@ export const PROGRESSION_CATALOG: Block[] = [
   { kind: 'text', text: '**Tons menores.**' },
   P('i – iv – V', ['i', 'iv', 'V7', 'i'], 'Cadência menor com o V da menor harmônica.', 'minor'),
   P('i – VII – VI – V (andaluza)', ['i', 'VII', 'VI', 'V7'], 'Descida típica do flamenco e do rock.', 'minor'),
-  P('ii° – V – i (menor)', ['iiø', 'V7', 'i'], 'O 2-5-1 menor: meio-diminuto, dominante, tônica menor.', 'minor'),
+  P('iiø – V – i (menor)', ['iiø', 'V7', 'i'], 'O 2-5-1 menor: meio-diminuto, dominante, tônica menor.', 'minor'),
 ];
 
 export const ProgressionCatalog = () => (

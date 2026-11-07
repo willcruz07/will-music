@@ -176,7 +176,7 @@ export const HARMONIA: Lesson[] = [
     blocks: [
       t('Intervalo é a distância entre duas notas. O número (2ª, 3ª, 5ª…) conta as letras; a qualidade (maior, menor, justa, aumentada, diminuta) conta os semitons. Por isso Dó–Mi é terça **maior** (4 semitons) e Dó–Mi♭ é terça **menor** (3).'),
       { kind: 'intervals', root: 'C', semitones: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], caption: 'Todos os intervalos dentro da oitava' },
-      { kind: 'list', title: 'Referências para reconhecer de ouvido', items: ['**4ª justa:** começo da Marcha Nupcial ("lá vem a noiva") e do hino "Amazing Grace".', '**5ª justa:** abertura de "Star Wars".', '**6ª maior:** "My Bonnie" / início de muitos chamados.', '**Trítono:** as duas primeiras notas do tema de "Os Simpsons"; é o coração do acorde dominante.', 'Use músicas que **você** conhece: o melhor exemplo é o que você já canta.'] },
+      { kind: 'list', title: 'Referências para reconhecer de ouvido', items: ['**4ª justa:** começo da Marcha Nupcial ("lá vem a noiva") e do hino "Amazing Grace".', '**5ª justa:** abertura de "Star Wars".', '**6ª maior:** "My Bonnie" / início de muitos chamados.', '**Trítono:** da primeira para a terceira nota do tema de "Os Simpsons" ("The Simp-sons": Dó, Mi, **Fá♯**); é o coração do acorde dominante.', 'Use músicas que **você** conhece: o melhor exemplo é o que você já canta.'] },
       { kind: 'exercise', steps: ['Use a ferramenta **Treino de intervalos** 10 minutos por dia.', 'Cante o intervalo antes de tocá-lo: ouvido e voz aprendem juntos.'] },
     ],
   },

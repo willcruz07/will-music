@@ -1,4 +1,4 @@
-import { pcOf, spellNote } from '../lib/chordTheory.ts';
+import { ROOTS, pcOf, spellNote } from '../lib/chordTheory.ts';
 import type { SynthEvent } from '../lib/synth.ts';
 
 // ---- Roman numerals ----
@@ -6,6 +6,9 @@ import type { SynthEvent } from '../lib/synth.ts';
 const DEGREES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const MAJOR = [0, 2, 4, 5, 7, 9, 11];
 const NATURAL_MINOR = [0, 2, 3, 5, 7, 8, 10];
+
+/** A double sharp or flat (Bbb, F##) becomes the plain note the app can draw and play (A, G). */
+const plain = (note: string) => (/^[A-G](bb|##)$/u.test(note) ? ROOTS[pcOf(note)]! : note);
 
 const rootOf = (chord: string) => /^[A-G][#b]*/u.exec(chord)?.[0] ?? 'C';
 
@@ -17,13 +20,13 @@ const rootOf = (chord: string) => /^[A-G][#b]*/u.exec(chord)?.[0] ?? 'C';
 export const romanToChord = (roman: string, key: string, mode: 'major' | 'minor' = 'major'): string => {
   const slash = roman.indexOf('/');
   if (slash > 0) return romanToChord(roman.slice(0, slash), rootOf(romanToChord(roman.slice(slash + 1), key, mode)), 'major');
-  if (roman.startsWith('subV')) return `${spellNote(key, 1, 1)}${roman.slice(4)}`;
+  if (roman.startsWith('subV')) return `${plain(spellNote(key, 1, 1))}${roman.slice(4)}`;
   const m = /^(b|#)?(VII|VI|IV|V|III|II|I|vii|vi|iv|v|iii|ii|i)(.*)$/u.exec(roman);
   if (!m) throw new Error(`Grau inválido: ${roman}`);
   const [, accidental = '', numeral, rest = ''] = m;
   const index = DEGREES.indexOf(numeral!.toUpperCase());
   const semis = (mode === 'major' ? MAJOR : NATURAL_MINOR)[index]! + (accidental === 'b' ? -1 : accidental === '#' ? 1 : 0);
-  const root = spellNote(key, (semis + 12) % 12, index);
+  const root = plain(spellNote(key, (semis + 12) % 12, index));
   if (numeral === numeral!.toUpperCase()) return `${root}${rest}`;
   if (rest.startsWith('ø')) return `${root}m7(b5)${rest.slice(1).replace(/^7/u, '')}`;
   if (rest.startsWith('°')) return `${root}${rest}`;
@@ -76,22 +79,28 @@ export const spellScale = (root: string, id: ScaleId): string[] => {
 };
 
 /**
- * A scale in one hand position (four frets from `startFret`), string by string from the lowest:
- * the frets to play on each string, ascending, and which of them are the root.
+ * A scale in one hand position (five frets, from one below `startFret`, so the run never
+ * skips a note), string by string from the lowest: the frets to play on each string, ascending, and
+ * which of them are the root. A note already reached on the string below is not repeated.
  */
 export const fretboardBox = (rootPc: number, steps: readonly number[], tuning: readonly number[], startFret: number) => {
   const pcs = new Set(steps.map((s) => (rootPc + s) % 12));
+  let last = -Infinity;
   return tuning.map((open, i) => {
     const frets: number[] = [];
-    for (let f = startFret; f <= startFret + 3; f++) if (pcs.has((open + f) % 12)) frets.push(f);
+    const low = Math.max(0, startFret - 1);
+    for (let f = low; f <= low + 4; f++)
+      if (pcs.has((open + f) % 12) && open + f > last) {
+        frets.push(f);
+        last = open + f;
+      }
     return { string: tuning.length - i, frets, roots: frets.filter((f) => (open + f) % 12 === rootPc) };
   });
 };
 
 /** Where to start the box so it holds the root on the lowest string (a common first position). */
 export const firstBoxFret = (rootPc: number, lowString = 40): number => {
-  const f = (((rootPc - lowString) % 12) + 12) % 12;
-  return f === 0 ? 0 : f;
+  return (((rootPc - lowString) % 12) + 12) % 12;
 };
 
 // ---- Rhythm ----
