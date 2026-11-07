@@ -2,3 +2,6 @@ export * from './cqt/plan.ts';
 export * from './cqt/frameCount.ts';
 export * from './audio/prepare.ts';
 export * from './cqt/cpuCqt.ts';
+export * from './chords/vocab.ts';
+export * from './chords/labels.ts';
+export * from './chords/decode.ts';
