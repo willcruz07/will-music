@@ -18,6 +18,7 @@ import { toDisplayLabel } from '@will-music/engine';
 import { AddToSetlist } from '../components/AddToSetlist.tsx';
 import { ExportButton } from '../components/PackageButtons.tsx';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
+import { ChordHelp } from '../components/ChordHelp.tsx';
 import { useScrollPrefs, useSteadyScroll } from '../lib/steadyScroll.ts';
 import { TranscribeLyrics } from '../components/TranscribeLyrics.tsx';
 import { useStems } from '../lib/useStems.ts';
@@ -37,6 +38,8 @@ export const Song = () => {
   const [autoScroll, setAutoScroll] = useState(true);
   const [scroll, setScroll] = useScrollPrefs();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [help, setHelp] = useState<{ chord: string; anchor: DOMRect } | null>(null);
+  const closeHelp = useCallback(() => setHelp(null), []);
   const [showLyrics, setShowLyrics] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
   const [showCurrent, setShowCurrent] = useState(true);
@@ -226,7 +229,7 @@ export const Song = () => {
             </Button>
           )}
           <Link to={`/musica/${song.id}/editar`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
-            <Pencil className="size-4" /> Editar cifra
+            <Pencil className="size-4" /> Editar letra e acordes
           </Link>
           <Link to={`/palco/musica/${song.id}`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
             <MonitorPlay className="size-4" /> Palco
@@ -329,9 +332,12 @@ export const Song = () => {
             fontSize={chart.fontSize}
             activeLineIndex={syncing ? syncMode.next : activeLine}
             autoScroll={(autoScroll && scroll.mode === 'follow') || syncing}
+            onChordTap={syncing ? undefined : (chord, anchor) => setHelp({ chord, anchor })}
           />
         </div>
       )}
+
+      {help && <ChordHelp chord={help.chord} anchor={help.anchor} onClose={closeHelp} />}
 
       {chart && !progress && <ChordPanel chordPro={chart.chordPro} transpose={chart.transpose} spellKey={shownKey} />}
 

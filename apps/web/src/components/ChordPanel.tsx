@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { parseChordPro } from '../lib/chart.ts';
 import { transposeChord } from '../lib/transpose.ts';
-import { ChordDiagram, type Instrument } from './ChordDiagram.tsx';
+import { ChordDiagram, INSTRUMENT_NAMES, type Instrument } from './ChordDiagram.tsx';
 
 const KEY = 'wm-instrument';
 
 export const readInstrument = (): Instrument => {
   try {
-    return localStorage.getItem(KEY) === 'teclado' ? 'teclado' : 'violao';
+    const v = localStorage.getItem(KEY);
+    return v === 'teclado' || v === 'cavaquinho' ? v : 'violao';
   } catch {
     return 'violao';
   }
@@ -28,7 +29,7 @@ export const chartChords = (chordPro: string, transpose: number, spellKey?: stri
 
 export const InstrumentToggle = ({ value, onChange }: { value: Instrument; onChange: (i: Instrument) => void }) => (
   <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label="Instrumento">
-    {(['violao', 'teclado'] as const).map((i) => (
+    {(['violao', 'teclado', 'cavaquinho'] as const).map((i) => (
       <button
         key={i}
         type="button"
@@ -44,7 +45,7 @@ export const InstrumentToggle = ({ value, onChange }: { value: Instrument; onCha
         }}
         className={`rounded-md px-3 py-1 text-sm ${value === i ? 'bg-muted font-semibold' : 'text-muted-foreground'}`}
       >
-        {i === 'violao' ? 'Violão' : 'Teclado'}
+        {INSTRUMENT_NAMES[i]}
       </button>
     ))}
   </div>
