@@ -191,7 +191,9 @@ export const EditChart = () => {
         }}
         onSelect={(e) => (caret.current = e.currentTarget.selectionStart)}
         spellCheck={false}
-        className="h-[56dvh] w-full resize-y rounded-lg border border-border bg-surface p-3 font-mono text-sm leading-relaxed outline-none focus:border-primary"
+        // Chords sit over their syllables only if lines never wrap: long lines scroll sideways instead.
+        wrap={format === 'cifra' ? 'off' : 'soft'}
+        className={`h-[56dvh] w-full resize-y rounded-lg border border-border bg-surface p-3 font-mono text-sm leading-relaxed outline-none focus:border-primary ${format === 'cifra' ? 'overflow-x-auto whitespace-pre' : ''}`}
       />
       {inserting && (
         <ChordLibrary

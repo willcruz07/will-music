@@ -67,7 +67,7 @@ export const Library = () => {
       )}
 
       {folders.length > 1 && (
-        <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Pastas">
+        <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Pastas">
           {[[null, 'Todas', songs?.length ?? 0] as const, ...folders.map(([f, n]) => [f, f || 'Sem pasta', n] as const)].map(([value, label, count]) => (
             <button
               key={value ?? '__all__'}

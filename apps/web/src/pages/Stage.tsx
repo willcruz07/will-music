@@ -153,7 +153,7 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
           <X className="size-5" />
         </Link>
         {entries.length > 1 && <span className="tabular-nums text-muted-foreground">{`${pos + 1} de ${entries.length}`}</span>}
-        <h1 className="min-w-0 flex-1 truncate text-xl font-bold">{entry.song.title}</h1>
+        <h1 className="min-w-[8rem] flex-1 truncate text-xl font-bold">{entry.song.title}</h1>
         {shownKey && (
           <span className="flex items-center gap-1">
             <button type="button" aria-label="Meio tom abaixo" onClick={() => changeKey(-1)} className="inline-flex size-10 items-center justify-center rounded-lg hover:bg-muted">
@@ -183,10 +183,10 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
       </div>
 
       <footer className="fixed inset-x-0 bottom-0 flex items-center gap-2 border-t border-border bg-surface px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-        <button type="button" onClick={() => go(-1)} disabled={pos === 0} className="inline-flex min-h-12 items-center gap-1 rounded-lg px-3 disabled:opacity-30">
-          <ChevronLeft className="size-6" /> Anterior
+        <button type="button" onClick={() => go(-1)} disabled={pos === 0} aria-label="Música anterior" className="inline-flex min-h-12 shrink-0 items-center gap-1 rounded-lg px-2 disabled:opacity-30 sm:px-3">
+          <ChevronLeft className="size-6" /> <span className="hidden sm:inline">Anterior</span>
         </button>
-        <span className="flex flex-1 items-center justify-center gap-3">
+        <span className="flex min-w-0 flex-1 items-center justify-center gap-3">
           <button
             type="button"
             aria-pressed={scrolling}
@@ -196,10 +196,10 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
           >
             {scrolling ? <Pause className="size-5" /> : <Play className="ml-0.5 size-5" />}
           </button>
-          <input type="range" min={1} max={10} value={speed} aria-label="Velocidade da rolagem" onChange={(e) => setSpeed(Number(e.target.value))} className="w-28 accent-[var(--primary)]" />
+          <input type="range" min={1} max={10} value={speed} aria-label="Velocidade da rolagem" onChange={(e) => setSpeed(Number(e.target.value))} className="w-28 min-w-0 shrink accent-[var(--primary)]" />
         </span>
-        <button type="button" onClick={() => go(1)} disabled={!nextEntry} className="inline-flex min-h-12 items-center gap-1 rounded-lg px-3 text-right disabled:opacity-30">
-          <span className="hidden max-w-40 truncate sm:inline">{nextEntry ? nextEntry.song.title : 'Fim da lista'}</span> Próxima <ChevronRight className="size-6" />
+        <button type="button" onClick={() => go(1)} disabled={!nextEntry} aria-label="Próxima música" className="inline-flex min-h-12 shrink-0 items-center gap-1 rounded-lg px-2 text-right disabled:opacity-30 sm:px-3">
+          <span className="hidden max-w-40 truncate sm:inline">{nextEntry ? nextEntry.song.title : 'Fim da lista'}</span> <span className="hidden sm:inline">Próxima</span> <ChevronRight className="size-6" />
         </button>
       </footer>
     </main>

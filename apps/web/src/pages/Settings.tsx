@@ -35,7 +35,7 @@ export const Settings = () => {
 
   return (
     <section className="max-w-2xl">
-      <h1 className="text-3xl font-bold tracking-tight">Ajustes</h1>
+      <h1 className="mb-4 text-3xl font-bold tracking-tight">Ajustes</h1>
 
       <Section title="Tema">
         <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" onKeyDown={rovingKeys} aria-label="Tema">

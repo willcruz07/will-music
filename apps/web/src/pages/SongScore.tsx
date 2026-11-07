@@ -22,6 +22,7 @@ import {
 } from '../lib/score.ts';
 import { createScoreSynth, toSynthEvents } from '../lib/synth.ts';
 import { useStems } from '../lib/useStems.ts';
+import { useRevealSelected } from '../lib/reveal.ts';
 import { Button } from '../ui/Button.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
 
@@ -78,6 +79,8 @@ const SongScorePage = ({ id }: { id: string }) => {
   const lyricSink = useRef<((t: number) => void) | null>(null);
   const synth = useRef<ReturnType<typeof createScoreSynth> | null>(null);
   const player = useRef<PlayerControls | null>(null);
+  const typeStrip = useRef<HTMLDivElement>(null);
+  useRevealSelected(typeStrip, `${type}:${song ? 1 : 0}`);
   const stems = useStems(id, audioUrl);
 
   useEffect(() => {
@@ -241,7 +244,7 @@ const SongScorePage = ({ id }: { id: string }) => {
       </Link>
       <h1 className="mt-2 text-3xl font-bold tracking-tight">Partitura</h1>
 
-      <div className="-mx-4 mt-4 overflow-x-auto px-4">
+      <div ref={typeStrip} className="no-scrollbar -mx-4 mt-4 overflow-x-auto px-4">
         <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="radiogroup" onKeyDown={rovingKeys} aria-label="Tipo de partitura">
           {SCORE_TYPES.map((t) => (
             <button
@@ -250,7 +253,7 @@ const SongScorePage = ({ id }: { id: string }) => {
               role="radio"
               aria-checked={type === t.type}
               onClick={() => chooseType(t.type)}
-              className={`min-h-10 whitespace-nowrap rounded-lg px-4 text-sm transition-colors ${type === t.type ? 'bg-primary font-semibold text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`min-h-10 scroll-mx-4 whitespace-nowrap rounded-lg px-4 text-sm transition-colors ${type === t.type ? 'bg-primary font-semibold text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
               {t.label}
               {hasScoreType(score, t.type) && type !== t.type && <span className="ml-1.5 inline-block size-1.5 rounded-full bg-primary align-middle" aria-label="pronta" />}
