@@ -55,8 +55,8 @@ const Layout = () => (
           will-music
         </Link>
         <div className="flex items-center gap-2">
-          <InstallButton />
           <TopNav />
+          <InstallButton />
           <ThemeToggle />
         </div>
       </div>
