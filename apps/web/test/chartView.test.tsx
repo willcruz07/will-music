@@ -29,6 +29,7 @@ describe('Player', () => {
 
   it('sets playback rate without changing pitch', () => {
     render(<Player src="blob:x" onTime={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir controles' }));
     fireEvent.change(screen.getByLabelText('Velocidade'), { target: { value: '75' } });
     const audio = document.querySelector('audio')!;
     expect(audio.playbackRate).toBe(0.75);
@@ -56,6 +57,7 @@ describe('ChartView picking', () => {
 describe('Player loop', () => {
   it('jumps back to A after passing B', () => {
     render(<Player src="blob:x" onTime={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir controles' }));
     const audio = document.querySelector('audio')!;
     Object.defineProperty(audio, 'duration', { value: 100, configurable: true });
     fireEvent.loadedMetadata(audio);

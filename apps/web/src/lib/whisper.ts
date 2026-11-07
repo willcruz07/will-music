@@ -1,6 +1,6 @@
 import type { WhisperRequest, WhisperResponse } from '../worker/whisper.worker.ts';
 import { db } from './db.ts';
-import { getStems } from './stems.ts';
+import { findVoiceTracks, getStems } from './stems.ts';
 import { type WhisperChunk, isUsefulTranscript, transcriptToLines } from './transcript.ts';
 import type { LyricLine } from './db.ts';
 
@@ -41,7 +41,7 @@ export const transcribeSong = async (
   onProgress: (loaded: number, total: number) => void,
 ): Promise<{ lines: LyricLine[]; usedVocals: boolean }> => {
   const stems = await getStems(songId);
-  const vocalTracks = stems?.tracks.filter((t) => t.name === 'lead' || t.name === 'backing') ?? [];
+  const vocalTracks = findVoiceTracks(stems);
   let audio: Float32Array;
   if (vocalTracks.length) {
     const parts = await Promise.all(vocalTracks.map((t) => decodeMono16k(t.blob)));

@@ -31,10 +31,10 @@ export const keyFifths = (key: KeyResult | undefined): number => {
   return MAJOR_FIFTHS[key.mode === 'minor' ? (pc + 3) % 12 : pc]!;
 };
 
-const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+export const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const spell = (pc: number, flats: boolean) => (flats ? FLATS : SHARPS)[((pc % 12) + 12) % 12]!;
-const alterXml = (alter: number, tag: string) => (alter ? `<${tag}>${alter}</${tag}>` : '');
+export const spell = (pc: number, flats: boolean) => (flats ? FLATS : SHARPS)[((pc % 12) + 12) % 12]!;
+export const alterXml = (alter: number, tag: string) => (alter ? `<${tag}>${alter}</${tag}>` : '');
 
 const DURATIONS: [number, string, boolean][] = [[16, 'whole', false], [12, 'half', true], [8, 'half', false], [6, 'quarter', true], [4, 'quarter', false], [3, 'eighth', true], [2, 'eighth', false], [1, '16th', false]];
 
@@ -50,10 +50,10 @@ const splitDuration = (ticks: number): [number, string, boolean][] => {
   return out;
 };
 
-type Piece = { start: number; dur: number; type: string; dot: boolean; note?: number; tieStart: boolean; tieStop: boolean };
+export type Piece = { start: number; dur: number; type: string; dot: boolean; note?: number; tieStart: boolean; tieStop: boolean };
 
 /** Notes and rests cut at bar lines and chord changes, then into writable values, with ties where a note is split. */
-const timeline = (notes: readonly QNote[], cuts: Set<number>, total: number): Piece[] => {
+export const timeline = (notes: readonly { start: number; dur: number }[], cuts: Set<number>, total: number): Piece[] => {
   const spans: { start: number; end: number; note?: number }[] = [];
   let at = 0;
   notes.forEach((n, i) => {
@@ -79,12 +79,12 @@ const timeline = (notes: readonly QNote[], cuts: Set<number>, total: number): Pi
   return pieces;
 };
 
-const pitchXml = (midi: number, flats: boolean) => {
+export const pitchXml = (midi: number, flats: boolean) => {
   const [step, alter] = spell(midi, flats);
   return `<pitch><step>${step}</step>${alterXml(alter, 'alter')}<octave>${Math.floor(midi / 12) - 1}</octave></pitch>`;
 };
 
-const harmonyXml = (raw: string, flats: boolean) => {
+export const harmonyXml = (raw: string, flats: boolean) => {
   const [root = 'C', quality = 'maj'] = raw.split(':');
   const [step, alter] = spell(PC[root] ?? 0, flats);
   return `<harmony><root><root-step>${step}</root-step>${alterXml(alter, 'root-alter')}</root><kind>${KINDS[quality] ?? 'major'}</kind></harmony>`;

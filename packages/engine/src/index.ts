@@ -18,3 +18,8 @@ export * from './score/tempo.ts';
 export * from './score/quantize.ts';
 export * from './score/tab.ts';
 export * from './score/musicxml.ts';
+export * from './separation/streaming.ts';
+export * from './separation/demucs.ts';
+export * from './audio/peaks.ts';
+export * from './score/drums.ts';
+export * from './score/parts.ts';

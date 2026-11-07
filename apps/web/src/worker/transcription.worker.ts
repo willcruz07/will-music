@@ -3,7 +3,8 @@ import { MODELS, type NoteEvent, extractNotes, modelVersion, runBasicPitch, toMe
 import { fetchModel } from '../lib/models.ts';
 import { createWebRunner } from '../lib/webRunner.ts';
 
-export type TranscriptionRequest = { type: 'transcribe'; pcm: Float32Array };
+/** poly: keep every note (keyboard score); otherwise reduce to the melody line. */
+export type TranscriptionRequest = { type: 'transcribe'; pcm: Float32Array; poly?: boolean };
 export type TranscriptionResponse =
   | { type: 'progress'; stage: 'models' | 'notes'; done: number; total: number }
   | { type: 'result'; notes: NoteEvent[]; model: string }
@@ -18,7 +19,8 @@ self.onmessage = async (event: MessageEvent<TranscriptionRequest>) => {
     const runner = await createWebRunner(bytes);
     try {
       const posteriors = await runBasicPitch(event.data.pcm, runner, (done, total) => post({ type: 'progress', stage: 'notes', done, total }));
-      post({ type: 'result', notes: toMelody(extractNotes(posteriors)), model: modelVersion('basicPitch') });
+      const notes = extractNotes(posteriors);
+      post({ type: 'result', notes: event.data.poly ? notes : toMelody(notes), model: modelVersion('basicPitch') });
     } finally {
       await runner.release();
     }

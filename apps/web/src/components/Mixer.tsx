@@ -1,16 +1,29 @@
+import { Headphones, VolumeX } from 'lucide-react';
 import type { MixTrack } from '../lib/mixer.ts';
 
-export const TRACK_LABELS: Record<string, string> = { instrumental: 'Instrumental', lead: 'Voz principal', backing: 'Backing vocals' };
+export const TRACK_LABELS: Record<string, string> = {
+  instrumental: 'Instrumental',
+  lead: 'Voz principal',
+  backing: 'Vocais de apoio',
+  vocals: 'Voz',
+  drums: 'Bateria',
+  bass: 'Baixo',
+  guitar: 'Violão / guitarra',
+  piano: 'Piano / teclado',
+  other: 'Outros',
+};
 
 export const Mixer = ({ tracks, onChange }: { tracks: MixTrack[]; onChange: (tracks: MixTrack[]) => void }) => {
   const set = (name: string, patch: Partial<MixTrack>) => onChange(tracks.map((t) => (t.name === name ? { ...t, ...patch } : t)));
+  const anySolo = tracks.some((t) => t.solo);
   return (
-    <ul className="divide-y divide-border">
+    <ul className="space-y-1">
       {tracks.map((t) => {
         const label = TRACK_LABELS[t.name] ?? t.name;
+        const silent = t.muted || (anySolo && !t.solo);
         return (
-          <li key={t.name} className="flex flex-wrap items-center gap-3 py-3">
-            <span className="w-36 font-semibold">{label}</span>
+          <li key={t.name} className={`grid grid-cols-[minmax(0,7.5rem)_1fr_auto] items-center gap-3 rounded-lg px-2 py-1.5 ${silent ? 'opacity-50' : ''}`}>
+            <span className="truncate text-sm font-semibold">{label}</span>
             <input
               type="range"
               min={0}
@@ -18,14 +31,30 @@ export const Mixer = ({ tracks, onChange }: { tracks: MixTrack[]; onChange: (tra
               value={Math.round(t.volume * 100)}
               aria-label={`Volume de ${label}`}
               onChange={(e) => set(t.name, { volume: Number(e.target.value) / 100 })}
-              className="w-40 accent-[var(--primary)]"
+              className="w-full accent-[var(--primary)]"
             />
-            <button type="button" aria-pressed={t.muted} onClick={() => set(t.name, { muted: !t.muted })} className={`rounded-lg px-3 py-2 text-sm ${t.muted ? 'bg-muted font-semibold text-danger' : 'text-muted-foreground'}`}>
-              Mudo
-            </button>
-            <button type="button" aria-pressed={t.solo} onClick={() => set(t.name, { solo: !t.solo })} className={`rounded-lg px-3 py-2 text-sm ${t.solo ? 'bg-muted font-semibold text-chord' : 'text-muted-foreground'}`}>
-              Solo
-            </button>
+            <span className="flex gap-1">
+              <button
+                type="button"
+                aria-pressed={t.muted}
+                aria-label="Mudo"
+                title={`Tirar ${label}`}
+                onClick={() => set(t.name, { muted: !t.muted })}
+                className={`inline-flex size-9 items-center justify-center rounded-lg ${t.muted ? 'bg-danger/15 text-danger' : 'text-muted-foreground hover:bg-muted'}`}
+              >
+                <VolumeX className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-pressed={t.solo}
+                aria-label="Solo"
+                title={`Só ${label}`}
+                onClick={() => set(t.name, { solo: !t.solo })}
+                className={`inline-flex size-9 items-center justify-center rounded-lg ${t.solo ? 'bg-primary/15 text-chord' : 'text-muted-foreground hover:bg-muted'}`}
+              >
+                <Headphones className="size-4" />
+              </button>
+            </span>
           </li>
         );
       })}
