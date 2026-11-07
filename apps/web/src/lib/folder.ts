@@ -18,7 +18,7 @@ export type DirLike = {
 export type FoundFile = { path: string; name: string; kind: 'package' | 'chordpro' | 'musicxml'; file: () => Promise<File> };
 
 const FOLDERS = { charts: 'Cifras', scores: 'Partituras', packages: 'Pacotes', backup: 'Backup' } as const;
-const TYPE_FILE: Record<string, string> = { melody: 'melodia', guitar: 'guitarra', keys: 'teclado', drums: 'bateria' };
+const TYPE_FILE: Record<string, string> = { melody: 'melodia', guitar: 'guitarra', keys: 'teclado', drums: 'bateria', choir: 'coral' };
 
 /** "Título - Artista" without the characters Windows, macOS, Android or iOS refuse in file names. */
 export const displayName = (song: Pick<Song, 'title' | 'artist'>): string => {

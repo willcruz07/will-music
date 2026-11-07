@@ -3,7 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Player, type PlayerControls } from '../components/Player.tsx';
 import { ScoreView } from '../components/ScoreView.tsx';
-import { type Analysis, type ScoreRecord, type Song, db } from '../lib/db.ts';
+import { PART_NAMES, VOICE_PARTS, type VoicePart, midiName, voiceType } from '@will-music/engine';
+import { LyricTicker } from '../components/LyricTicker.tsx';
+import { type Analysis, type Chart, type ScoreRecord, type Song, db } from '../lib/db.ts';
+import { chartLineStarts, lyricTexts } from '../lib/lineTimes.ts';
 import {
   type ScoreProgress,
   type ScoreType,
@@ -12,6 +15,7 @@ import {
   downloadText,
   hasScoreType,
   saveScore,
+  transcribeChoir,
   transcribeDrums,
   transcribeKeys,
   transcribeMelody,
@@ -33,11 +37,22 @@ const readType = (): ScoreType => {
   }
 };
 
+/** What the score synth plays for a type: the part on screen, at the real times heard in the song. */
+const eventsFor = (type: ScoreType, score: ScoreRecord | undefined, voices: ReadonlySet<VoicePart>) =>
+  type === 'keys'
+    ? toSynthEvents({ notes: score?.piano?.notes })
+    : type === 'drums'
+      ? toSynthEvents({ hits: score?.drums?.hits })
+      : type === 'choir'
+        ? toSynthEvents({ notes: VOICE_PARTS.filter((v) => voices.has(v)).flatMap((v) => score?.choir?.voices[v] ?? []) })
+        : toSynthEvents({ notes: score?.notes });
+
 const EMPTY_TEXT: Record<ScoreType, string> = {
   melody: 'O app escuta a voz principal (ou a música inteira, se as faixas não foram separadas) e escreve a melodia com a cifra por cima.',
   guitar: 'O app escuta a voz principal e escreve a melodia em pauta e em tablatura, com a corda e a casa de cada nota.',
   keys: 'O app escuta o piano (ou o acompanhamento) e escreve as duas mãos: clave de sol para a direita e clave de fá para a esquerda, na armadura do tom.',
   drums: 'O app escuta a faixa de bateria e escreve bumbo, caixa e chimbal. Antes, separe as faixas em 4, 6 ou na completa pelos controles do player.',
+  choir: 'O app escuta as vozes separadas, divide as notas em soprano, contralto, tenor e baixo e escreve a partitura do coral com a letra. Antes, separe as faixas pelos controles do player.',
 };
 
 /** Keyed by the song id, so a transcription still running for the previous song can never land on this one. */
@@ -57,6 +72,9 @@ const SongScorePage = ({ id }: { id: string }) => {
   const [synthOn, setSynthOn] = useState(false);
   const [onlyScore, setOnlyScore] = useState(false);
   const [synthVolume, setSynthVolume] = useState(0.7);
+  const [guideVoices, setGuideVoices] = useState<Set<VoicePart>>(() => new Set(VOICE_PARTS));
+  const [chart, setChart] = useState<Chart | undefined>();
+  const lyricSink = useRef<((t: number) => void) | null>(null);
   const synth = useRef<ReturnType<typeof createScoreSynth> | null>(null);
   const player = useRef<PlayerControls | null>(null);
   const stems = useStems(id, audioUrl);
@@ -65,8 +83,9 @@ const SongScorePage = ({ id }: { id: string }) => {
     let cancelled = false;
     let url: string | undefined;
     void (async () => {
-      const [s, a, sc, audio] = await Promise.all([db.songs.get(id), db.analyses.where('songId').equals(id).first(), db.scores.get(id), db.audio.get(id)]);
+      const [s, a, sc, audio, c] = await Promise.all([db.songs.get(id), db.analyses.where('songId').equals(id).first(), db.scores.get(id), db.audio.get(id), db.charts.where('songId').equals(id).first()]);
       if (cancelled) return;
+      setChart(c);
       setAnalysis(a);
       setScore(sc);
       if (audio) {
@@ -82,14 +101,19 @@ const SongScorePage = ({ id }: { id: string }) => {
     };
   }, [id]);
 
-  const xml = useMemo(() => (song ? buildScoreXml(type, song, analysis, score) : null), [type, song, analysis, score]);
+  // Lyric lines with their start times (from the chart sync or the downloaded lyrics).
+  const lyrics = useMemo(() => {
+    if (!chart) return [];
+    const starts = chartLineStarts(chart, analysis?.lyrics?.lines);
+    return lyricTexts(chart.chordPro).map((text, i) => ({ time: starts[i] ?? 0, text }));
+  }, [chart, analysis]);
+
+  const xml = useMemo(() => (song ? buildScoreXml(type, song, analysis, score, { lyrics }) : null), [type, song, analysis, score, lyrics]);
 
   // What the score synth plays: the notes of the part on screen, at their real times in the song.
   useEffect(() => {
-    const events =
-      type === 'keys' ? toSynthEvents({ notes: score?.piano?.notes }) : type === 'drums' ? toSynthEvents({ hits: score?.drums?.hits }) : toSynthEvents({ notes: score?.notes });
-    synth.current?.setEvents(events);
-  }, [type, score]);
+    synth.current?.setEvents(eventsFor(type, score, guideVoices));
+  }, [type, score, guideVoices]);
   useEffect(() => synth.current?.setVolume(synthVolume), [synthVolume]);
   useEffect(() => {
     if (!synthOn) synth.current?.stop();
@@ -111,7 +135,7 @@ const SongScorePage = ({ id }: { id: string }) => {
   const generate = () => {
     setError(null);
     setProgress({ stage: 'decode', done: 0, total: 1 });
-    const run = type === 'keys' ? transcribeKeys : type === 'drums' ? transcribeDrums : transcribeMelody;
+    const run = type === 'keys' ? transcribeKeys : type === 'drums' ? transcribeDrums : type === 'choir' ? transcribeChoir : transcribeMelody;
     void run(song, setProgress)
       .then(setScore)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'A transcrição das notas falhou.'))
@@ -131,8 +155,7 @@ const SongScorePage = ({ id }: { id: string }) => {
     void saveScore(next);
   };
 
-  const partEvents = () =>
-    type === 'keys' ? toSynthEvents({ notes: score?.piano?.notes }) : type === 'drums' ? toSynthEvents({ hits: score?.drums?.hits }) : toSynthEvents({ notes: score?.notes });
+  const partEvents = () => eventsFor(type, score, guideVoices);
 
   // Runs inside the tap: the audio context is created and resumed here (iOS only allows that in a gesture),
   // and if the music is already playing the notes start right away.
@@ -147,6 +170,7 @@ const SongScorePage = ({ id }: { id: string }) => {
   };
 
   const ready = hasScoreType(score, type);
+  const leadVoice = score?.notes.length ? voiceType(score.notes.map((n) => n.pitch)) : null;
   const info = SCORE_TYPES.find((t) => t.type === type)!;
   const sources = onlyScore && synthOn ? stems.sources?.map((s) => ({ ...s, volume: 0 })) : stems.sources;
 
@@ -159,6 +183,28 @@ const SongScorePage = ({ id }: { id: string }) => {
             <input type="checkbox" checked={synthOn} onChange={(e) => toggleSynth(e.target.checked)} className="size-4 accent-[var(--primary)]" />
             Tocar as notas da partitura junto com a música
           </label>
+          {type === 'choir' && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Vozes da guia">
+              {VOICE_PARTS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={guideVoices.has(v)}
+                  onClick={() =>
+                    setGuideVoices((cur) => {
+                      const next = new Set(cur);
+                      if (next.has(v)) next.delete(v);
+                      else next.add(v);
+                      return next;
+                    })
+                  }
+                  className={`min-h-9 rounded-full border px-3 text-sm ${guideVoices.has(v) ? 'border-primary bg-primary/15 font-semibold text-chord' : 'border-border text-muted-foreground'}`}
+                >
+                  {PART_NAMES[v]}
+                </button>
+              ))}
+            </div>
+          )}
           {synthOn && (
             <>
               <label className="flex items-center gap-2">
@@ -269,7 +315,13 @@ const SongScorePage = ({ id }: { id: string }) => {
       )}
       {ready && xml && (
         <>
+          {(type === 'choir' || type === 'melody') && leadVoice && (
+            <p className="mt-3 text-sm">
+              Voz principal: extensão {midiName(leadVoice.low)} a {midiName(leadVoice.high)}, próxima de <span className="font-semibold text-chord">{leadVoice.label}</span>.
+            </p>
+          )}
           <p className="mt-3 text-xs text-muted-foreground">É um rascunho feito de ouvido pelo app: confira tocando e ajuste no MuseScore se precisar.</p>
+          {lyrics.some((l) => l.text.trim()) && <LyricTicker lines={lyrics} sink={lyricSink} />}
           <ScoreView xml={xml} />
         </>
       )}
@@ -278,7 +330,7 @@ const SongScorePage = ({ id }: { id: string }) => {
         <>
           <Player
             sources={sources}
-            onTime={() => {}}
+            onTime={(t) => lyricSink.current?.(t)}
             title={song.title}
             songId={song.id}
             stems={stems}

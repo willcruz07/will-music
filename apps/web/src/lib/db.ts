@@ -1,4 +1,4 @@
-import type { ChordSegment, DrumHit, KeyResult, NoteEvent, StemMode } from '@will-music/engine';
+import type { ChordSegment, DrumHit, KeyResult, NoteEvent, StemMode, VoicePart } from '@will-music/engine';
 import Dexie, { type EntityTable, type Table } from 'dexie';
 import { requestPersistence } from './storage.ts';
 
@@ -71,6 +71,8 @@ export type ScoreRecord = {
   piano?: { notes: NoteEvent[]; source: string };
   /** Drum hits for the drum score (from a separated drum track). */
   drums?: { hits: DrumHit[] };
+  /** The sung notes split into soprano, alto, tenor and bass (choir score and voice guides). */
+  choir?: { voices: Record<VoicePart, NoteEvent[]>; source: string };
 };
 
 export type SetlistItem = { songId: string; targetKey?: string; note?: string };
