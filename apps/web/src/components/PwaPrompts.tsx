@@ -10,7 +10,7 @@ export const UpdateBanner = () => {
   return (
     <div
       role="status"
-      className="glass fixed inset-x-3 z-40 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-border px-4 py-3 shadow-[0_12px_40px_-16px_rgb(0_0_0/0.5)] md:bottom-6"
+      className="glass player-slide fixed inset-x-3 z-40 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-border px-4 py-3 shadow-[0_12px_40px_-16px_rgb(0_0_0/0.5)] md:bottom-6"
       style={{ bottom: 'calc(var(--nav-height) + env(safe-area-inset-bottom) + 1.5rem)' }}
     >
       {needRefresh ? <RefreshCw className="size-5 shrink-0 text-primary" /> : <WifiOff className="size-5 shrink-0 text-primary" />}
