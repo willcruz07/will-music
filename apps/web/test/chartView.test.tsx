@@ -35,3 +35,10 @@ describe('Player', () => {
     expect(audio.preservesPitch).toBe(true);
   });
 });
+
+describe('ChartView spelling', () => {
+  it('spells borrowed chords with flats in the shown key', () => {
+    render(<ChartView chordPro={'[C]Santo [A#]Santo'} transpose={0} preferFlats={false} spellKey="C" fontSize={16} />);
+    expect(screen.getByText('Bb')).toBeInTheDocument();
+  });
+});

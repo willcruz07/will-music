@@ -13,7 +13,7 @@ export const applyLyrics = async (songId: string, lyrics: LyricsChoice): Promise
     ]);
     if (!song || !analysis) return 'no-analysis';
     const stamp = now();
-    await db.analyses.update(analysis.id, { lyrics, updatedAt: stamp });
+    await db.analyses.update(analysis.id, { lyrics: { ...lyrics, chosenByUser: true }, updatedAt: stamp });
     if (chart && chart.origin !== 'generated') return 'kept-edited';
     const chordPro = buildChart({ title: song.title, artist: song.artist, key: analysis.key, chords: analysis.chords, lines: lyrics.lines });
     if (chart) await db.charts.update(chart.id, { chordPro, generatedFromAnalysisId: analysis.id, updatedAt: stamp });
@@ -21,3 +21,7 @@ export const applyLyrics = async (songId: string, lyrics: LyricsChoice): Promise
     return 'rebuilt';
   });
 };
+
+/** Lyrics that must survive a re-analysis: pasted ones and ones the user picked from the search. */
+export const lyricsToKeep = (lyrics: Analysis['lyrics']): Analysis['lyrics'] =>
+  lyrics && (lyrics.source === 'manual' || lyrics.chosenByUser) ? lyrics : undefined;

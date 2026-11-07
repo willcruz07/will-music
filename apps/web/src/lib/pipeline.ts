@@ -3,6 +3,7 @@ import { buildChart, keyToChord } from './chart.ts';
 import { type Analysis, type Chart, type LyricLine, db, now, updateSong } from './db.ts';
 import { decodeForAnalysis } from './decode.ts';
 import { distributePlainLyrics, parseLrc, pickBestLyrics, searchLyrics } from './lrclib.ts';
+import { lyricsToKeep } from './lyricsApply.ts';
 
 export type PipelineProgress = { label: string; fraction?: number };
 
@@ -23,14 +24,19 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       else onProgress({ label: 'Detectando o tom' });
     });
 
-    onProgress({ label: 'Buscando a letra' });
-    const picked = pickBestLyrics(await searchLyrics(song.title, song.artist), durationSec, song.artist);
-    let lines: LyricLine[] = [];
-    if (picked) {
-      lines = picked.result.syncedLyrics
-        ? parseLrc(picked.result.syncedLyrics)
-        : distributePlainLyrics(picked.result.plainLyrics ?? '', durationSec);
+    const previous = await db.analyses.where('songId').equals(songId).first();
+    let lyrics = lyricsToKeep(previous?.lyrics);
+    if (!lyrics) {
+      onProgress({ label: 'Buscando a letra' });
+      const picked = pickBestLyrics(await searchLyrics(song.title, song.artist), durationSec, song.artist);
+      if (picked) {
+        const lines: LyricLine[] = picked.result.syncedLyrics
+          ? parseLrc(picked.result.syncedLyrics)
+          : distributePlainLyrics(picked.result.plainLyrics ?? '', durationSec);
+        lyrics = { source: 'lrclib', lrclibId: picked.result.id, lines, warning: picked.warning };
+      }
     }
+    const lines = lyrics?.lines ?? [];
 
     const stamp = now();
     const analysis: Analysis = {
@@ -40,7 +46,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       models: result.models,
       key: result.key,
       chords: result.chords,
-      lyrics: picked ? { source: 'lrclib', lrclibId: picked.result.id, lines, warning: picked.warning } : undefined,
+      lyrics,
       createdAt: stamp,
       updatedAt: stamp,
     };

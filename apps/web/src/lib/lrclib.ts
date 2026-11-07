@@ -54,13 +54,15 @@ export const pickBestLyrics = (
 export const parseLrc = (text: string): LyricLine[] => {
   const lines: LyricLine[] = [];
   for (const raw of text.split(/\r?\n/u)) {
-    const match = /^\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)$/u.exec(raw.trim());
+    const match = /^((?:\[\d+:\d+(?:\.\d+)?\])+)\s*(.*)$/u.exec(raw.trim());
     if (!match) continue;
-    const lyric = match[3]!.trim();
+    const lyric = match[2]!.trim();
     if (!lyric) continue;
-    lines.push({ start: Number(match[1]) * 60 + Number(match[2]), text: lyric });
+    for (const stamp of match[1]!.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/gu)) {
+      lines.push({ start: Number(stamp[1]) * 60 + Number(stamp[2]), text: lyric });
+    }
   }
-  return lines;
+  return lines.sort((a, b) => a.start - b.start);
 };
 
 export const distributePlainLyrics = (plain: string, durationSec: number): LyricLine[] => {

@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { analyzeChords, analyzeKey, downmixMean, MODELS, modelVersion, verifyCqtPlan } from '@will-music/engine';
+import { analyzeChords, analyzeKey, downmixMean, estimateKeyFromChords, type KeyResult, MODELS, modelVersion, verifyCqtPlan } from '@will-music/engine';
 import { fetchModel } from '../lib/models.ts';
 import { createWebRunner } from '../lib/webRunner.ts';
 import type { WorkerRequest, WorkerResponse } from './protocol.ts';
@@ -23,8 +23,16 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     try {
       const chords = await analyzeChords(pcm, plan, chordRunner, (done, runs) => post({ type: 'progress', stage: 'chords', done, total: runs }));
       post({ type: 'progress', stage: 'key', done: 0, total: 1 });
-      const key = await analyzeKey(pcm, keyRunner);
-      post({ type: 'result', key, chords, models: { chords: modelVersion('chordnet'), cqtPlan: modelVersion('cqtPlan'), key: modelVersion('skey') } });
+      // A key-model failure (e.g. a very short clip) must not throw away the chords already detected.
+      let key: KeyResult;
+      let keyModel = modelVersion('skey');
+      try {
+        key = await analyzeKey(pcm, keyRunner);
+      } catch {
+        key = estimateKeyFromChords(chords);
+        keyModel = 'estimado-pelos-acordes';
+      }
+      post({ type: 'result', key, chords, models: { chords: modelVersion('chordnet'), cqtPlan: modelVersion('cqtPlan'), key: keyModel } });
     } finally {
       await chordRunner.release();
       await keyRunner.release();

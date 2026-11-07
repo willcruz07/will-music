@@ -27,7 +27,7 @@ export type Analysis = {
   models: Record<string, string>;
   key: KeyResult;
   chords: ChordSegment[];
-  lyrics?: { source: 'lrclib' | 'manual'; lrclibId?: number; lines: LyricLine[]; warning?: string };
+  lyrics?: { source: 'lrclib' | 'manual'; lrclibId?: number; lines: LyricLine[]; warning?: string; chosenByUser?: boolean };
   createdAt: string;
   updatedAt: string;
 };

@@ -9,13 +9,15 @@ type Props = {
   fontSize: number;
   /** Index among lyric lines (the k-th lyric line of the chart ↔ the k-th lyric line of the analysis). */
   activeLineIndex?: number;
+  /** Key the chart is shown in; when given, chord spelling follows it. */
+  spellKey?: string;
   autoScroll?: boolean;
 };
 
-export const ChartView = ({ chordPro, transpose, preferFlats, fontSize, activeLineIndex = -1, autoScroll = false }: Props) => {
+export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize, activeLineIndex = -1, autoScroll = false }: Props) => {
   const { lines } = useMemo(() => parseChordPro(chordPro), [chordPro]);
   const activeRef = useRef<HTMLDivElement | null>(null);
-  const t = (chord: string) => transposeChord(chord, transpose, preferFlats);
+  const t = (chord: string) => transposeChord(chord, transpose, spellKey ?? preferFlats);
 
   useEffect(() => {
     if (autoScroll && activeRef.current) activeRef.current.scrollIntoView?.({ block: 'center', behavior: 'smooth' });

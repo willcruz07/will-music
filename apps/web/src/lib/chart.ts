@@ -33,17 +33,30 @@ const wordStarts = (text: string): number[] => {
   return starts.length ? starts : [0];
 };
 
-const placeChords = (text: string, start: number, end: number, chords: Chord[], active?: Chord): string => {
+// Square brackets in lyrics ("[Refrão]") would be read as chords; show them as parentheses.
+const escapeLyric = (text: string): string => text.replace(/\[/gu, '(').replace(/\]/gu, ')');
+
+/** Chords go left to right in time order on word starts; chords that find no free word are appended after the text. */
+const placeChords = (rawText: string, start: number, end: number, chords: Chord[], active?: Chord): string => {
+  const text = escapeLyric(rawText);
   const starts = wordStarts(text);
+  const span = Math.max(0.001, end - start);
+  const queue = [
+    ...(active ? [{ label: active.label, target: Number.NEGATIVE_INFINITY }] : []),
+    ...[...chords].sort((a, b) => a.start - b.start).map((c) => ({ label: c.label, target: ((c.start - start) / span) * text.length })),
+  ];
   const used = new Map<number, string>();
-  if (active) used.set(starts[0]!, active.label);
-  for (const chord of chords) {
-    const target = ((chord.start - start) / Math.max(0.001, end - start)) * text.length;
-    const ordered = [...starts].sort((a, b) => Math.abs(a - target) - Math.abs(b - target));
-    const free = ordered.find((p) => !used.has(p) && p >= Math.max(-1, ...[...used.keys()].filter((k) => k <= target)));
-    const position = free ?? ordered.find((p) => !used.has(p));
-    if (position === undefined) continue;
+  const extras: string[] = [];
+  let last = -1;
+  for (const chord of queue) {
+    const candidates = starts.filter((p) => p > last);
+    if (candidates.length === 0) {
+      extras.push(chord.label);
+      continue;
+    }
+    const position = candidates.reduce((best, p) => (Math.abs(p - chord.target) < Math.abs(best - chord.target) ? p : best));
     used.set(position, chord.label);
+    last = position;
   }
   let out = '';
   for (let i = 0; i < text.length; i++) {
@@ -51,7 +64,7 @@ const placeChords = (text: string, start: number, end: number, chords: Chord[], 
     if (label) out += `[${label}]`;
     out += text[i];
   }
-  return out;
+  return extras.length ? `${out} ${extras.map((l) => `[${l}]`).join(' ')}` : out;
 };
 
 export const buildChart = (input: { title: string; artist: string; key: KeyResult; chords: ChordSegment[]; lines: LyricLine[] }): string => {

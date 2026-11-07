@@ -7,11 +7,10 @@ import { LyricsPanel } from '../components/LyricsPanel.tsx';
 import { applyLyrics } from '../lib/lyricsApply.ts';
 import { Player, activeIndexAt } from '../components/Player.tsx';
 import { type Analysis, type Chart, type Song as SongRecord, db, deleteSong } from '../lib/db.ts';
+import { isRunning, startAnalysis, subscribeAnalysis } from '../lib/jobs.ts';
 import { type PipelineProgress, runPipeline } from '../lib/pipeline.ts';
 import { prefersFlats, transposeKey } from '../lib/transpose.ts';
 import { Button, IconButton } from '../ui/Button.tsx';
-
-const running = new Set<string>();
 
 export const Song = () => {
   const { id = '' } = useParams();
@@ -39,36 +38,47 @@ export const Song = () => {
     return s;
   }, [id]);
 
-  const analyze = useCallback(async () => {
-    if (running.has(id)) return;
-    running.add(id);
+  // Follows the analysis through the module-level job registry, so leaving and reopening the page keeps showing it.
+  const follow = useCallback(
+    () =>
+      subscribeAnalysis(id, (event) => {
+        if (event === 'done') {
+          setProgress(null);
+          void load();
+        } else setProgress(event);
+      }),
+    [id, load],
+  );
+
+  const analyze = useCallback(() => {
     setProgress({ label: 'Preparando o áudio' });
-    try {
-      await runPipeline(id, setProgress);
-    } catch {
+    startAnalysis(id, (onProgress) => runPipeline(id, onProgress)).catch(() => {
       // status and message are stored on the song
-    } finally {
-      running.delete(id);
-      setProgress(null);
-      await load();
-    }
-  }, [id, load]);
+    });
+    return follow();
+  }, [id, follow]);
 
   useEffect(() => {
+    let cancelled = false;
     let url: string | undefined;
+    let unsubscribe = () => {};
     void (async () => {
       const s = await load();
       const audio = await db.audio.get(id);
+      if (cancelled) return;
       if (audio) {
         url = URL.createObjectURL(audio.blob);
         setAudioUrl(url);
       }
-      if (s && (s.analysisStatus === 'pending' || (s.analysisStatus === 'running' && !running.has(id)))) void analyze();
+      if (isRunning(id)) unsubscribe = follow();
+      else if (s && (s.analysisStatus === 'pending' || s.analysisStatus === 'running')) unsubscribe = analyze();
     })();
     return () => {
+      cancelled = true;
+      unsubscribe();
       if (url) URL.revokeObjectURL(url);
     };
-  }, [id, load, analyze]);
+  }, [id, load, analyze, follow]);
 
   const onTime = useCallback((t: number) => setActiveLine(activeIndexAt(lineStarts.current, t)), []);
 
@@ -184,6 +194,7 @@ export const Song = () => {
             chordPro={chart.chordPro}
             transpose={chart.transpose}
             preferFlats={shownKey ? prefersFlats(shownKey) : false}
+            spellKey={shownKey}
             fontSize={chart.fontSize}
             activeLineIndex={activeLine}
             autoScroll={autoScroll}

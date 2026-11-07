@@ -19,7 +19,7 @@ export const parseReferenceChord = (text: string): MajMin | null => {
   const match = /^([A-G])([#b]?)(.*)$/u.exec(trimmed);
   if (!match) throw new RangeError(`Cannot parse chord "${text}"`);
   const rest = (match[3] ?? '').split('/')[0] ?? '';
-  const minor = (/^m(?!aj)/u.test(rest)) || rest.includes('°') || rest.includes('dim');
+  const minor = (/^m(?!aj)/u.test(rest)) || rest.includes('°') || rest.includes('º') || rest.includes('dim');
   return { pc: pitchClass(`${match[1]}${match[2]}`), quality: minor ? 'min' : 'maj' };
 };
 
