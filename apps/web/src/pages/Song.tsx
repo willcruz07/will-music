@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { AnalysisProgress } from '../components/AnalysisProgress.tsx';
 import { ChartView } from '../components/ChartView.tsx';
 import { LyricsPanel } from '../components/LyricsPanel.tsx';
+import { chartLineStarts } from '../lib/lineTimes.ts';
 import { applyLyrics } from '../lib/lyricsApply.ts';
 import { Player, activeIndexAt } from '../components/Player.tsx';
 import { type Analysis, type Chart, type Song as SongRecord, db, deleteSong } from '../lib/db.ts';
@@ -34,7 +35,7 @@ export const Song = () => {
     setSong(s ?? null);
     setChart(c);
     setAnalysis(a);
-    lineStarts.current = a?.lyrics?.lines.map((l) => l.start) ?? [];
+    lineStarts.current = chartLineStarts(c, a?.lyrics?.lines);
     return s;
   }, [id]);
 

@@ -40,6 +40,8 @@ export type Chart = {
   fontSize: number;
   origin: 'generated' | 'edited' | 'manual';
   generatedFromAnalysisId?: string;
+  /** Start time of each lyric line, in chart order (spec §5.5). null = interpolate. */
+  lineTimes?: (number | null)[];
   createdAt: string;
   updatedAt: string;
 };

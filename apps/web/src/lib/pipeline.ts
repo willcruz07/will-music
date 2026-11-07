@@ -57,10 +57,10 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       await db.analyses.add(analysis);
       const existing = await db.charts.where('songId').equals(songId).first();
       if (!existing) {
-        const chart: Chart = { id: crypto.randomUUID(), songId, chordPro, transpose: 0, fontSize: 18, origin: 'generated', generatedFromAnalysisId: analysis.id, createdAt: stamp, updatedAt: stamp };
+        const chart: Chart = { id: crypto.randomUUID(), songId, chordPro, lineTimes: lines.map((l) => l.start), transpose: 0, fontSize: 18, origin: 'generated', generatedFromAnalysisId: analysis.id, createdAt: stamp, updatedAt: stamp };
         await db.charts.add(chart);
       } else if (existing.origin === 'generated') {
-        await db.charts.update(existing.id, { chordPro, generatedFromAnalysisId: analysis.id, updatedAt: stamp });
+        await db.charts.update(existing.id, { chordPro, lineTimes: lines.map((l) => l.start), generatedFromAnalysisId: analysis.id, updatedAt: stamp });
       }
       await updateSong(songId, { key: keyToChord(result.key), durationSec: song.durationSec || durationSec, analysisStatus: 'done' });
     });

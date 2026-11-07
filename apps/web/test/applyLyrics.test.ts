@@ -24,6 +24,7 @@ describe('applyLyrics', () => {
     expect(chart!.chordPro).toContain('[G]Primeira linha');
     expect(chart!.chordPro).toContain('[C]Segunda linha');
     expect(chart!.transpose).toBe(2);
+    expect(chart!.lineTimes).toEqual([1, 11]);
     expect((await db.analyses.get('a1'))!.lyrics!.lines).toHaveLength(2);
   });
 
