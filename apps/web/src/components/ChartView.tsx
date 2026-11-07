@@ -14,7 +14,24 @@ type Props = {
   autoScroll?: boolean;
   /** Editor mode: called with (lyric line index, plain character index) when a word is tapped. */
   onPick?: (lyricLineIndex: number, charIndex: number) => void;
+  /** Reading mode: called with the shown chord when it is tapped (to show how to play it). */
+  onChordTap?: (chord: string, anchor: DOMRect) => void;
 };
+
+/** A chord name; a button when it can be tapped for help. */
+const Chord = ({ name, onTap }: { name: string; onTap?: (chord: string, anchor: DOMRect) => void }) =>
+  onTap ? (
+    <button
+      type="button"
+      onClick={(e) => onTap(name, e.currentTarget.getBoundingClientRect())}
+      aria-label={`Como tocar ${name}`}
+      className="rounded font-bold text-chord underline decoration-chord/30 decoration-dotted underline-offset-4 hover:bg-muted hover:decoration-chord"
+    >
+      {name}
+    </button>
+  ) : (
+    <span className="font-bold text-chord">{name}</span>
+  );
 
 const Words = ({ text, offset, onPick }: { text: string; offset: number; onPick: (charIndex: number) => void }) => {
   let at = offset;
@@ -34,7 +51,7 @@ const Words = ({ text, offset, onPick }: { text: string; offset: number; onPick:
   );
 };
 
-export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize, activeLineIndex = -1, autoScroll = false, onPick }: Props) => {
+export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize, activeLineIndex = -1, autoScroll = false, onPick, onChordTap }: Props) => {
   const { lines } = useMemo(() => parseChordPro(chordPro), [chordPro]);
   const activeRef = useRef<HTMLDivElement | null>(null);
   const t = (chord: string) => transposeChord(chord, transpose, spellKey ?? preferFlats);
@@ -58,7 +75,7 @@ export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize
           return (
             <div key={i} className="mb-2 flex flex-wrap gap-x-5 gap-y-1 font-bold text-chord">
               {line.chords.map((c, j) => (
-                <span key={j} className="text-chord">{t(c)}</span>
+                <Chord key={j} name={t(c)} onTap={onChordTap} />
               ))}
             </div>
           );
@@ -80,7 +97,7 @@ export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize
               offset += part.text.length;
               return (
                 <span key={j} className="inline-flex flex-col">
-                  <span className="min-h-[1.25em] pr-1 font-bold text-chord">{part.chord ? t(part.chord) : ' '}</span>
+                  <span className="min-h-[1.25em] pr-1 font-bold text-chord">{part.chord ? <Chord name={t(part.chord)} onTap={onChordTap} /> : ' '}</span>
                   <span className="whitespace-pre">
                     {onPick ? <Words text={part.text} offset={base} onPick={(c) => onPick(lineIndex, c)} /> : part.text}
                   </span>

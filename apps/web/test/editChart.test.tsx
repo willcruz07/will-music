@@ -29,6 +29,7 @@ describe('chart editor', () => {
         </Routes>
       </MemoryRouter>,
     );
+    await userEvent.click(await screen.findByRole('radio', { name: 'ChordPro' }));
     const box = await screen.findByLabelText('Cifra em ChordPro');
     await userEvent.type(box, '[[G]Santo');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
@@ -53,5 +54,47 @@ describe('review fixes: editor', () => {
     await db.charts.add({ id: 'c', songId: song.id, chordPro: 'um\ndois', transpose: 0, fontSize: 18, origin: 'generated', createdAt: '', updatedAt: '' });
     await saveEditedChart(song.id, '[G]um\ndois');
     expect((await db.charts.get('c'))!.lineTimes).toEqual([3, 8]);
+  });
+});
+
+
+describe('editing lyrics and chords', () => {
+  const open = (id: string) =>
+    render(
+      <MemoryRouter initialEntries={[`/musica/${id}/editar`]}>
+        <Routes>
+          <Route path="/musica/:id/editar" element={<EditChart />} />
+          <Route path="/musica/:id" element={<p>tela da música</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it('opens filled in with the chords above the lyric and saves it back as ChordPro', async () => {
+    localStorage.removeItem('wm-edit-format');
+    const song = await createManualSong('Hino', '');
+    await saveEditedChart(song.id, '[G]Santo [D]santo');
+    open(song.id);
+    const box = (await screen.findByLabelText('Cifra com os acordes em cima da letra')) as HTMLTextAreaElement;
+    expect(box.value).toBe('G     D\nSanto santo');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'C     G{enter}Santo santo');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    await screen.findByText('tela da música');
+    expect((await db.charts.where('songId').equals(song.id).first())!.chordPro).toBe('[C]Santo [G]santo');
+  });
+
+  it('inserts a chord from the library at the cursor', async () => {
+    const song = await createManualSong('Hino', '');
+    await saveEditedChart(song.id, '{title: Hino}');
+    open(song.id);
+    await userEvent.click(await screen.findByRole('radio', { name: 'ChordPro' }));
+    const box = (await screen.findByLabelText('Cifra em ChordPro')) as HTMLTextAreaElement;
+    await userEvent.click(box);
+    await userEvent.type(box, '{end}{enter}Santo');
+    await userEvent.click(screen.getByRole('button', { name: /Inserir acorde/ }));
+    await userEvent.click(screen.getByRole('radio', { name: 'A (Lá)' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'm7' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Usar Am7' }));
+    expect(box.value).toContain('Santo[Am7]');
   });
 });

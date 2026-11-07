@@ -19,7 +19,7 @@ describe('song page without audio', () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByRole('link', { name: /Editar cifra/ })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /Editar letra e acordes/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Analisar de novo' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Sincronizar/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Tocar' })).toBeNull();

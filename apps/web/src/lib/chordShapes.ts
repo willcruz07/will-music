@@ -36,6 +36,17 @@ type GuitarDb = { chords: Record<string, { suffix: string; positions: GuitarShap
 let guitarDb: Promise<GuitarDb> | undefined;
 const loadGuitarDb = () => (guitarDb ??= import('@tombatossals/chords-db/lib/guitar.json').then((m) => (m.default ?? m) as unknown as GuitarDb));
 
+/** Every guitar position chords-db has for a chord (a missing slash shape falls back to the chord without bass). */
+export const guitarShapes = async (chord: string): Promise<GuitarShape[]> => {
+  const target = dbKeyFor(chord);
+  if (!target) return [];
+  const db = await loadGuitarDb();
+  const list = db.chords[target.key]?.find((c) => c.suffix === target.suffix)?.positions ?? [];
+  if (list.length) return list.map((p) => ({ frets: p.frets, fingers: p.fingers, baseFret: p.baseFret, barres: p.barres }));
+  if (target.suffix.startsWith('/') || target.suffix.startsWith('m/')) return guitarShapes(chord.replace(/\/.*$/u, ''));
+  return [];
+};
+
 /** First guitar position for a chord; a missing slash shape falls back to the chord without bass. */
 export const guitarShape = async (chord: string): Promise<GuitarShape | null> => {
   const target = dbKeyFor(chord);
@@ -58,14 +69,15 @@ export type SvguitarChord = {
 
 /** chords-db lists strings low E → high E; svguitar numbers them 1 (high E) to 6 (low E). */
 export const toSvguitar = (shape: GuitarShape): SvguitarChord => {
+  const n = shape.frets.length;
   const fingers: SvguitarChord['fingers'] = shape.frets.map((fret, i) => {
-    const string = 6 - i;
+    const string = n - i;
     if (fret < 0) return [string, 'x'];
     if (fret === 0) return [string, 0];
-    return [string, fret, String(shape.fingers[i] ?? '')];
+    return [string, fret, shape.fingers[i] ? String(shape.fingers[i]) : ''];
   });
   const barres = shape.barres.map((fret) => {
-    const strings = shape.frets.flatMap((f, i) => (f === fret ? [6 - i] : []));
+    const strings = shape.frets.flatMap((f, i) => (f === fret ? [n - i] : []));
     return { fromString: Math.max(...strings), toString: Math.min(...strings), fret };
   });
   return { fingers, barres, position: shape.baseFret };
