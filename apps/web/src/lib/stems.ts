@@ -52,6 +52,20 @@ export const runSeparationInWorker = (planar: Float32Array, samples: number, mod
     worker.postMessage({ type: 'separate', planar, samples, mode }, [planar.buffer]);
   });
 
+/**
+ * Runs one step of the separation. A storage refusal is explained in Portuguese and keeps the step and the
+ * browser's own text, so a report from the field says exactly what failed; other errors pass through.
+ */
+const step = async <T>(label: string, fn: () => Promise<T>): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (!isQuotaError(error)) throw error;
+    const raw = error instanceof Error ? (error.name && error.name !== 'Error' ? `${error.name}: ${error.message}` : error.message) : String(error);
+    throw new Error(`${explainQuota(await storageStatus())} Etapa: ${label}. Detalhe técnico: ${raw}`);
+  }
+};
+
 type GpuLike = { requestAdapter?: () => Promise<unknown> };
 
 /** A GPU object is not enough: blocklisted GPUs return no adapter. */
@@ -87,8 +101,8 @@ export const separateSong = async (songId: string, onProgress: (p: SeparationPro
   const trackBytes = (song?.durationSec || 300) * 24000 * STEM_MODES[mode].tracks.length;
   void requestPersistence();
   await ensureRoom((modelBytes + trackBytes) * 1.1, deps.storage);
-  const { planar, samples } = await (deps.decode ?? decodeForSeparation)(audio.blob);
-  const tracks = await (deps.run ?? runSeparationInWorker)(planar, samples, mode, onProgress, deps.signal);
+  const { planar, samples } = await step('preparar o áudio', () => (deps.decode ?? decodeForSeparation)(audio.blob));
+  const tracks = await step('separar as faixas', () => (deps.run ?? runSeparationInWorker)(planar, samples, mode, onProgress, deps.signal));
   const names = STEM_MODES[mode].tracks;
   if (names.some((n) => !tracks[n])) throw new Error('A separação veio incompleta. Tente de novo.');
   const stamp = now();
@@ -101,12 +115,7 @@ export const separateSong = async (songId: string, onProgress: (p: SeparationPro
     createdAt: stamp,
     selectedAt: `${stamp}${await laterThanOthers(songId, stamp)}`,
   };
-  try {
-    await db.stemSets.put(record);
-  } catch (error) {
-    if (isQuotaError(error)) throw new Error(explainQuota(await storageStatus()));
-    throw error;
-  }
+  await step('guardar as faixas', () => db.stemSets.put(record));
 };
 
 export const listStemSets = (songId: string): Promise<StemsRecord[]> => db.stemSets.where('songId').equals(songId).toArray();

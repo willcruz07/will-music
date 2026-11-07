@@ -94,12 +94,15 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
   const { planar, samples, mode } = event.data;
   const needsDemucs = mode !== 'vocals';
   const needsKara2 = mode === 'vocals' || mode === 'full';
+  // What the worker is doing, so an error report names the step (and the browser's own error text).
+  let stage = 'preparar a placa de vídeo (WebGPU)';
   try {
     const device = await createDevice(needsKara2);
     const ids = [...(needsDemucs ? (['demucs6s'] as const) : []), ...(needsKara2 ? (['kara2Core', 'kara2Data'] as const) : [])];
     const totalBytes = ids.reduce((n, id) => n + MODELS[id].bytes, 0);
     let base = 0;
     const load = async (id: (typeof ids)[number]) => {
+      stage = `baixar o modelo ${MODELS[id].file}`;
       const bytes = await fetchModel(id, (loaded) => post({ type: 'progress', stage: 'models', done: base + loaded, total: totalBytes }));
       base += MODELS[id].bytes;
       return bytes;
@@ -120,6 +123,7 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
       if (needsDemucs) {
         const demucsMode = mode as Exclude<StemMode, 'vocals'>;
         // Already optimized offline; re-optimizing it in the browser only spikes memory.
+        stage = 'carregar o modelo de 4/6 faixas na placa de vídeo';
         let model: Uint8Array | null = await fetchModel('demucs6s');
         const session = await ort.InferenceSession.create(model, { executionProviders: webgpu(device), graphOptimizationLevel: 'disabled' });
         model = null;
@@ -128,6 +132,7 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
           const encoders = await Promise.all(names.map(() => mp3Stream(DEMUCS.SAMPLE_RATE)));
           const acc = createStreamingAccumulator(demucsPlan, samples, names.length);
           for (let i = 0; i < demucsPlan.length; i++) {
+            stage = `separar em faixas (bloco ${i + 1} de ${demucsPlan.length})`;
             const out = await session.run({ [DEMUCS.INPUT]: new ort.Tensor('float32', sliceChunk(planar, samples, demucsPlan[i]!.start, DEMUCS.SEGMENT), [1, 2, DEMUCS.SEGMENT]) });
             const stems = out[DEMUCS.OUTPUT]?.data;
             if (!(stems instanceof Float32Array)) throw new Error('O modelo de separação não devolveu as faixas.');
@@ -147,6 +152,7 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
       }
 
       if (needsKara2) {
+        stage = 'carregar o modelo de voz na placa de vídeo';
         let core: Uint8Array | null = await fetchModel('kara2Core');
         let data: Uint8Array | null = await fetchModel('kara2Data');
         const session = await ort.InferenceSession.create(core, { executionProviders: webgpu(device), externalData: [{ path: MODELS.kara2Data.file, data }] });
@@ -157,6 +163,7 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
           normalizePeak(planar);
           const acc = createStemAccumulator(samples, 2);
           for (let i = 0; i < karaPlan.length; i++) {
+            stage = `separar a voz (bloco ${i + 1} de ${karaPlan.length})`;
             const stft = stftChunk(sliceChunk(planar, samples, karaPlan[i]!.start, G.chunkSamples));
             const out = await session.run({ stft_repr: new ort.Tensor('float32', stft, [1, 2050, G.frames, 2]) });
             const masks = out.masks?.data;
@@ -170,6 +177,7 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
           const stems = deriveStems(planar, vocals!, backing!);
           limitPeak([stems.instrumental, stems.lead, stems.backing], 0.99);
           const wanted = mode === 'full' ? (['lead', 'backing'] as const) : (['instrumental', 'lead', 'backing'] as const);
+          stage = 'gerar os arquivos MP3';
           for (const name of wanted) {
             const enc = await mp3Stream(G.sampleRate);
             enc.push(stems[name], samples);
@@ -184,6 +192,7 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
       device.destroy();
     }
   } catch (error) {
-    post({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+    const text = error instanceof Error ? (error.name && error.name !== 'Error' ? `${error.name}: ${error.message}` : error.message) : String(error);
+    post({ type: 'error', message: `${stage}: ${text}` });
   }
 };

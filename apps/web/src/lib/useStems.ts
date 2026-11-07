@@ -4,7 +4,6 @@ import type { PlayerSource } from '../components/Player.tsx';
 import type { StemsRecord } from './db.ts';
 import { exportMixMp3 } from './exportMix.ts';
 import { type MixTrack, mixVolumes } from './mixer.ts';
-import { explainQuota, isQuotaError, storageStatus } from './storage.ts';
 import { type SeparationProgress, deleteStemSet, getStems, listStemSets, selectStemSet, separateSong } from './stems.ts';
 
 const DEFAULT_MIX = (names: string[]): MixTrack[] => names.map((name) => ({ name, volume: 1, muted: false, solo: false }));
@@ -55,7 +54,8 @@ export const useStems = (songId: string, originalUrl?: string) => {
         await load();
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return;
-        setError(isQuotaError(e) ? explainQuota(await storageStatus()) : e instanceof Error ? e.message : 'A separação falhou.');
+        console.error('Separação de faixas falhou', e);
+        setError(e instanceof Error ? e.message : 'A separação falhou.');
       } finally {
         abort.current = null;
         setProgress(null);

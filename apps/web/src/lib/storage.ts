@@ -26,7 +26,7 @@ export const requestPersistence = async (): Promise<boolean> => {
 
 /** The browser refused to store more data for this site (also when the error crossed a worker as text). */
 export const isQuotaError = (error: unknown): boolean =>
-  (error instanceof DOMException && error.name === 'QuotaExceededError') || (error instanceof Error && (error.name === 'QuotaExceededError' || /quota/i.test(error.message)));
+  (error instanceof DOMException && error.name === 'QuotaExceededError') || (error instanceof Error && (error.name === 'QuotaExceededError' || /QuotaExceededError|quota exceeded/i.test(error.message)));
 
 /** What to tell the user when the site's storage is full, with the browser's own numbers. */
 export const explainQuota = (estimate: { usage?: number; quota?: number }): string => {

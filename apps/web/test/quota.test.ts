@@ -58,3 +58,30 @@ describe('storage quota', () => {
     expect(run).not.toHaveBeenCalled();
   });
 });
+
+describe('separation error details', () => {
+  it('says which step failed and keeps the browser text', async () => {
+    const song = await createSong({ title: 'A', artist: '', durationSec: 10 }, new Blob(['x']));
+    const run = async () => {
+      throw new Error('baixar o modelo de separação: QuotaExceededError: Quota exceeded.');
+    };
+    const error = await separateSong(song.id, () => {}, { gpu: { requestAdapter: async () => ({}) }, decode: async () => ({ planar: new Float32Array(8), samples: 4 }), run, cachedModels: async () => [] }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/baixar o modelo de separação/);
+    expect((error as Error).message).toMatch(/Detalhe técnico: .*Quota exceeded/);
+  });
+
+  it('names the saving step when the tracks cannot be stored', async () => {
+    const song = await createSong({ title: 'A', artist: '', durationSec: 10 }, new Blob(['x']));
+    const original = db.stemSets.put.bind(db.stemSets);
+    db.stemSets.put = (() => Promise.reject(new DOMException('Quota exceeded.', 'QuotaExceededError'))) as unknown as typeof db.stemSets.put;
+    const error = await separateSong(song.id, () => {}, {
+      gpu: { requestAdapter: async () => ({}) },
+      decode: async () => ({ planar: new Float32Array(8), samples: 4 }),
+      run: async () => ({ instrumental: new ArrayBuffer(8), lead: new ArrayBuffer(8), backing: new ArrayBuffer(8) }),
+      cachedModels: async () => [],
+    }).catch((e: unknown) => e);
+    db.stemSets.put = original;
+    expect((error as Error).message).toMatch(/guardar as faixas/);
+  });
+});
