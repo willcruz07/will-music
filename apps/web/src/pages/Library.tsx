@@ -70,7 +70,7 @@ export const Library = () => {
         <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Pastas">
           {[[null, 'Todas', songs?.length ?? 0] as const, ...folders.map(([f, n]) => [f, f || 'Sem pasta', n] as const)].map(([value, label, count]) => (
             <button
-              key={label}
+              key={value ?? '__all__'}
               type="button"
               aria-pressed={folder === value}
               onClick={() => setFolder(value)}

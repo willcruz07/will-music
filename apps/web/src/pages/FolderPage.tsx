@@ -5,6 +5,7 @@ import {
   type DirLike,
   type FoundFile,
   folderAccess,
+  folderSync,
   folderPrefs,
   forgetFolder,
   getFolder,
@@ -37,11 +38,13 @@ export const FolderPage = () => {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [viewing, setViewing] = useState<{ name: string; xml: string } | null>(null);
+  const [pending, setPending] = useState(0);
   const folderInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void (async () => {
       setPrefs(await folderPrefs());
+      setPending((await folderSync.pending()).length);
       const saved = await getFolder();
       if (saved) {
         setDir(saved);
@@ -66,6 +69,10 @@ export const FolderPage = () => {
   const ensureAccess = async (d: DirLike) => {
     const ok = await folderAccess(d, true);
     setGranted(ok);
+    if (ok) {
+      await folderSync.flush();
+      setPending(0);
+    }
     if (!ok) throw new Error('Sem permissão para usar a pasta. Toque de novo e escolha "Permitir".');
   };
 
@@ -128,6 +135,7 @@ export const FolderPage = () => {
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {granted ? 'O app pode gravar nela.' : 'O navegador pede permissão a cada visita: toque em um dos botões abaixo para permitir.'}
+                {pending > 0 && ` ${pending} alteração(ões) ainda não foram gravadas na pasta: elas serão gravadas quando você permitir.`}
               </p>
               <div className="mt-3 space-y-2 text-sm">
                 <label className="flex items-center gap-2">

@@ -99,6 +99,7 @@ export const buildChoirXml = (input: ChoirInput): string => {
     end = Math.max(end, n.start + n.dur);
   }
   for (const h of input.harmonies) end = Math.max(end, h.tick + 1);
+  for (const l of input.lyrics) end = Math.max(end, l.tick + 1);
   const skip = Number.isFinite(first) ? Math.floor(first / TICKS_PER_BAR) * TICKS_PER_BAR : 0;
   end -= skip;
   const bars = Math.max(1, Math.ceil(end / TICKS_PER_BAR));
@@ -106,7 +107,12 @@ export const buildChoirXml = (input: ChoirInput): string => {
   const fifths = keyFifths(input.key);
   const flats = fifths < 0;
   const harmonies = new Map(input.harmonies.map((h) => [h.tick - skip, h.raw]).filter(([t]) => (t as number) >= 0) as [number, string][]);
-  const lyrics = new Map(input.lyrics.map((l) => [Math.max(0, l.tick - skip), l.text]));
+  // Lines that land on the same tick (e.g. several before the first note) are joined, never dropped.
+  const lyrics = new Map<number, string>();
+  for (const l of input.lyrics) {
+    const t = Math.max(0, l.tick - skip);
+    lyrics.set(t, lyrics.has(t) ? `${lyrics.get(t)} / ${l.text}` : l.text);
+  }
   const barLines = Array.from({ length: bars }, (_, i) => i * TICKS_PER_BAR);
   const tempo = `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${input.bpm}</per-minute></metronome></direction-type><sound tempo="${input.bpm}"/></direction>`;
 

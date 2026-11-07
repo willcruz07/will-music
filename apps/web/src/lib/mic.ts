@@ -11,9 +11,18 @@ export const openMic = async (): Promise<{ context: AudioContext; source: MediaS
     if (e instanceof DOMException && e.name === 'NotFoundError') throw new Error('Nenhum microfone encontrado neste aparelho.');
     throw e;
   }
-  const context = new AudioContext({ latencyHint: 'interactive' });
-  await context.resume();
-  const source = context.createMediaStreamSource(stream);
+  let context: AudioContext | undefined;
+  let source: MediaStreamAudioSourceNode;
+  try {
+    context = new AudioContext({ latencyHint: 'interactive' });
+    await context.resume();
+    source = context.createMediaStreamSource(stream);
+  } catch (e) {
+    // Never leave the microphone on when the audio graph could not be built.
+    stream.getTracks().forEach((t) => t.stop());
+    void context?.close();
+    throw e;
+  }
   return {
     context,
     source,
@@ -43,10 +52,20 @@ class Tap extends AudioWorkletProcessor {
 registerProcessor('wm-tap', Tap);
 `;
 
+// The processor can be registered only once per audio context.
+const loaded = new WeakMap<AudioContext, Promise<void>>();
+const loadTap = (context: AudioContext) => {
+  let p = loaded.get(context);
+  if (!p) {
+    const url = URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' }));
+    p = context.audioWorklet.addModule(url).finally(() => URL.revokeObjectURL(url));
+    loaded.set(context, p);
+  }
+  return p;
+};
+
 export const tapSamples = async (context: AudioContext, source: AudioNode, onSamples: (samples: Float32Array) => void): Promise<() => void> => {
-  const url = URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' }));
-  await context.audioWorklet.addModule(url);
-  URL.revokeObjectURL(url);
+  await loadTap(context);
   const node = new AudioWorkletNode(context, 'wm-tap');
   node.port.onmessage = (e: MessageEvent<Float32Array>) => onSamples(e.data);
   // A worklet only runs while connected to the output: route it through a silent gain (no echo).
@@ -58,5 +77,6 @@ export const tapSamples = async (context: AudioContext, source: AudioNode, onSam
     node.port.onmessage = null;
     source.disconnect(node);
     node.disconnect();
+    mute.disconnect();
   };
 };

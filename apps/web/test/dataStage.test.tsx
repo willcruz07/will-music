@@ -4,47 +4,11 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createManualSong } from '../src/lib/chartEdit.ts';
 import { createSong, db, updateSong } from '../src/lib/db.ts';
-import { type DirLike, displayName, restoreFiles, scanFileList, scanFolder, writeAllToFolder, writeSongToFolder } from '../src/lib/folder.ts';
+import { memoryDir } from './memoryDir.ts';
+import { displayName, restoreFiles, scanFileList, scanFolder, writeAllToFolder, writeSongToFolder } from '../src/lib/folder.ts';
 import { exportSongs, importPackage, readPackage } from '../src/lib/package.ts';
 import { keepOnlyChart, songStorage } from '../src/lib/storageManager.ts';
 import { Library } from '../src/pages/Library.tsx';
-
-/** In-memory stand-in for a FileSystemDirectoryHandle. */
-type MemDir = DirLike & { files: Map<string, Blob>; dirs: Map<string, MemDir> };
-const memoryDir = (name = 'will-music'): MemDir => {
-  const files = new Map<string, Blob>();
-  const dirs = new Map<string, MemDir>();
-  const dir: MemDir = {
-    kind: 'directory' as const,
-    name,
-    files,
-    dirs,
-    async getDirectoryHandle(child: string, opts?: { create?: boolean }) {
-      if (!dirs.has(child)) {
-        if (!opts?.create) throw new DOMException('not found', 'NotFoundError');
-        dirs.set(child, memoryDir(child));
-      }
-      return dirs.get(child)!;
-    },
-    async getFileHandle(child: string, opts?: { create?: boolean }) {
-      if (!files.has(child) && !opts?.create) throw new DOMException('not found', 'NotFoundError');
-      return {
-        kind: 'file' as const,
-        name: child,
-        getFile: async () => new File([files.get(child) ?? new Blob([])], child),
-        createWritable: async () => {
-          const parts: BlobPart[] = [];
-          return { write: async (data: BlobPart) => void parts.push(data), close: async () => void files.set(child, new Blob(parts)) };
-        },
-      };
-    },
-    async *values() {
-      for (const d of dirs.values()) yield d;
-      for (const f of files.keys()) yield await dir.getFileHandle(f);
-    },
-  };
-  return dir;
-};
 
 const clear = () => Promise.all([db.songs.clear(), db.audio.clear(), db.analyses.clear(), db.charts.clear(), db.scores.clear(), db.stemSets.clear(), db.peaks.clear(), db.setlists.clear()]);
 beforeEach(clear);
@@ -71,9 +35,10 @@ describe('device folder', () => {
     await db.scores.put(scoreOf(song.id));
     const root = memoryDir();
     await writeSongToFolder(root, song.id, { includeAudio: false });
-    expect([...root.dirs.get('Cifras')!.dirs.get('Culto')!.files.keys()]).toEqual(['Santo - Coral.cho']);
-    expect([...root.dirs.get('Partituras')!.files.keys()].sort()).toEqual(['Santo - Coral (guitarra).musicxml', 'Santo - Coral (melodia).musicxml']);
-    expect([...root.dirs.get('Pacotes')!.files.keys()]).toEqual(['Santo - Coral.willmusic.zip']);
+    const tag = song.id.slice(0, 6);
+    expect([...root.dirs.get('Cifras')!.dirs.get('Culto')!.files.keys()]).toEqual([`Santo - Coral [${tag}].cho`]);
+    expect([...root.dirs.get('Partituras')!.files.keys()].sort()).toEqual([`Santo - Coral [${tag}] (guitarra).musicxml`, `Santo - Coral [${tag}] (melodia).musicxml`]);
+    expect([...root.dirs.get('Pacotes')!.files.keys()]).toEqual([`Santo - Coral [${tag}].willmusic.zip`]);
   });
 
   it('saves everything plus a text-only backup, then restores it all into an empty app', async () => {

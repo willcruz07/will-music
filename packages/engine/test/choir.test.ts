@@ -45,3 +45,18 @@ describe('buildChoirXml', () => {
     expect(xml).toContain('<words>Santo, santo &amp; bom</words>');
   });
 });
+
+describe('review fixes: choir lyrics', () => {
+  it('keeps lines that land on the same tick or after the last note', () => {
+    const xml = buildChoirXml({
+      title: 'x',
+      artist: '',
+      bpm: 80,
+      voices: { S: [{ pitch: 72, start: 16, dur: 4 }], A: [], T: [], B: [] },
+      harmonies: [],
+      lyrics: [{ tick: 0, text: 'Um' }, { tick: 0, text: 'Dois' }, { tick: 80, text: 'Fim' }],
+    });
+    expect(xml).toContain('<words>Um / Dois</words>');
+    expect(xml).toContain('<words>Fim</words>');
+  });
+});

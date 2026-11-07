@@ -115,24 +115,45 @@ export const MicPage = () => {
   const settings = useRef({ presetId, a4 });
   settings.current = { presetId, a4 };
 
+  const mounted = useRef(true);
+  const opening = useRef(false);
+  const [starting, setStarting] = useState(false);
+
   const stop = () => {
     mic.current?.close();
     mic.current = null;
-    setRunning(false);
-    setReading(null);
-  };
-
-  const start = async () => {
-    setError(null);
-    try {
-      mic.current = await openMic();
-      setRunning(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Não foi possível usar o microfone.');
+    if (mounted.current) {
+      setRunning(false);
+      setReading(null);
     }
   };
 
-  useEffect(() => stop, []);
+  const start = async () => {
+    if (opening.current || mic.current) return; // one microphone at a time, even with a double tap
+    opening.current = true;
+    setStarting(true);
+    setError(null);
+    try {
+      const opened = await openMic();
+      // Left the page while the permission prompt was open: release the microphone right away.
+      if (!mounted.current) return opened.close();
+      mic.current = opened;
+      setRunning(true);
+    } catch (e) {
+      if (mounted.current) setError(e instanceof Error ? e.message : 'Não foi possível usar o microfone.');
+    } finally {
+      opening.current = false;
+      if (mounted.current) setStarting(false);
+    }
+  };
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      stop();
+    };
+  }, []);
 
   // Pitch loop (tuner and voice): ~25 readings per second, steadied by a short median.
   useEffect(() => {
@@ -196,10 +217,12 @@ export const MicPage = () => {
     worker.postMessage({ type: 'start', sampleRate: m.context.sampleRate } satisfies LiveChordsRequest);
     let untap: (() => void) | null = null;
     let cancelled = false;
-    void tapSamples(m.context, m.source, (samples) => worker.postMessage({ type: 'audio', samples } satisfies LiveChordsRequest, [samples.buffer])).then((u) => {
-      if (cancelled) u();
-      else untap = u;
-    });
+    void tapSamples(m.context, m.source, (samples) => worker.postMessage({ type: 'audio', samples } satisfies LiveChordsRequest, [samples.buffer]))
+      .then((u) => {
+        if (cancelled) u();
+        else untap = u;
+      })
+      .catch(() => setChordStatus('Este navegador não deixa o app escutar o microfone continuamente. Tente o Chrome ou o Edge atualizados.'));
     return () => {
       cancelled = true;
       untap?.();
@@ -221,8 +244,8 @@ export const MicPage = () => {
             <MicOff className="size-4" /> Desligar
           </Button>
         ) : (
-          <Button onClick={() => void start()}>
-            <Mic className="size-4" /> Ligar microfone
+          <Button onClick={() => void start()} disabled={starting}>
+            <Mic className="size-4" /> {starting ? 'Ligando…' : 'Ligar microfone'}
           </Button>
         )}
       </div>
