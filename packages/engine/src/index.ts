@@ -12,3 +12,5 @@ export * from './eval/sequence.ts';
 export * from './models.ts';
 export * from './separation/stft.ts';
 export * from './separation/chunks.ts';
+export * from './score/basicPitch.ts';
+export * from './score/notes.ts';
