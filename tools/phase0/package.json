@@ -1,0 +1,15 @@
+{
+  "name": "@will-music/phase0",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:models": "vitest run test/models.integration.test.ts",
+    "phase0": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@will-music/engine": "*",
+    "onnxruntime-node": "^1.31.1"
+  }
+}
