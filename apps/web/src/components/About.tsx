@@ -12,6 +12,7 @@ export const AUTHOR = {
 };
 
 const PHOTO = `${import.meta.env.BASE_URL}will.jpeg`;
+const LOGO = `${import.meta.env.BASE_URL}logo.webp`;
 
 /** Instagram has no icon in lucide (no brand marks), so a plain camera-style glyph stands in. */
 const InstagramGlyph = ({ className = '' }: { className?: string }) => (
@@ -105,14 +106,17 @@ export const AboutSheet = ({ onClose }: { onClose: () => void }) => {
             </p>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-border bg-surface-2 p-4">
-            <p className="flex items-center gap-2 font-semibold">
-              <Sparkles className="size-4 text-chord" aria-hidden /> Sobre o will-music
-            </p>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              Gratuito e de código aberto. Cifras, acordes, separação de faixas, partituras, afinador e trilhas de estudo — tudo roda no seu aparelho, com a
-              inteligência artificial no próprio navegador, e funciona até sem internet.
-            </p>
+          <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface-2">
+            <img src={LOGO} alt="Will-Music — sua música, sem limites" className="aspect-[3/2] w-full bg-black object-cover object-[50%_47%]" />
+            <div className="p-4">
+              <p className="flex items-center gap-2 font-semibold">
+                <Sparkles className="size-4 text-chord" aria-hidden /> Sobre o will-music
+              </p>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                Gratuito e de código aberto. Cifras, acordes, separação de faixas, partituras, afinador e trilhas de estudo — tudo roda no seu aparelho, com a
+                inteligência artificial no próprio navegador, e funciona até sem internet.
+              </p>
+            </div>
           </div>
 
           <p className="mt-6 text-sm font-semibold text-muted-foreground">Bora trocar uma ideia? 💬</p>

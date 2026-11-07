@@ -1,4 +1,4 @@
-import { AudioLines, Moon, Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { Suspense, lazy, useEffect } from 'react';
 import { Link, Route, Routes } from 'react-router';
 import { BottomNav, SettingsLink, TopNav } from './components/AppNav.tsx';
@@ -59,9 +59,7 @@ const Layout = () => {
     <header className="glass sticky top-0 z-20 border-b border-border pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
         <Link to="/" className="inline-flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight">
-          <span className="inline-flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <AudioLines className="size-5" />
-          </span>
+          <img src={`${import.meta.env.BASE_URL}icons/mark-96.png`} alt="" width={32} height={32} className="size-8 rounded-lg" />
           will-music
         </Link>
         <div className="flex items-center gap-2">
