@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ExportButton, ImportButton } from '../components/PackageButtons.tsx';
+import { InstallApp } from '../components/PwaPrompts.tsx';
 import { db } from '../lib/db.ts';
 import { deleteCachedModels, listCachedModels } from '../lib/models.ts';
 import { formatBytes, requestPersistence, storageStatus } from '../lib/storage.ts';
 import { useThemePref } from '../lib/theme.ts';
 import { Button } from '../ui/Button.tsx';
 
-const MODEL_NAMES: Record<string, string> = { chordnet: 'Acordes (ChordMini)', cqtPlan: 'Plano de frequências dos acordes', skey: 'Tom (S-KEY)', kara2Core: 'Separação de faixas (estrutura)', kara2Data: 'Separação de faixas (pesos)' };
+const MODEL_NAMES: Record<string, string> = { chordnet: 'Acordes (ChordMini)', cqtPlan: 'Plano de frequências dos acordes', skey: 'Tom (S-KEY)', kara2Core: 'Separação de faixas (estrutura)', kara2Data: 'Separação de faixas (pesos)', basicPitch: 'Notas da melodia (Basic Pitch)' };
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section className="border-t border-border py-6">
@@ -50,6 +51,11 @@ export const Settings = () => {
             </button>
           ))}
         </div>
+      </Section>
+
+      <Section title="Aplicativo">
+        <p className="mb-3 text-sm text-muted-foreground">Instalado, o will-music abre como um app, em tela cheia, e funciona sem internet no ensaio ou na igreja.</p>
+        <InstallApp />
       </Section>
 
       <Section title="Modelos de análise">

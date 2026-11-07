@@ -3,7 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#10b981" />
+    <meta name="theme-color" content="#f5f7fb" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Cifras, acordes, letra, partitura e faixas para estudar e tocar. Tudo no seu aparelho." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="will-music" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>
+      // Apply the saved theme before the first paint, so dark users never see a white flash.
+      (function () {
+        try {
+          var p = localStorage.getItem("wm-theme");
+          var dark = p === "dark" || (p !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) {
+            document.documentElement.classList.add("dark");
+            document.querySelector('meta[name="theme-color"]').content = "#0b1220";
+          }
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>will-music</title>

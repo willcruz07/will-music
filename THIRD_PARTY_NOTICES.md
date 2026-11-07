@@ -41,3 +41,15 @@ reserved rights and permitted uses are set out in [trademark.md](trademark.md).
 |---|---|---|
 | [musetric/chordmini-onnx](https://huggingface.co/musetric/chordmini-onnx) (ChordMini ChordNet 2E1D, export ONNX) | `8ab85fc0f61439900cd07ac21257a43eac57075c` | MIT |
 | [musetric/skey-onnx](https://huggingface.co/musetric/skey-onnx) (S-KEY, Deezer, export ONNX) | `9d90d2a9ff6679df1d64000f4fa750643f247643` | MIT |
+
+## Basic Pitch (Spotify) — Apache License 2.0
+
+The note-transcription model `nmp.onnx` (downloaded at run time from huggingface.co/daserge/basic-pitch-onnx,
+byte-identical to spotify/basic-pitch `basic_pitch/saved_models/icassp_2022/nmp.onnx`) and the windowing and
+note-creation logic ported in `packages/engine/src/score/` come from https://github.com/spotify/basic-pitch.
+Copyright 2022 Spotify AB. Licensed under the Apache License, Version 2.0.
+
+## OpenSheetMusicDisplay — BSD 3-Clause License
+
+Score rendering uses opensheetmusicdisplay (https://github.com/opensheetmusicdisplay/opensheetmusicdisplay),
+Copyright (c) 2019 PhonicScore. Licensed under the BSD 3-Clause License.

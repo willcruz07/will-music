@@ -73,7 +73,7 @@ export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize
             data-line
             data-active={active ? 'true' : 'false'}
             ref={active ? activeRef : undefined}
-            className={`-ml-3 flex flex-wrap items-end border-l-[3px] py-1 pl-3 transition-colors ${active ? 'border-primary bg-muted' : 'border-transparent'}`}
+            className={`-ml-3 flex flex-wrap items-end rounded-r-lg py-1 pl-3 transition-[background,box-shadow] duration-300 ${active ? 'now-playing' : ''}`}
           >
             {line.parts.map((part, j) => {
               const base = offset;

@@ -1,4 +1,4 @@
-import type { ChordSegment, KeyResult } from '@will-music/engine';
+import type { ChordSegment, KeyResult, NoteEvent } from '@will-music/engine';
 import Dexie, { type EntityTable } from 'dexie';
 import { requestPersistence } from './storage.ts';
 
@@ -53,6 +53,9 @@ export type AudioRecord = { songId: string; blob: Blob; mimeType: string };
 export type StemName = 'instrumental' | 'lead' | 'backing';
 export type StemsRecord = { songId: string; model: string; sampleRate: number; tracks: { name: StemName; blob: Blob }[]; createdAt: string };
 
+/** Transcribed melody (raw note times); the MusicXML is rebuilt from it on demand. */
+export type ScoreRecord = { songId: string; notes: NoteEvent[]; bpm: number; source: 'lead' | 'mix'; model: string; createdAt: string };
+
 export type SetlistItem = { songId: string; targetKey?: string; note?: string };
 export type Setlist = { id: string; name: string; date?: string; items: SetlistItem[]; createdAt: string; updatedAt: string };
 
@@ -65,6 +68,7 @@ export const db = new Dexie('will-music') as Dexie & {
   charts: EntityTable<Chart, 'id'>;
   setlists: EntityTable<Setlist, 'id'>;
   stems: EntityTable<StemsRecord, 'songId'>;
+  scores: EntityTable<ScoreRecord, 'songId'>;
 };
 
 db.version(1).stores({
@@ -76,6 +80,7 @@ db.version(1).stores({
 
 db.version(2).stores({ setlists: 'id, updatedAt' });
 db.version(3).stores({ stems: 'songId' });
+db.version(4).stores({ scores: 'songId' });
 
 export const now = (): string => new Date().toISOString();
 
@@ -96,8 +101,9 @@ export const updateSong = async (id: string, patch: Partial<Omit<Song, 'id' | 'c
 };
 
 export const deleteSong = async (id: string): Promise<void> => {
-  await db.transaction('rw', [db.songs, db.audio, db.analyses, db.charts, db.stems], async () => {
+  await db.transaction('rw', [db.songs, db.audio, db.analyses, db.charts, db.stems, db.scores], async () => {
     await db.songs.delete(id);
+    await db.scores.delete(id);
     await db.audio.delete(id);
     await db.stems.delete(id);
     await db.analyses.where('songId').equals(id).delete();

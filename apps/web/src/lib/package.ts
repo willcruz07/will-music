@@ -124,7 +124,7 @@ export const importPackage = async (
   const stamp = now();
   const setlists: Setlist[] = [];
 
-  await db.transaction('rw', [db.songs, db.charts, db.analyses, db.audio, db.setlists, db.stems], async () => {
+  await db.transaction('rw', [db.songs, db.charts, db.analyses, db.audio, db.setlists, db.stems, db.scores], async () => {
     for (const entry of contents.songs) {
       const original = entry.song.id;
       const copy = conflictIds.has(original) && decision === 'keep-both';
@@ -134,6 +134,7 @@ export const importPackage = async (
         await db.songs.delete(original);
         await db.audio.delete(original);
         await db.stems.delete(original);
+        await db.scores.delete(original);
         await db.analyses.where('songId').equals(original).delete();
         await db.charts.where('songId').equals(original).delete();
       }

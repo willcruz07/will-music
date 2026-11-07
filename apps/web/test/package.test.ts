@@ -111,3 +111,13 @@ describe('review fixes: package replace and stems', () => {
     expect(await db.stems.get(song.id)).toBeUndefined();
   });
 });
+
+describe('review fixes: package replace and scores', () => {
+  it('drops the old score when a song is replaced', async () => {
+    const song = await seed();
+    const zip = await exportSongs([song.id], { includeAudio: false, kind: 'song' });
+    await db.scores.put({ songId: song.id, notes: [], bpm: 100, source: 'mix', model: 'x', createdAt: '' });
+    await importPackage(await readPackage(zip), async () => 'replace');
+    expect(await db.scores.get(song.id)).toBeUndefined();
+  });
+});
