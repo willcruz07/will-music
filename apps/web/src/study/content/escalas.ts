@@ -1,0 +1,95 @@
+import type { Lesson } from '../types.ts';
+
+const t = (text: string) => ({ kind: 'text' as const, text });
+
+export const ESCALAS: Lesson[] = [
+  {
+    id: 'e-maior-menor',
+    track: 'escalas',
+    level: 'iniciante',
+    title: 'Maior, menor e pentatônicas',
+    summary: 'As escalas que estão em 90% das músicas.',
+    blocks: [
+      t('Quatro escalas resolvem quase tudo no começo: a **maior**, a **menor natural** e as duas **pentatônicas**. Toque cada uma subindo e descendo, devagar, falando o nome das notas.'),
+      { kind: 'scale', scale: 'major', root: 'G' },
+      { kind: 'scale', scale: 'minor', root: 'E' },
+      { kind: 'scale', scale: 'majorPentatonic', root: 'G' },
+      { kind: 'scale', scale: 'minorPentatonic', root: 'E' },
+    ],
+  },
+  {
+    id: 'e-modos',
+    track: 'escalas',
+    level: 'intermediario',
+    title: 'Os sete modos',
+    summary: 'A mesma escala, sete caracteres diferentes.',
+    blocks: [
+      t('Cada modo é a escala maior começando num grau. Mais útil que decorar "a partir de qual grau" é ouvir **a nota característica** de cada um, a que o diferencia do maior ou do menor:'),
+      { kind: 'list', items: ['**Jônio** (maior): o padrão.', '**Dórico:** menor com **6ª maior**.', '**Frígio:** menor com **2ª menor**.', '**Lídio:** maior com **4ª aumentada**.', '**Mixolídio:** maior com **7ª menor**.', '**Eólio** (menor natural): o padrão menor.', '**Lócrio:** menor com **2ª menor e 5ª diminuta**.'] },
+      { kind: 'scale', scale: 'dorian', root: 'D' },
+      { kind: 'scale', scale: 'mixolydian', root: 'G' },
+      { kind: 'scale', scale: 'lydian', root: 'F' },
+      { kind: 'scale', scale: 'phrygian', root: 'E' },
+      { kind: 'scale', scale: 'locrian', root: 'B' },
+    ],
+  },
+  {
+    id: 'e-menores',
+    track: 'escalas',
+    level: 'intermediario',
+    title: 'Menor harmônica e melódica',
+    summary: 'As menores que criam o dominante e a base do jazz.',
+    blocks: [
+      t('A **menor harmônica** eleva a 7ª da menor natural para criar o V7 (E7 em Lá menor). Entre a 6ª e a 7ª fica uma **segunda aumentada** (3 semitons), o som "oriental" característico.'),
+      { kind: 'scale', scale: 'harmonicMinor', root: 'A' },
+      t('A **menor melódica** (do jazz) eleva também a 6ª: sobe como uma maior com terça menor. Seus modos geram a escala alterada e o lídio dominante.'),
+      { kind: 'scale', scale: 'melodicMinor', root: 'A' },
+    ],
+  },
+  {
+    id: 'e-simetricas',
+    track: 'escalas',
+    level: 'avancado',
+    title: 'Escalas simétricas e do jazz',
+    summary: 'Tons inteiros, diminutas, alterada e bebop.',
+    blocks: [
+      t('As **simétricas** repetem um padrão de distâncias: por isso têm poucas transposições diferentes e servem a vários acordes ao mesmo tempo.'),
+      { kind: 'scale', scale: 'wholeTone', root: 'C', caption: 'Só existem duas escalas de tons inteiros diferentes.' },
+      { kind: 'scale', scale: 'diminishedHW', root: 'C', caption: 'Só existem três escalas diminutas diferentes.' },
+      { kind: 'scale', scale: 'altered', root: 'G' },
+      { kind: 'scale', scale: 'lydianDominant', root: 'Db' },
+    ],
+  },
+  {
+    id: 'e-orientais',
+    track: 'escalas',
+    level: 'avancado',
+    title: 'Escalas orientais e árabes',
+    summary: 'Hijaz, menor húngara, bizantina e as pentatônicas japonesas.',
+    blocks: [
+      t('Muitas escalas de outras tradições têm em comum a **segunda aumentada** e a **segunda menor**, que dão o colorido "oriental" ao ouvido ocidental. Na música árabe o sistema completo é o dos **maqamat**, que também usam quartos de tom (que o teclado não toca). Aqui estão as aproximações temperadas mais usadas:'),
+      { kind: 'scale', scale: 'phrygianDominant', root: 'E', caption: 'Próximo do maqam Hijaz; também é o som do flamenco.' },
+      { kind: 'scale', scale: 'doubleHarmonic', root: 'C', caption: 'Bizantina / Hijaz Kar: duas segundas aumentadas.' },
+      { kind: 'scale', scale: 'hungarianMinor', root: 'A' },
+      { kind: 'scale', scale: 'hirajoshi', root: 'E', caption: 'Japonesa (koto).' },
+      { kind: 'scale', scale: 'inSen', root: 'E', caption: 'Japonesa (shakuhachi).' },
+      { kind: 'scale', scale: 'kumoi', root: 'D', caption: 'Japonesa, mais suave.' },
+    ],
+  },
+  {
+    id: 'e-indianas',
+    track: 'escalas',
+    level: 'pro',
+    title: 'Escalas indianas: os thaats',
+    summary: 'Os dez "pais" de onde os ragas são classificados.',
+    blocks: [
+      t('Na música clássica do norte da Índia (hindustani), os **ragas** são agrupados em dez **thaats**, escalas-mãe de sete notas. Um raga é muito mais que a escala: tem notas proibidas na subida ou na descida, frases obrigatórias, hora do dia e sentimento (rasa). Os thaats são um bom ponto de entrada.'),
+      { kind: 'list', items: ['**Bilawal** = maior · **Khamaj** = mixolídio · **Kafi** = dórico · **Asavari** = menor natural · **Bhairavi** = frígio · **Kalyan** = lídio (raga Yaman).', 'E quatro sem equivalente nos modos gregos: **Bhairav, Poorvi, Marwa e Todi**.'] },
+      { kind: 'scale', scale: 'bhairav', root: 'C' },
+      { kind: 'scale', scale: 'poorvi', root: 'C' },
+      { kind: 'scale', scale: 'marwa', root: 'C' },
+      { kind: 'scale', scale: 'todi', root: 'C' },
+      { kind: 'tip', text: 'Na prática indiana a nota de base (Sa) fica soando o tempo todo num **drone** (tanpura). Toque a escala sobre uma nota pedal para sentir o caráter de cada thaat.' },
+    ],
+  },
+];

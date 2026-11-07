@@ -163,6 +163,17 @@ h1 {
   transform: none;
 }
 
+/* Sideways strips: fade the edge that still hides options (data-more is set by ScrollStrip). */
+.scroll-strip[data-more='end'] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+}
+.scroll-strip[data-more='start'] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
+}
+.scroll-strip[data-more='both'] {
+  mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+}
+
 /* Space left at the bottom for the floating nav (mobile) and the safe area. */
 .pb-nav {
   padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 1.5rem);

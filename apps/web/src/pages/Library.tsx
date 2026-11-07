@@ -1,5 +1,6 @@
 import { FolderOpen, Music, Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { Link } from 'react-router';
 import { ImportButton } from '../components/PackageButtons.tsx';
 import { type Song, listSongs } from '../lib/db.ts';
@@ -67,7 +68,7 @@ export const Library = () => {
       )}
 
       {folders.length > 1 && (
-        <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Pastas">
+        <ScrollStrip className="mt-3" role="group" label="Pastas" selected={folder} innerClassName="gap-2 pb-1">
           {[[null, 'Todas', songs?.length ?? 0] as const, ...folders.map(([f, n]) => [f, f || 'Sem pasta', n] as const)].map(([value, label, count]) => (
             <button
               key={value ?? '__all__'}
@@ -79,7 +80,7 @@ export const Library = () => {
               {label} <span className="tabular-nums opacity-70">{count}</span>
             </button>
           ))}
-        </div>
+        </ScrollStrip>
       )}
 
       {songs && songs.length === 0 && (
