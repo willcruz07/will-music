@@ -206,7 +206,7 @@ export const Song = () => {
       )}
 
       {chart && (
-        <div className="-mx-4 mt-5 flex items-center gap-2 overflow-x-auto border-y border-border px-4 py-2 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&>*]:shrink-0">
+        <div className="-mx-4 mt-5 flex items-center gap-2 no-scrollbar overflow-x-auto border-y border-border px-4 py-2 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&>*]:shrink-0">
           <span className="text-sm text-muted-foreground">Transpor</span>
           <IconButton label="Meio tom abaixo" onClick={() => void saveChart({ transpose: chart.transpose - 1 })}>
             <Minus className="size-4" />

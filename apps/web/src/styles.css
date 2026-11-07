@@ -108,11 +108,26 @@ h1 {
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
 }
 
+/* Bars that float over the chart: more opaque, so the lyric behind does not compete with them. */
+.glass-strong {
+  background: color-mix(in oklab, var(--surface) 92%, transparent);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+
 /* The line being played: a thin cyan rail with a soft halo. */
 .now-playing {
   border-color: var(--glow);
   box-shadow: inset 3px 0 0 var(--glow), 0 0 24px -12px var(--glow);
   background: color-mix(in oklab, var(--glow) 8%, transparent);
+}
+
+/* Horizontal strips of options (tabs, chips) scroll by touch without a visible bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Space left at the bottom for the floating nav (mobile) and the safe area. */

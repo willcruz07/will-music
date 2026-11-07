@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Mic } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useRevealSelected } from '../lib/reveal.ts';
 import { Link, useSearchParams } from 'react-router';
 import { ChordDiagram, type Instrument } from '../components/ChordDiagram.tsx';
 import { InstrumentToggle, readInstrument } from '../components/ChordPanel.tsx';
@@ -403,6 +404,8 @@ export const StudyPage = () => {
   const [tab, setTab] = useState<Tab>('chords');
   const [chordKey, setChordKey] = useState(0);
   const [initial, setInitial] = useState(asked);
+  const tabStrip = useRef<HTMLDivElement>(null);
+  useRevealSelected(tabStrip, tab);
 
   const openChord = (chord: string) => {
     setInitial(parseChord(chord));
@@ -421,7 +424,7 @@ export const StudyPage = () => {
         </Link>
       </div>
       <p className="mt-2 max-w-2xl text-muted-foreground">Todos os acordes no violão, no teclado e no cavaquinho, como eles são formados, as escalas e o campo harmônico de cada tom.</p>
-      <div className="-mx-4 mt-4 overflow-x-auto px-4">
+      <div ref={tabStrip} className="no-scrollbar -mx-4 mt-4 overflow-x-auto px-4">
         <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="tablist" onKeyDown={rovingKeys} aria-label="Assunto">
           {TABS.map((t) => (
             <button
@@ -430,7 +433,7 @@ export const StudyPage = () => {
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`min-h-10 whitespace-nowrap rounded-lg px-4 text-sm ${tab === t.id ? 'bg-primary font-semibold text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              className={`min-h-10 scroll-mx-4 whitespace-nowrap rounded-lg px-4 text-sm ${tab === t.id ? 'bg-primary font-semibold text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
               {t.label}
             </button>
