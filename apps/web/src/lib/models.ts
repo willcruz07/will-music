@@ -60,12 +60,31 @@ export const listCachedModels = async (): Promise<{ id: ModelId; bytes: number }
   const out: { id: ModelId; bytes: number }[] = [];
   for (const id of Object.keys(MODELS) as ModelId[]) {
     if (!urls.has(MODELS[id].url)) continue;
-    const response = await cache.match(MODELS[id].url);
-    out.push({ id, bytes: response ? (await response.arrayBuffer()).byteLength : 0 });
+    // Cached files were verified by SHA-256 on the way in, so their size is the pinned one (no need to read 285 MB).
+    out.push({ id, bytes: MODELS[id].bytes });
   }
   return out;
 };
 
 export const deleteCachedModels = async (): Promise<void> => {
   await caches.delete(CACHE_NAME);
+};
+
+export const deleteCachedModel = async (id: ModelId): Promise<void> => {
+  const cache = await caches.open(CACHE_NAME);
+  await cache.delete(MODELS[id].url);
+};
+
+/** Downloads every model not yet on the device (for using the app offline later), one at a time. */
+export const downloadAllModels = async (onProgress: (done: number, total: number) => void, fetchFn: typeof fetch = fetch): Promise<void> => {
+  const cache = await caches.open(CACHE_NAME);
+  const missing: ModelId[] = [];
+  for (const id of Object.keys(MODELS) as ModelId[]) if (!(await cache.match(MODELS[id].url))) missing.push(id);
+  const total = missing.reduce((n, id) => n + MODELS[id].bytes, 0);
+  let base = 0;
+  for (const id of missing) {
+    await fetchModel(id, (loaded) => onProgress(base + loaded, total), fetchFn);
+    base += MODELS[id].bytes;
+  }
+  onProgress(total, total);
 };

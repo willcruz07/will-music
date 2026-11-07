@@ -3,7 +3,8 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createManualSong } from '../src/lib/chartEdit.ts';
 import { type ScoreRecord, db, deleteSong } from '../src/lib/db.ts';
-import { buildSongScore, saveScore } from '../src/lib/score.ts';
+import { DRUMS_NEED_STEMS, buildScoreXml, buildSongScore, saveScore, transcribeDrums } from '../src/lib/score.ts';
+import userEvent from '@testing-library/user-event';
 import { Scores } from '../src/pages/Scores.tsx';
 import { SongScore } from '../src/pages/SongScore.tsx';
 
@@ -94,7 +95,7 @@ describe('score pages', () => {
     await saveScore(record(song.id));
     openScore(song.id);
     expect(await screen.findByTestId('score')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Tablatura/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('radio', { name: /Guitarra/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: /Baixar MusicXML/ })).toBeInTheDocument();
     expect(screen.getByLabelText('Andamento (BPM)')).toHaveValue(120);
   });
@@ -109,5 +110,43 @@ describe('review fixes: tempo and navigation', () => {
       expect(tempo).toBeLessThanOrEqual(240);
       expect((xml.match(/<measure /g) ?? []).length).toBeLessThan(20);
     }
+  });
+});
+
+describe('score types', () => {
+  it('builds keyboard and drum scores from their parts, and nothing for a missing part', () => {
+    const base = record('x');
+    expect(buildScoreXml('keys', { title: 'a', artist: '' }, undefined, base)).toBeNull();
+    const withParts: ScoreRecord = {
+      ...base,
+      piano: { notes: [{ pitch: 48, start: 0, end: 1, velocity: 1 }, { pitch: 64, start: 0, end: 1, velocity: 1 }], source: 'piano' },
+      drums: { hits: [{ time: 0, kind: 'kick' }, { time: 0.5, kind: 'snare' }] },
+    };
+    expect(buildScoreXml('keys', { title: 'a', artist: '' }, undefined, withParts)).toContain('<staves>2</staves>');
+    expect(buildScoreXml('drums', { title: 'a', artist: '' }, undefined, withParts)).toContain('<sign>percussion</sign>');
+    expect(buildScoreXml('guitar', { title: 'a', artist: '' }, undefined, withParts)).toContain('<sign>TAB</sign>');
+    expect(buildScoreXml('melody', { title: 'a', artist: '' }, undefined, withParts)).not.toContain('<sign>TAB</sign>');
+  });
+
+  it('asks for separated drums before a drum score', async () => {
+    const song = await createManualSong('Hino', '');
+    await db.audio.put({ songId: song.id, blob: new Blob(['x']), mimeType: 'audio/mpeg' });
+    await expect(transcribeDrums(song, () => {})).rejects.toThrow(DRUMS_NEED_STEMS);
+  });
+
+  it('offers a type selector and per-type generation', async () => {
+    const song = await createManualSong('Hino', '');
+    await saveScore(record(song.id));
+    render(
+      <MemoryRouter initialEntries={[`/musica/${song.id}/partitura`]}>
+        <Routes>
+          <Route path="/musica/:id/partitura" element={<SongScore />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId('score')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: /Teclado/ }));
+    expect(screen.queryByTestId('score')).toBeNull();
+    expect(screen.getByText(/Clave de sol e clave de fá/)).toBeInTheDocument();
   });
 });

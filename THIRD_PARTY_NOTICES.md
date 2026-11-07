@@ -53,3 +53,17 @@ Copyright 2022 Spotify AB. Licensed under the Apache License, Version 2.0.
 
 Score rendering uses opensheetmusicdisplay (https://github.com/opensheetmusicdisplay/opensheetmusicdisplay),
 Copyright (c) 2019 PhonicScore. Licensed under the BSD 3-Clause License.
+
+## HTDemucs 6s (Meta) — MIT License
+
+The 4/6-stem separation model `htdemucs_6s.onnx` is downloaded at run time from
+huggingface.co/kramp/htdemucs-6s-webgpu-onnx (MIT), a constant-folded copy of
+huggingface.co/StemSplitio/htdemucs-6s-onnx (MIT), exported from HTDemucs by Meta Platforms
+(https://github.com/facebookresearch/demucs, MIT; Rouard, Massa, Défossez, ICASSP 2023).
+The overlap-add windowing follows the reference `infer.py` of that model repository.
+
+## wasm-media-encoders — MIT License (includes LAME, LGPL)
+
+MP3 encoding uses wasm-media-encoders (https://github.com/arseneyr/wasm-media-encoders, MIT),
+which ships the LAME MP3 encoder (https://lame.sourceforge.io, LGPL-2.0) compiled to WebAssembly.
+It is loaded as its own module, unmodified, so it can be replaced independently of the app.
