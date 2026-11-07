@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ChordDiagram, type Instrument } from '../components/ChordDiagram.tsx';
 import { InstrumentToggle, readInstrument } from '../components/ChordPanel.tsx';
-import { CHORD_TYPES, INTERVAL_NAMES, ROOTS, SCALES, type ScaleKind, SOLFEGE, chordFormation, harmonicField, pcOf, scaleNotes } from '../lib/chordTheory.ts';
+import { CHORD_TYPES, INTERVAL_NAMES, KEYS, ROOTS, SCALES, type ScaleKind, SOLFEGE, chordFormation, harmonicField, pcOf, scaleNotes } from '../lib/chordTheory.ts';
+import { rovingKeys } from '../lib/a11y.ts';
 
 type Tab = 'chords' | 'theory' | 'scales';
 const TABS: { id: Tab; label: string }[] = [
@@ -107,7 +108,7 @@ const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | nu
       </div>
       <div>
         <p className="text-xs text-muted-foreground">Nota</p>
-        <div className="mt-1 grid grid-cols-6 gap-1 sm:grid-cols-12" role="radiogroup" aria-label="Nota">
+        <div className="mt-1 grid grid-cols-6 gap-1 sm:grid-cols-12" role="radiogroup" onKeyDown={rovingKeys} aria-label="Nota">
           {ROOTS.map((r) => (
             <Chip key={r} active={root === r} onClick={() => pick(r, suffix)} label={`${r} (${solfege(r).replace('♭', 'b').replace('♯', '#')})`}>
               <span className="block font-semibold">{r}</span>
@@ -118,7 +119,7 @@ const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | nu
       </div>
       <div>
         <p className="text-xs text-muted-foreground">Tipo</p>
-        <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" aria-label="Tipo">
+        <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" onKeyDown={rovingKeys} aria-label="Tipo">
           {CHORD_TYPES.map((t) => (
             <Chip key={t.suffix} active={suffix === t.suffix} onClick={() => pick(root, t.suffix)} label={t.suffix || 'maior'}>
               {t.suffix || 'maior'}
@@ -168,7 +169,7 @@ const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | nu
       <div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Grade de acordes</h2>
-          <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label="O que mostrar na grade">
+          <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" onKeyDown={rovingKeys} aria-label="O que mostrar na grade">
             {(
               [
                 ['types', `Todos os tipos de ${root}`],
@@ -287,13 +288,20 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
   const [kind, setKind] = useState<ScaleKind>('major');
   const notes = scaleNotes(key, kind);
   const pcs = notes.map(pcOf);
-  const mode = kind === 'major' || kind === 'majorPentatonic' ? 'major' : 'minor';
+  const mode = kind === 'major' || kind === 'majorPentatonic' ? 'major' : kind === 'harmonicMinor' ? 'harmonicMinor' : 'minor';
   const field = harmonicField(key, mode);
   const relative = mode === 'major' ? `${scaleNotes(key, 'major')[5]} menor` : `${scaleNotes(key, 'minor')[2]} maior`;
   const steps = SCALES[kind].steps;
   const pattern = steps.map((s, i) => ((steps[i + 1] ?? 12) - s === 1 ? 'S' : (steps[i + 1] ?? 12) - s === 2 ? 'T' : `${(steps[i + 1] ?? 12) - s}st`)).join(' ');
   const degree = (i: number) => field[i]!.triad;
-  const progressions = mode === 'major'
+  const progressions =
+    mode === 'harmonicMinor'
+      ? [
+          ['i – iv – V', [0, 3, 4]],
+          ['i – VI – V', [0, 5, 4]],
+          ['ii° – V – i', [1, 4, 0]],
+        ]
+      : mode === 'major'
     ? [
         ['I – V – vi – IV', [0, 4, 5, 3]],
         ['ii – V – I', [1, 4, 0]],
@@ -312,7 +320,7 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
         <label className="flex items-center gap-2">
           Tom
           <select aria-label="Tom" value={key} onChange={(e) => setKey(e.target.value)} className="h-10 rounded-lg border border-border bg-surface px-2">
-            {ROOTS.map((r) => (
+            {KEYS.map((r) => (
               <option key={r} value={r}>
                 {r} ({solfege(r)})
               </option>
@@ -346,7 +354,9 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold">Campo harmônico de {key} {mode === 'major' ? 'maior' : 'menor'}</h2>
+        <h2 className="text-lg font-semibold">
+          Campo harmônico de {key} {mode === 'major' ? 'maior' : mode === 'minor' ? 'menor' : 'menor harmônico'}
+        </h2>
         <p className="mt-1 text-sm text-muted-foreground">Os acordes que nascem de cada nota da escala, empilhando terças só com as notas dela. Toque num acorde para ver como tocar.</p>
         <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2" aria-label="Campo harmônico">
           {field.map((d) => (
@@ -412,7 +422,7 @@ export const StudyPage = () => {
       </div>
       <p className="mt-2 max-w-2xl text-muted-foreground">Todos os acordes no violão, no teclado e no cavaquinho, como eles são formados, as escalas e o campo harmônico de cada tom.</p>
       <div className="-mx-4 mt-4 overflow-x-auto px-4">
-        <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="tablist" aria-label="Assunto">
+        <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="tablist" onKeyDown={rovingKeys} aria-label="Assunto">
           {TABS.map((t) => (
             <button
               key={t.id}

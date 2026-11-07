@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { parseChordPro } from '../lib/chart.ts';
 import { transposeChord } from '../lib/transpose.ts';
 import { ChordDiagram, INSTRUMENT_NAMES, type Instrument } from './ChordDiagram.tsx';
+import { rovingKeys } from '../lib/a11y.ts';
 
 const KEY = 'wm-instrument';
 
@@ -28,7 +29,7 @@ export const chartChords = (chordPro: string, transpose: number, spellKey?: stri
 };
 
 export const InstrumentToggle = ({ value, onChange }: { value: Instrument; onChange: (i: Instrument) => void }) => (
-  <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label="Instrumento">
+  <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" onKeyDown={rovingKeys} aria-label="Instrumento">
     {(['violao', 'teclado', 'cavaquinho'] as const).map((i) => (
       <button
         key={i}

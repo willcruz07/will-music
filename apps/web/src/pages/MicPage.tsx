@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
 import { readInstrument } from '../components/ChordPanel.tsx';
 import { openMic, tapSamples } from '../lib/mic.ts';
-import { TUNINGS, type TunerReading, median, tunerReading } from '../lib/tuner.ts';
+import { TUNINGS, type TunerReading, decimate2, median, tunerReading } from '../lib/tuner.ts';
 import type { LiveChordsRequest, LiveChordsResponse } from '../worker/liveChords.worker.ts';
 import { Button } from '../ui/Button.tsx';
+import { rovingKeys } from '../lib/a11y.ts';
 
 type Tab = 'tuner' | 'voice' | 'chords';
 const TABS: { id: Tab; label: string }[] = [
@@ -163,6 +164,10 @@ export const MicPage = () => {
     analyser.fftSize = 4096;
     m.source.connect(analyser);
     const buf = new Float32Array(analyser.fftSize);
+    // At 44.1/48 kHz, analyse at half the rate (a quarter of the work, same accuracy).
+    const halve = m.context.sampleRate >= 44100;
+    const half = new Float32Array(analyser.fftSize / 2);
+    const rate = halve ? m.context.sampleRate / 2 : m.context.sampleRate;
     const recent: number[] = [];
     let frame = 0;
     let raf = 0;
@@ -171,7 +176,7 @@ export const MicPage = () => {
       if (frame++ % 2) return;
       analyser.getFloatTimeDomainData(buf);
       const preset = TUNINGS.find((t) => t.id === settings.current.presetId)!;
-      const p = detectPitch(buf, m.context.sampleRate, { minHz: tab === 'voice' ? 70 : preset.minHz, maxHz: tab === 'voice' ? 1200 : 1600 });
+      const p = detectPitch(halve ? decimate2(buf, half) : buf, rate, { minHz: tab === 'voice' ? 70 : preset.minHz, maxHz: tab === 'voice' ? 1200 : 1600 });
       const now = performance.now() / 1000;
       if (!p || p.clarity < 0.85) {
         recent.length = 0;
@@ -256,7 +261,7 @@ export const MicPage = () => {
         </p>
       )}
 
-      <div className="mt-4 inline-flex rounded-xl border border-border bg-surface p-1" role="tablist" aria-label="Ferramenta">
+      <div className="mt-4 inline-flex rounded-xl border border-border bg-surface p-1" role="tablist" onKeyDown={rovingKeys} aria-label="Ferramenta">
         {TABS.map((t) => (
           <button
             key={t.id}

@@ -17,7 +17,7 @@ import {
   stftChunk,
 } from '@will-music/engine';
 import * as ort from 'onnxruntime-web/webgpu';
-import { createMp3Encoder } from 'wasm-media-encoders';
+import { createAlignedMp3 } from '../lib/mp3.ts';
 import { fetchModel } from '../lib/models.ts';
 import type { SeparationRequest, SeparationResponse, SeparationTracks } from './separationProtocol.ts';
 
@@ -61,29 +61,12 @@ const normalizePeak = (planar: Float32Array, max = 0.9): void => {
   for (let i = 0; i < planar.length; i++) planar[i] = planar[i]! * scale;
 };
 
-/** Incremental MP3 (192 kbps CBR, stereo): planar regions go in, the file comes out at the end. */
+/** Incremental MP3 (192 kbps CBR, stereo), aligned with the input (encoder delay cancelled). */
 const mp3Stream = async (sampleRate: number) => {
-  const encoder = await createMp3Encoder();
-  encoder.configure({ sampleRate, channels: 2, bitrate: 192 });
-  const parts: Uint8Array[] = [];
-  const STEP = sampleRate; // one second at a time keeps the encoder's own buffer small
+  const enc = await createAlignedMp3(sampleRate, 192);
   return {
-    push(planar: Float32Array, length: number) {
-      for (let i = 0; i < length; i += STEP) {
-        const end = Math.min(length, i + STEP);
-        parts.push(encoder.encode([planar.subarray(i, end), planar.subarray(length + i, length + end)]).slice());
-      }
-    },
-    finish(): ArrayBuffer {
-      parts.push(encoder.finalize().slice());
-      const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-      let at = 0;
-      for (const p of parts) {
-        out.set(p, at);
-        at += p.length;
-      }
-      return out.buffer;
-    },
+    push: (planar: Float32Array, length: number) => enc.push(planar.subarray(0, length), planar.subarray(length, 2 * length)),
+    finish: () => enc.finish(),
   };
 };
 

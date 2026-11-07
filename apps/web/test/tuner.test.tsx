@@ -37,3 +37,14 @@ describe('microphone page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/não dá acesso ao microfone/);
   });
 });
+
+describe('pending fixes: lighter tuner', () => {
+  it('keeps the pitch when the signal is decimated by two', async () => {
+    const { detectPitch } = await import('@will-music/engine');
+    const { decimate2 } = await import('../src/lib/tuner.ts');
+    const rate = 48000;
+    const buf = Float32Array.from({ length: 4096 }, (_, i) => 0.4 * Math.sin((2 * Math.PI * 82.41 * i) / rate) + 0.2 * Math.sin((2 * Math.PI * 164.82 * i) / rate));
+    const p = detectPitch(decimate2(buf, new Float32Array(2048)), rate / 2)!;
+    expect(Math.abs(p.hz - 82.41)).toBeLessThan(0.5);
+  });
+});

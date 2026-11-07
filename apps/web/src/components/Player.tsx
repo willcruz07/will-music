@@ -6,6 +6,7 @@ import { getPeaks } from '../lib/peaks.ts';
 import type { StemsState } from '../lib/useStems.ts';
 import { StemsPanel } from './player/StemsPanel.tsx';
 import { Waveform } from './player/Waveform.tsx';
+import { rovingKeys } from '../lib/a11y.ts';
 
 export const activeIndexAt = (starts: readonly number[], t: number): number => {
   let lo = 0;
@@ -372,7 +373,7 @@ export const Player = (props: Props) => {
               </label>
               {autoScroll && props.onScrollModeChange && (
                 <div className="mt-2 space-y-2 text-sm">
-                  <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label="Como rolar">
+                  <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" onKeyDown={rovingKeys} aria-label="Como rolar">
                     {(
                       [
                         ['follow', 'Acompanhar a música'],
