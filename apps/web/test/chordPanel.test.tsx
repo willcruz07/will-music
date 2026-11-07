@@ -16,3 +16,13 @@ describe('chord panel', () => {
     expect(screen.getByText('Sem diagrama para Xyz')).toBeInTheDocument();
   });
 });
+
+describe('review fixes: diagram', () => {
+  it('recovers after an unknown chord when the next one is known', async () => {
+    const { rerender, findByText, queryByText } = render(<ChordDiagram chord="Xyz" instrument="violao" />);
+    expect(await findByText('Sem diagrama para Xyz')).toBeInTheDocument();
+    rerender(<ChordDiagram chord="C" instrument="violao" />);
+    await new Promise((r) => setTimeout(r, 200));
+    expect(queryByText(/Sem diagrama/)).toBeNull();
+  });
+});

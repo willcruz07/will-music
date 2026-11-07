@@ -5,7 +5,7 @@ import { AnalysisProgress } from '../components/AnalysisProgress.tsx';
 import { ChartView } from '../components/ChartView.tsx';
 import { LyricsPanel } from '../components/LyricsPanel.tsx';
 import { chartLineStarts, lyricTexts } from '../lib/lineTimes.ts';
-import { createSyncSession } from '../lib/syncSession.ts';
+import { syncKeyAction, useSyncMode } from '../lib/useSyncMode.ts';
 import { applyLyrics } from '../lib/lyricsApply.ts';
 import { Player, type PlayerControls, activeIndexAt } from '../components/Player.tsx';
 import { SongInfoForm } from '../components/SongInfoForm.tsx';
@@ -35,9 +35,6 @@ export const Song = () => {
   const [showCurrent, setShowCurrent] = useState(true);
   const lineStarts = useRef<number[]>([]);
   const player = useRef<PlayerControls | null>(null);
-  const sync = useRef<ReturnType<typeof createSyncSession> | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [, setSyncTick] = useState(0);
 
   const load = useCallback(async () => {
     const [s, c, a] = await Promise.all([
@@ -115,49 +112,36 @@ export const Song = () => {
 
   const shownKey = useMemo(() => (song?.key ? transposeKey(song.key, chart?.transpose ?? 0) : undefined), [song?.key, chart?.transpose]);
 
-  const finishSync = useCallback(async () => {
-    const session = sync.current;
-    sync.current = null;
-    setSyncing(false);
-    player.current?.pause();
-    if (!session || !chart) return;
-    await db.charts.update(chart.id, { lineTimes: session.times, updatedAt: new Date().toISOString() });
-    await load();
-  }, [chart, load]);
+  // Saved through a ref inside useSyncMode: re-renders (font size, transpose, reloads) never end the session.
+  const syncMode = useSyncMode({
+    currentTime: () => player.current?.currentTime() ?? 0,
+    onSave: (times) => {
+      player.current?.pause();
+      const chartId = chart?.id;
+      if (!chartId) return;
+      void db.charts.update(chartId, { lineTimes: times, updatedAt: new Date().toISOString() }).then(() => load());
+    },
+  });
+  const syncing = syncMode.syncing;
 
   const startSync = () => {
     if (!chart) return;
-    const count = lyricTexts(chart.chordPro).length;
-    sync.current = createSyncSession(count, chart.lineTimes ?? lineStarts.current);
-    setSyncing(true);
+    syncMode.start(lyricTexts(chart.chordPro).length, chart.lineTimes ?? lineStarts.current);
     player.current?.playFrom(0);
   };
-
-  const markLine = useCallback(() => {
-    const session = sync.current;
-    if (!session) return;
-    session.mark(player.current?.currentTime() ?? 0);
-    setSyncTick((n) => n + 1);
-    if (session.done) void finishSync();
-  }, [finishSync]);
 
   useEffect(() => {
     if (!syncing) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        markLine();
-      } else if (e.key === 'ArrowLeft') {
-        sync.current?.back();
-        setSyncTick((n) => n + 1);
-      }
+      const action = syncKeyAction({ code: e.code, key: e.key, targetTag: (e.target as HTMLElement | null)?.tagName });
+      if (!action) return;
+      e.preventDefault();
+      if (action === 'mark') syncMode.mark();
+      else syncMode.back();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [syncing, markLine]);
-
-  // Leaving the page while syncing keeps the marks made so far.
-  useEffect(() => () => void (sync.current && finishSync()), [finishSync]);
+  }, [syncing, syncMode.mark, syncMode.back]);
 
   if (song === undefined) return null;
   if (song === null) {
@@ -245,9 +229,11 @@ export const Song = () => {
               <FileText className="size-4" /> Trocar letra
             </Button>
           )}
-          <IconButton label="Analisar de novo" onClick={() => void analyze()} disabled={!!progress}>
-            <RefreshCw className="size-4" />
-          </IconButton>
+          {audioUrl && (
+            <IconButton label="Analisar de novo" onClick={() => void analyze()} disabled={!!progress}>
+              <RefreshCw className="size-4" />
+            </IconButton>
+          )}
           <IconButton
             label="Excluir música"
             onClick={() => {
@@ -289,33 +275,30 @@ export const Song = () => {
         />
       )}
 
-      {syncing && sync.current && (
+      {syncing && (
         <div className="sticky top-14 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-primary bg-surface p-3" role="status">
           <p className="mr-auto text-sm">
             <span className="font-semibold">Sincronizando.</span> Toque na letra ou aperte espaço quando cada linha começar. Seta para a esquerda desfaz a última marca.
           </p>
           <Button
             variant="outline"
-            onClick={() => {
-              sync.current?.back();
-              setSyncTick((n) => n + 1);
-            }}
+            onClick={syncMode.back}
           >
             Voltar uma linha
           </Button>
-          <Button onClick={() => void finishSync()}>Concluir</Button>
+          <Button onClick={syncMode.finish}>Concluir</Button>
         </div>
       )}
 
       {chart && !progress && (
-        <div className={`mt-6 ${syncing ? 'cursor-pointer select-none' : ''}`} onClick={syncing ? markLine : undefined}>
+        <div className={`mt-6 ${syncing ? 'cursor-pointer select-none' : ''}`} onClick={syncing ? syncMode.mark : undefined}>
           <ChartView
             chordPro={chart.chordPro}
             transpose={chart.transpose}
             preferFlats={shownKey ? prefersFlats(shownKey) : false}
             spellKey={shownKey}
             fontSize={chart.fontSize}
-            activeLineIndex={syncing && sync.current ? sync.current.next : activeLine}
+            activeLineIndex={syncing ? syncMode.next : activeLine}
             autoScroll={autoScroll || syncing}
           />
         </div>

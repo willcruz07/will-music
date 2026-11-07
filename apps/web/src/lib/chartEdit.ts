@@ -9,7 +9,10 @@ export const saveEditedChart = async (songId: string, chordPro: string): Promise
     await db.charts.add({ id: crypto.randomUUID(), songId, chordPro, transpose: 0, fontSize: 18, origin: 'edited', createdAt: stamp, updatedAt: stamp });
     return;
   }
-  const lineTimes = remapLineTimes(chart.chordPro, chordPro, chart.lineTimes ?? []);
+  // Charts saved before lineTimes existed take their times from the analysis lyrics (same fallback as chartLineStarts).
+  const analysis = chart.lineTimes ? undefined : await db.analyses.where('songId').equals(songId).first();
+  const before = chart.lineTimes ?? analysis?.lyrics?.lines.map((l) => l.start) ?? [];
+  const lineTimes = remapLineTimes(chart.chordPro, chordPro, before);
   await db.charts.update(chart.id, { chordPro, lineTimes, origin: 'edited', updatedAt: stamp });
 };
 

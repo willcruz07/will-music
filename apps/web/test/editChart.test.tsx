@@ -45,3 +45,13 @@ describe('chart editor', () => {
     expect((await db.charts.where('songId').equals(song.id).first())!.origin).toBe('manual');
   });
 });
+
+describe('review fixes: editor', () => {
+  it('keeps line timing of charts saved before lineTimes existed', async () => {
+    const song = await createSong({ title: 'T', artist: 'A', durationSec: 10 }, new Blob());
+    await db.analyses.add({ id: 'a', songId: song.id, schemaVersion: 1, models: {}, key: { root: 'G', mode: 'major', label: 'G major', index: 10, margin: 0 }, chords: [], lyrics: { source: 'lrclib', lines: [{ start: 3, text: 'um' }, { start: 8, text: 'dois' }] }, createdAt: '', updatedAt: '' });
+    await db.charts.add({ id: 'c', songId: song.id, chordPro: 'um\ndois', transpose: 0, fontSize: 18, origin: 'generated', createdAt: '', updatedAt: '' });
+    await saveEditedChart(song.id, '[G]um\ndois');
+    expect((await db.charts.get('c'))!.lineTimes).toEqual([3, 8]);
+  });
+});

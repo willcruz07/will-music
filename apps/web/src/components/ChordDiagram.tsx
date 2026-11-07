@@ -12,24 +12,33 @@ const Guitar = ({ chord }: { chord: string }) => {
   const [missing, setMissing] = useState(false);
   useEffect(() => {
     let cancelled = false;
+    setMissing(false);
     void guitarShape(chord).then((shape) => {
       const el = box.current;
       if (cancelled || !el) return;
       el.innerHTML = '';
       setMissing(!shape);
       if (!shape) return;
-      const ink = css('--foreground');
-      const accent = css('--chord');
-      new SVGuitarChord(el)
-        .configure({ color: ink, fingerColor: accent, fingerTextColor: css('--primary-foreground'), fontFamily: 'Atkinson Hyperlegible Next, sans-serif', frets: 4, fretSize: 1.4, fingerSize: 0.7, strokeWidth: 2 })
-        .chord(toSvguitar(shape))
-        .draw();
+      try {
+        new SVGuitarChord(el)
+          .configure({ color: css('--foreground'), fingerColor: css('--chord'), fingerTextColor: css('--primary-foreground'), fontFamily: 'Atkinson Hyperlegible Next, sans-serif', frets: 4, fretSize: 1.4, fingerSize: 0.7, strokeWidth: 2 })
+          .chord(toSvguitar(shape))
+          .draw();
+      } catch {
+        // Rendering needs real SVG layout (not available in every environment); leave the box empty.
+      }
     });
     return () => {
       cancelled = true;
     };
   }, [chord]);
-  return missing ? <p className="text-sm text-muted-foreground">Sem diagrama para {chord}</p> : <div ref={box} className="w-full" aria-label={`Diagrama de violão de ${chord}`} role="img" />;
+  // The box stays mounted (hidden when there is no shape) so the next chord can draw into it.
+  return (
+    <>
+      {missing && <p className="text-sm text-muted-foreground">Sem diagrama para {chord}</p>}
+      <div ref={box} hidden={missing} className="w-full" aria-label={`Diagrama de violão de ${chord}`} role="img" />
+    </>
+  );
 };
 
 const WHITE = [0, 2, 4, 5, 7, 9, 11];
