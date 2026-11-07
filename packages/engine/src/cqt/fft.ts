@@ -62,3 +62,49 @@ export const rfft = (
     out[2 * k + 1] = im[k]!;
   }
 };
+
+/** In-place complex FFT (forward when `sign` = -1, unnormalized inverse when +1). Size must be a power of two. */
+export const fftComplex = (re: Float64Array, im: Float64Array, sign: -1 | 1): void => {
+  const size = re.length;
+  const { cos, sin, rev } = getTables(size);
+  for (let i = 0; i < size; i++) {
+    const j = rev[i]!;
+    if (j > i) {
+      [re[i], re[j]] = [re[j]!, re[i]!];
+      [im[i], im[j]] = [im[j]!, im[i]!];
+    }
+  }
+  for (let len = 2; len <= size; len <<= 1) {
+    const half = len >> 1;
+    const stride = size / len;
+    for (let start = 0; start < size; start += len) {
+      for (let j = 0; j < half; j++) {
+        const wr = cos[j * stride]!;
+        const wi = sign === -1 ? sin[j * stride]! : -sin[j * stride]!;
+        const a = start + j;
+        const b = a + half;
+        const xr = re[b]! * wr - im[b]! * wi;
+        const xi = re[b]! * wi + im[b]! * wr;
+        re[b] = re[a]! - xr;
+        im[b] = im[a]! - xi;
+        re[a] = re[a]! + xr;
+        im[a] = im[a]! + xi;
+      }
+    }
+  }
+};
+
+/** Inverse of `rfft`: half spectrum (size/2 + 1 interleaved bins) → real signal of `out.length` samples. */
+export const irfft = (spectrum: Float32Array, out: Float32Array, re: Float64Array, im: Float64Array): void => {
+  const size = out.length;
+  for (let k = 0; k <= size / 2; k++) {
+    re[k] = spectrum[2 * k]!;
+    im[k] = spectrum[2 * k + 1]!;
+  }
+  for (let k = size / 2 + 1; k < size; k++) {
+    re[k] = spectrum[2 * (size - k)]!;
+    im[k] = -spectrum[2 * (size - k) + 1]!;
+  }
+  fftComplex(re, im, 1);
+  for (let n = 0; n < size; n++) out[n] = re[n]! / size;
+};
