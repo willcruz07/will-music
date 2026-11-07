@@ -1,5 +1,6 @@
 import type { ChordSegment, KeyResult } from '@will-music/engine';
 import Dexie, { type EntityTable } from 'dexie';
+import { requestPersistence } from './storage.ts';
 
 export type AnalysisStatus = 'pending' | 'running' | 'done' | 'error';
 
@@ -74,6 +75,8 @@ db.version(2).stores({ setlists: 'id, updatedAt' });
 export const now = (): string => new Date().toISOString();
 
 export const createSong = async (input: { title: string; artist: string; durationSec: number }, audio: Blob): Promise<Song> => {
+  // First saved song: ask the browser to keep this site's data (spec §5.4).
+  if ((await db.songs.count()) === 0) void requestPersistence();
   const stamp = now();
   const song: Song = { id: crypto.randomUUID(), ...input, favorite: false, analysisStatus: 'pending', createdAt: stamp, updatedAt: stamp };
   await db.transaction('rw', db.songs, db.audio, async () => {

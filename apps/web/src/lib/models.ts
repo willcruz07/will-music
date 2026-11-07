@@ -53,3 +53,19 @@ export const fetchModel = async (
   await cache.put(model.url, new Response(bytes));
   return bytes;
 };
+
+export const listCachedModels = async (): Promise<{ id: ModelId; bytes: number }[]> => {
+  const cache = await caches.open(CACHE_NAME);
+  const urls = new Set((await cache.keys()).map((r) => r.url));
+  const out: { id: ModelId; bytes: number }[] = [];
+  for (const id of Object.keys(MODELS) as ModelId[]) {
+    if (!urls.has(MODELS[id].url)) continue;
+    const response = await cache.match(MODELS[id].url);
+    out.push({ id, bytes: response ? (await response.arrayBuffer()).byteLength : 0 });
+  }
+  return out;
+};
+
+export const deleteCachedModels = async (): Promise<void> => {
+  await caches.delete(CACHE_NAME);
+};

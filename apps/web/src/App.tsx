@@ -5,6 +5,7 @@ import { BottomNav, TopNav } from './components/AppNav.tsx';
 import { EditChart } from './pages/EditChart.tsx';
 import { SetlistEdit } from './pages/SetlistEdit.tsx';
 import { Setlists } from './pages/Setlists.tsx';
+import { Settings } from './pages/Settings.tsx';
 import { Stage } from './pages/Stage.tsx';
 import { Library } from './pages/Library.tsx';
 import { NewSong } from './pages/NewSong.tsx';
@@ -69,6 +70,7 @@ const Layout = () => (
         <Route path="/musica/:id/editar" element={<EditChart />} />
         <Route path="/listas" element={<Setlists />} />
         <Route path="/listas/:id" element={<SetlistEdit />} />
+        <Route path="/ajustes" element={<Settings />} />
       </Routes>
     </main>
     <BottomNav />
