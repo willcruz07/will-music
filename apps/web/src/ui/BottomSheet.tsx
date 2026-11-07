@@ -66,6 +66,8 @@ export const BottomSheet = ({
   }, []);
 
   const onHandleDown = (e: React.PointerEvent) => {
+    // A press on the close button is a tap, not a drag: capturing the pointer would send its click to the handle instead.
+    if ((e.target as HTMLElement).closest('button')) return;
     dragStart.current = e.clientY;
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
