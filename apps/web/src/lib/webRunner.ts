@@ -1,8 +1,7 @@
 import type { TensorRunner } from '@will-music/engine';
 import * as ort from 'onnxruntime-web/wasm';
 
-// WASM files are copied to /ort/ by the copy-ort plugin in vite.config.ts.
-ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`;
+// The WASM binary is bundled by Vite (onnxruntime-web resolves it via import.meta.url).
 ort.env.wasm.numThreads = typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
 ort.env.logLevel = 'error';
 
