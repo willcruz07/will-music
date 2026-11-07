@@ -183,7 +183,7 @@ Regras do gerenciador de modelos:
 ## 7. Funcionalidades e critérios de aceite
 
 ### 7.0 Fase 0: validação dos acordes (antes de qualquer tela)
-Um script ou página de teste que roda S-KEY + ChordMini + Beat This em músicas de referência e imprime a sequência de acordes por compasso.
+Uma ferramenta de linha de comando (Node) que roda S-KEY + ChordMini em músicas de referência, usando o mesmo código de análise que o app vai usar no navegador, e gera um relatório com a sequência de acordes e as notas.
 
 **Músicas** (aprovadas pelo usuário, arquivos locais em `C:\Users\WillCruz\Music`, nunca enviados para fora nem versionados no repositório):
 
@@ -196,7 +196,12 @@ Um script ou página de teste que roda S-KEY + ChordMini + Beat This em músicas
 | 5 | Boulevard of Broken Dreams (Green Day) | `Spotify\00s Rock Anthems\Green Day - Boulevard Of Broken Dreams [Official Music Video] [4K Upgrade].mp3` | Rock | Controle fácil |
 
 - **Cifra de referência:** o Claude monta a sequência de acordes esperada de cada música, e o usuário (músico) confirma ou corrige antes da comparação.
-- **Métrica** *(decisão do Claude)*: porcentagem de compassos cujo acorde principal tem fundamental e tipo (maior/menor) corretos. Para o tom: acerto exato ou relativo, reportados separadamente.
+- **Métrica** *(decisão do Claude, revista no planejamento)*: as cifras de referência não têm tempo, então a comparação é por **sequência**.
+  - A sequência linear de acordes da gravação (com repetições expandidas) é comparada com a sequência prevista: segmentos menores que 0,75 s descartados, repetições seguidas fundidas, sem `N`/`X`.
+  - Ambas são reduzidas a fundamental (classe de altura) + maior/menor e alinhadas por maior subsequência comum (LCS).
+  - **Nota principal:** LCS / tamanho da referência (cobertura). Também se reporta LCS / tamanho da previsão (ruído).
+  - **Tom:** acerto exato, relativo ou quinta, reportados separadamente.
+  - O modelo de batidas não é necessário na Fase 0.
 - **Gate** *(decisão do Claude)*: média ≥ 70% → seguir normalmente.
 - **Se ficar abaixo de 70%** (decisão do usuário): testar uma alternativa barata (Essentia.js) e ficar com a melhor. A V1 segue de qualquer forma, apresentando a cifra gerada como **rascunho editável** ("confira os acordes"). Exportar outros modelos para ONNX (ex.: BTC) não faz parte da V1.
 
