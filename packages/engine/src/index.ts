@@ -8,3 +8,4 @@ export * from './chords/decode.ts';
 export * from './inference/runner.ts';
 export * from './key/key.ts';
 export * from './analyze.ts';
+export * from './eval/sequence.ts';
