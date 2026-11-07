@@ -15,6 +15,8 @@ const EditChart = named(() => import('./pages/EditChart.tsx'), 'EditChart');
 const Setlists = named(() => import('./pages/Setlists.tsx'), 'Setlists');
 const SetlistEdit = named(() => import('./pages/SetlistEdit.tsx'), 'SetlistEdit');
 const Settings = named(() => import('./pages/Settings.tsx'), 'Settings');
+const Scores = named(() => import('./pages/Scores.tsx'), 'Scores');
+const SongScore = named(() => import('./pages/SongScore.tsx'), 'SongScore');
 const Stage = named(() => import('./pages/Stage.tsx'), 'Stage');
 
 // Reads the saved preference, never the <html> class (the stage forces dark while it is open).
@@ -64,6 +66,8 @@ const Layout = () => (
           <Route path="/nova" element={<NewSong />} />
           <Route path="/musica/:id" element={<Song />} />
           <Route path="/musica/:id/editar" element={<EditChart />} />
+          <Route path="/musica/:id/partitura" element={<SongScore />} />
+          <Route path="/partituras" element={<Scores />} />
           <Route path="/listas" element={<Setlists />} />
           <Route path="/listas/:id" element={<SetlistEdit />} />
           <Route path="/ajustes" element={<Settings />} />
