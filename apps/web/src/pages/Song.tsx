@@ -13,7 +13,10 @@ import { setChordProMeta } from '../lib/chordProEdit.ts';
 import { type Analysis, type Chart, type Song as SongRecord, db, deleteSong, updateSong } from '../lib/db.ts';
 import { isRunning, startAnalysis, subscribeAnalysis } from '../lib/jobs.ts';
 import { type PipelineProgress, runPipeline } from '../lib/pipeline.ts';
-import { prefersFlats, transposeKey } from '../lib/transpose.ts';
+import { prefersFlats, transposeChord, transposeKey } from '../lib/transpose.ts';
+import { toDisplayLabel } from '@will-music/engine';
+import { ChordDiagram } from '../components/ChordDiagram.tsx';
+import { ChordPanel, readInstrument } from '../components/ChordPanel.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
 
 export const Song = () => {
@@ -28,6 +31,7 @@ export const Song = () => {
   const [autoScroll, setAutoScroll] = useState(true);
   const [showLyrics, setShowLyrics] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(true);
   const lineStarts = useRef<number[]>([]);
   const player = useRef<PlayerControls | null>(null);
   const sync = useRef<ReturnType<typeof createSyncSession> | null>(null);
@@ -89,7 +93,18 @@ export const Song = () => {
     };
   }, [id, load, analyze, follow]);
 
-  const onTime = useCallback((t: number) => setActiveLine(activeIndexAt(lineStarts.current, t)), []);
+  const chordStarts = useRef<{ starts: number[]; raws: string[] }>({ starts: [], raws: [] });
+  const [currentRaw, setCurrentRaw] = useState<string | null>(null);
+  useEffect(() => {
+    const usable = (analysis?.chords ?? []).filter((c) => c.raw !== 'N' && c.raw !== 'X');
+    chordStarts.current = { starts: usable.map((c) => c.start), raws: usable.map((c) => c.raw) };
+  }, [analysis]);
+
+  const onTime = useCallback((t: number) => {
+    setActiveLine(activeIndexAt(lineStarts.current, t));
+    const i = activeIndexAt(chordStarts.current.starts, t);
+    setCurrentRaw(i >= 0 ? chordStarts.current.raws[i]! : null);
+  }, []);
 
   const saveChart = async (patch: Partial<Chart>) => {
     if (!chart) return;
@@ -301,6 +316,17 @@ export const Song = () => {
             activeLineIndex={syncing && sync.current ? sync.current.next : activeLine}
             autoScroll={autoScroll || syncing}
           />
+        </div>
+      )}
+
+      {chart && !progress && <ChordPanel chordPro={chart.chordPro} transpose={chart.transpose} spellKey={shownKey} />}
+
+      {audioUrl && currentRaw && showCurrent && (
+        <div className="fixed bottom-24 right-4 z-30 rounded-lg border border-border bg-surface p-3 shadow-sm">
+          <button type="button" onClick={() => setShowCurrent(false)} className="absolute right-1 top-1 rounded px-1 text-xs text-muted-foreground hover:bg-muted" aria-label="Esconder acorde atual">
+            ×
+          </button>
+          <ChordDiagram chord={transposeChord(toDisplayLabel(currentRaw), chart?.transpose ?? 0, shownKey ?? false)} instrument={readInstrument()} />
         </div>
       )}
 
