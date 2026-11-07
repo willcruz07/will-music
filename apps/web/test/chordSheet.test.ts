@@ -7,7 +7,7 @@ describe('chord sheet format', () => {
   });
 
   it('keeps directives, empty lines and chord-only lines', () => {
-    expect(chordProToSheet('{title: Hino}\n\n[C] [G]')).toBe('{title: Hino}\n\nC G');
+    expect(chordProToSheet('{title: Hino}\n\n[C] [G]')).toBe('{title: Hino}\n\n[C] [G]');
   });
 
   it('pads the lyric when a chord sits past its end', () => {

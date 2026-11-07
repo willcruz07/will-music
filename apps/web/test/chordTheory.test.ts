@@ -41,10 +41,11 @@ describe('fretted voicings', () => {
     const shapes = findVoicings(pcs, 0, CAVAQUINHO.tuning);
     expect(shapes.length).toBeGreaterThan(2);
     for (const s of shapes) {
-      const notes = s.frets.map((f, i) => (CAVAQUINHO.tuning[i]! + f) % 12);
+      const absolute = s.frets.map((f) => (f > 0 && s.baseFret > 1 ? f + s.baseFret - 1 : f));
+      const notes = absolute.map((f, i) => (CAVAQUINHO.tuning[i]! + f) % 12);
       expect(notes.every((n) => pcs.includes(n))).toBe(true);
       expect(new Set(notes)).toEqual(new Set(pcs));
-      const fretted = s.frets.filter((f) => f > 0);
+      const fretted = absolute.filter((f) => f > 0);
       expect(Math.max(0, ...fretted) - Math.min(99, ...fretted)).toBeLessThanOrEqual(3);
     }
   });

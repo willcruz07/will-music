@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { ChartView } from '../components/ChartView.tsx';
 import { ChordLibrary } from '../components/ChordLibrary.tsx';
 import { setChordAt } from '../lib/chordProEdit.ts';
-import { chordProToSheet, sheetToChordPro } from '../lib/chordSheet.ts';
+import { chordProToSheet, insertChordInSheet, isLossless, sheetToChordPro, snapOutOfBrackets } from '../lib/chordSheet.ts';
 import { restoreGeneratedChart, saveEditedChart } from '../lib/chartEdit.ts';
 import { type Song, db } from '../lib/db.ts';
 import { createHistory } from '../lib/history.ts';
@@ -39,7 +39,10 @@ export const EditChart = () => {
   const [tab, setTab] = useState<'texto' | 'ver'>('texto');
   const [picking, setPicking] = useState<{ line: number; char: number } | null>(null);
   const [inserting, setInserting] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [, force] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
+  const ONLY_CHORDPRO = 'Esta cifra tem trechos que só cabem em ChordPro (acordes que o app não reconhece, ou linhas de letra que parecem acordes), então ela abre só em ChordPro para nada se perder.';
   const box = useRef<HTMLTextAreaElement>(null);
   const caret = useRef(0);
 
@@ -52,11 +55,15 @@ export const EditChart = () => {
       setSong(s ?? null);
       setHasAnalysis(!!analysis);
       const text = chart?.chordPro ?? '';
-      const shown = fromChordPro(text, readFormat());
+      // The chord-above layout is used only when the chart comes back from it exactly.
+      const f = readFormat() === 'cifra' && !isLossless(text) ? 'chordpro' : readFormat();
+      if (f !== readFormat()) setNotice(ONLY_CHORDPRO);
+      setFormat(f);
+      const shown = fromChordPro(text, f);
       history.current = createHistory(shown);
       setDraft(shown);
-      // What "unchanged" means: the chart as it reads back from the editor's layout.
-      setSaved(toChordPro(shown, readFormat()));
+      setSaved(text);
+      setLoaded(true);
     })();
   }, [id]);
 
@@ -77,6 +84,11 @@ export const EditChart = () => {
 
   const switchFormat = (next: Format) => {
     if (next === format) return;
+    if (next === 'cifra' && !isLossless(chordPro)) {
+      setNotice(ONLY_CHORDPRO);
+      return;
+    }
+    setNotice(null);
     const shown = fromChordPro(chordPro, next);
     history.current = createHistory(shown);
     setDraft(shown);
@@ -89,14 +101,18 @@ export const EditChart = () => {
   };
 
   const save = useCallback(async () => {
+    // Nothing to save before the chart has loaded or when nothing changed (Ctrl+S included).
+    if (!loaded || chordPro === saved) return;
     await saveEditedChart(id, chordPro);
     setSaved(chordPro);
     navigate(`/musica/${id}`, { replace: true });
-  }, [id, chordPro, navigate]);
+  }, [id, chordPro, saved, loaded, navigate]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
+      // Undo inside the chord library's own field belongs to that field.
+      if (e.target instanceof HTMLInputElement) return;
       const k = e.key.toLowerCase();
       if (k === 's') {
         e.preventDefault();
@@ -130,9 +146,15 @@ export const EditChart = () => {
   /** Puts the chord where the cursor was: "[G]" in ChordPro, "G " in the chord-above layout. */
   const insertAtCaret = (chord: string) => {
     const at = Math.min(caret.current, draft.length);
-    const piece = format === 'chordpro' ? `[${chord}]` : `${chord} `;
-    update(draft.slice(0, at) + piece + draft.slice(at));
-    caret.current = at + piece.length;
+    if (format === 'cifra') {
+      const next = insertChordInSheet(draft, at, chord);
+      update(next.text);
+      caret.current = next.caret;
+    } else {
+      const safe = snapOutOfBrackets(draft, at);
+      update(`${draft.slice(0, safe)}[${chord}]${draft.slice(safe)}`);
+      caret.current = safe + chord.length + 2;
+    }
     requestAnimationFrame(() => {
       box.current?.focus();
       box.current?.setSelectionRange(caret.current, caret.current);
@@ -196,8 +218,16 @@ export const EditChart = () => {
           suggestions={usedChords}
           allowRemove
           onCancel={() => setPicking(null)}
+          key={`${picking.line}:${picking.char}`}
           onApply={(chord) => {
-            update(fromChordPro(setChordAt(chordPro, picking.line, picking.char, chord), format));
+            const next = setChordAt(chordPro, picking.line, picking.char, chord);
+            if (format === 'cifra' && !isLossless(next)) {
+              // That chord only fits in ChordPro: switch rather than lose it.
+              history.current = createHistory(next);
+              setDraft(next);
+              setFormat('chordpro');
+              setNotice(ONLY_CHORDPRO);
+            } else update(fromChordPro(next, format));
             setPicking(null);
           }}
         />
@@ -252,6 +282,12 @@ export const EditChart = () => {
           </>
         )}
       </p>
+
+      {notice && (
+        <p className="mt-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm" role="status">
+          {notice}
+        </p>
+      )}
 
       <div className="mt-4 flex gap-2 md:hidden" role="tablist">
         {(['texto', 'ver'] as const).map((t) => (

@@ -98,3 +98,52 @@ describe('editing lyrics and chords', () => {
     expect(box.value).toContain('Santo[Am7]');
   });
 });
+
+describe('review fixes: editing without losses', () => {
+  const openEditor = (id: string) =>
+    render(
+      <MemoryRouter initialEntries={[`/musica/${id}/editar`]}>
+        <Routes>
+          <Route path="/musica/:id/editar" element={<EditChart />} />
+          <Route path="/musica/:id" element={<p>tela da música</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it('opens a chart with chords the layout cannot hold in ChordPro, with a notice', async () => {
+    localStorage.removeItem('wm-edit-format');
+    const song = await createManualSong('Hino', '');
+    await saveEditedChart(song.id, 'E\n[C(add9)]Letra [G]mais');
+    openEditor(song.id);
+    expect(((await screen.findByLabelText('Cifra em ChordPro')) as HTMLTextAreaElement).value).toBe('E\n[C(add9)]Letra [G]mais');
+    expect(screen.getByRole('status')).toHaveTextContent(/só em ChordPro/);
+    await userEvent.click(screen.getByRole('radio', { name: 'Acordes em cima' }));
+    expect(screen.getByLabelText('Cifra em ChordPro')).toBeInTheDocument();
+  });
+
+  it('does not save an unchanged chart with Ctrl+S', async () => {
+    const song = await createManualSong('Hino', '');
+    await db.charts.where('songId').equals(song.id).modify({ chordPro: '[G]Santo', origin: 'manual' });
+    openEditor(song.id);
+    await screen.findByLabelText(/Cifra/);
+    await userEvent.keyboard('{Control>}s{/Control}');
+    expect((await db.charts.where('songId').equals(song.id).first())!.origin).toBe('manual');
+  });
+
+  it('puts an inserted chord on the chord line above the cursor', async () => {
+    localStorage.removeItem('wm-edit-format');
+    const song = await createManualSong('Hino', '');
+    await db.charts.where('songId').equals(song.id).modify({ chordPro: '[G]Ninguém explica' });
+    openEditor(song.id);
+    const box = (await screen.findByLabelText('Cifra com os acordes em cima da letra')) as HTMLTextAreaElement;
+    box.setSelectionRange(box.value.indexOf('explica'), box.value.indexOf('explica'));
+    box.dispatchEvent(new Event('select', { bubbles: true }));
+    await userEvent.click(screen.getByRole('button', { name: /Inserir acorde/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Usar G' }));
+    await userEvent.click(screen.getByRole('button', { name: /Inserir acorde/ }));
+    await userEvent.clear(screen.getByLabelText('Acorde digitado'));
+    await userEvent.type(screen.getByLabelText('Acorde digitado'), 'D');
+    await userEvent.click(screen.getByRole('button', { name: 'Usar D' }));
+    expect(box.value.split('\n')[1]).toBe('Ninguém explica');
+  });
+});

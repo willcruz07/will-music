@@ -2,18 +2,19 @@ import { ChevronLeft, ChevronRight, GraduationCap, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { chordNotes } from '../lib/chordNotation.ts';
+import { pcOf, spellChordTones } from '../lib/chordTheory.ts';
 import { ChordDiagram, type Instrument } from './ChordDiagram.tsx';
 import { InstrumentToggle, readInstrument } from './ChordPanel.tsx';
 
-const SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-const FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-
-/** Note names of a chord, spelled with flats when the chord is written with one. */
+/** Note names of a chord, each spelled by its letter from the root (Gm is G Bb D, not G A# D). */
 export const chordNoteNames = (chord: string): string[] => {
+  const m = /^([A-G][#b]?)([^/]*)(?:\/([A-G][#b]?))?$/u.exec(chord.trim());
   const pcs = chordNotes(chord);
-  if (!pcs) return [];
-  const names = /^[A-G]b/u.test(chord) || /^(F|Bb|Eb|Ab|Db)(?![#])/u.test(chord) ? FLAT : SHARP;
-  return pcs.map((pc) => names[pc]!);
+  if (!m || !pcs) return [];
+  const root = m[1]!;
+  const rootPc = pcOf(root);
+  const dim7 = /°7|º7|dim7/u.test(m[2]!);
+  return pcs.map((pc, i) => (m[3] && i === 0 && pc !== rootPc ? m[3] : spellChordTones(root, [(pc - rootPc + 12) % 12], dim7)[0]!));
 };
 
 const FORM_LABEL: Record<Instrument, string> = { violao: 'Forma', teclado: 'Inversão', cavaquinho: 'Forma' };

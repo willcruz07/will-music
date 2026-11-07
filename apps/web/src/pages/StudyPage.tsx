@@ -14,13 +14,32 @@ const TABS: { id: Tab; label: string }[] = [
 
 const solfege = (root: string) => `${SOLFEGE[root[0]!]}${root.length > 1 ? (root[1] === 'b' ? '♭' : '♯') : ''}`;
 
-const parseChord = (chord: string | null) => {
-  const m = chord ? /^([A-G][#b]?)(.*)$/u.exec(chord) : null;
+const SYNONYMS: [RegExp, string][] = [
+  [/^(m7b5|m7-5|ø|m7\(5-\))/u, 'm7(b5)'],
+  [/^(dim7|º7)/u, '°7'],
+  [/^(dim|º)/u, '°'],
+  [/^(maj7|M7|7\+)/u, '7M'],
+  [/^(aug|5\+)/u, '+'],
+  [/^add9/u, '9'],
+  [/^sus(?![24])/u, 'sus4'],
+];
+
+/**
+ * The chord a link asks for, as root + one of the study types: the bass is dropped, synonyms are
+ * understood (m7b5, dim, maj7…) and an unknown kind falls back to the closest known one, never to C.
+ */
+export const parseStudyChord = (chord: string | null): { root: string; suffix: string } | null => {
+  const m = chord ? /^([A-G][#b]*)([^/]*)/u.exec(chord.trim()) : null;
   if (!m) return null;
-  const sharpToFlat: Record<string, string> = { 'D#': 'Eb', 'G#': 'Ab', 'A#': 'Bb', Db: 'C#', Gb: 'F#' };
-  const root = ROOTS.includes(m[1]!) ? m[1]! : (sharpToFlat[m[1]!] ?? 'C');
-  return CHORD_TYPES.some((t) => t.suffix === m[2]) ? { root, suffix: m[2]! } : null;
+  const root = ROOTS.includes(m[1]!) ? m[1]! : ROOTS[pcOf(m[1]!)]!;
+  let rest = m[2]!;
+  for (const [re, to] of SYNONYMS) if (re.test(rest)) rest = rest.replace(re, to);
+  const exact = CHORD_TYPES.find((t) => t.suffix === rest);
+  if (exact) return { root, suffix: exact.suffix };
+  const prefix = CHORD_TYPES.filter((t) => t.suffix && rest.startsWith(t.suffix)).sort((a, z) => z.suffix.length - a.suffix.length)[0];
+  return { root, suffix: prefix?.suffix ?? '' };
 };
+const parseChord = parseStudyChord;
 
 /** Keyboard of two octaves with the given pitch classes lit (the first one marked as the tonic). */
 const ScaleKeyboard = ({ pcs }: { pcs: number[] }) => {

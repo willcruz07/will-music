@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isKnownChord } from '../lib/chordNotation.ts';
 import { CHORD_TYPES, ROOTS, SOLFEGE } from '../lib/chordTheory.ts';
 import { Button } from '../ui/Button.tsx';
@@ -33,9 +33,12 @@ export const ChordLibrary = ({ suggestions, title = 'Escolha o acorde', allowRem
   const [instrument, setInstrument] = useState<Instrument>(readInstrument);
   const built = `${root}${suffix}${bass && bass !== root ? `/${bass}` : ''}`;
   const chord = (typed ?? built).trim();
+  const box = useRef<HTMLDivElement>(null);
+  // Opened under a tall editor on phones: bring it into view.
+  useEffect(() => box.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), []);
 
   return (
-    <div className="mt-3 rounded-xl border border-primary bg-surface p-4" role="dialog" aria-label={title}>
+    <div ref={box} className="mt-3 scroll-mb-28 rounded-xl border border-primary bg-surface p-4" role="dialog" aria-label={title}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-semibold">{title}</p>
         <InstrumentToggle value={instrument} onChange={setInstrument} />

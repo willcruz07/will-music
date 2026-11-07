@@ -29,7 +29,10 @@ export const findVoicings = (pcs: readonly number[], rootPc: number, tuning: rea
         const key = acc.join(',');
         const score = hi + (hi - lo) + (notes[0] === rootPc ? 0 : 4);
         if (!found.has(key) || found.get(key)!.score > score) {
-          found.set(key, { shape: { frets: [...acc], fingers: acc.map(() => 0), baseFret: hi > 4 ? lo : 1, barres: [] }, score });
+          // High on the neck the diagram starts at the first fretted fret, and frets are counted from it.
+          const baseFret = hi > 4 ? lo : 1;
+          const frets = baseFret > 1 ? acc.map((f) => (f > 0 ? f - baseFret + 1 : 0)) : [...acc];
+          found.set(key, { shape: { frets, fingers: acc.map(() => 0), baseFret, barres: [] }, score });
         }
         return;
       }

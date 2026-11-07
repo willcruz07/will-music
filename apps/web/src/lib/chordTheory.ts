@@ -25,12 +25,34 @@ const SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 export const SOLFEGE: Record<string, string> = { C: 'Dó', D: 'Ré', E: 'Mi', F: 'Fá', G: 'Sol', A: 'Lá', B: 'Si' };
 
-const PC: Record<string, number> = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
-export const pcOf = (note: string): number => PC[note] ?? 0;
+const NATURAL: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+/** Pitch class of a note name with any number of sharps or flats (E#, Cb, Bbb…). */
+export const pcOf = (note: string): number => {
+  const m = /^([A-G])([#b]*)$/u.exec(note);
+  if (!m) return 0;
+  const shift = [...m[2]!].reduce((n, c) => n + (c === '#' ? 1 : -1), 0);
+  return (((NATURAL[m[1]!]! + shift) % 12) + 12) % 12;
+};
 
 const INTERVAL: Record<number, string> = { 0: '1', 2: '2M', 3: '3m', 4: '3M', 5: '4J', 6: '5b', 7: '5J', 8: '5#', 9: '6M', 10: '7m', 11: '7M', 14: '9M' };
+/** Letter steps from the root for each interval: a third is always two letters up, a seventh six, and so on. */
+const STEPS: Record<number, number> = { 0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 4, 8: 4, 9: 5, 10: 6, 11: 6, 13: 1, 14: 1, 15: 1, 17: 3, 18: 3, 21: 5 };
+
+/** The note some semitones above the root, a given number of letters away (a minor third of G is Bb, not A#). */
+export const spellNote = (root: string, semitones: number, steps: number): string => {
+  const letter = LETTERS[(LETTERS.indexOf(root[0]!) + steps) % 7]!;
+  const target = (pcOf(root) + semitones) % 12;
+  const diff = ((((target - NATURAL[letter]!) % 12) + 18) % 12) - 6;
+  return letter + (diff > 0 ? '#'.repeat(diff) : 'b'.repeat(-diff));
+};
+
+/** Spells chord tones given in semitones above the root; in a diminished seventh chord, 9 is a seventh. */
+export const spellChordTones = (root: string, intervals: readonly number[], diminishedSeventh = false): string[] =>
+  intervals.map((i) => spellNote(root, i, diminishedSeventh && i === 9 ? 6 : (STEPS[i] ?? Math.round((i * 7) / 12))));
+
 export const INTERVAL_NAMES: Record<string, string> = {
   '1': 'tônica',
+  '7°': 'sétima diminuta',
   '2M': 'segunda maior',
   '3m': 'terça menor',
   '3M': 'terça maior',
@@ -54,20 +76,18 @@ const spellDiatonic = (root: string, pcs: number[]): string[] => {
   const start = LETTERS.indexOf(root[0]!);
   return pcs.map((pc, i) => {
     const letter = LETTERS[(start + i) % 7]!;
-    const diff = ((((pc - PC[letter]!) % 12) + 18) % 12) - 6;
+    const diff = ((((pc - NATURAL[letter]!) % 12) + 18) % 12) - 6;
     return letter + (diff > 0 ? '#'.repeat(diff) : 'b'.repeat(-diff));
   });
 };
 
 export const chordFormation = (root: string, suffix: string): { name: string; notes: string[]; intervals: string[] } => {
   const type = CHORD_TYPES.find((t) => t.suffix === suffix) ?? CHORD_TYPES[0]!;
-  const rootPc = pcOf(root);
-  const minor = type.intervals.includes(3);
-  const names = root.includes('b') || (!root.includes('#') && flatKey(rootPc, minor)) ? FLAT : SHARP;
+  const dim7 = type.suffix === '°7';
   return {
     name: `${root}${suffix}`,
-    notes: type.intervals.map((i) => (i === 0 ? root : names[(rootPc + i) % 12]!)),
-    intervals: type.intervals.map((i) => INTERVAL[i] ?? String(i)),
+    notes: spellChordTones(root, type.intervals, dim7),
+    intervals: type.intervals.map((i) => (dim7 && i === 9 ? '7°' : (INTERVAL[i] ?? String(i)))),
   };
 };
 
