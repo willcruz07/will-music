@@ -54,7 +54,7 @@ type Props = {
   controls?: React.RefObject<PlayerControls | null>;
 };
 
-export type PlayerControls = { playFrom: (t: number) => void; pause: () => void; currentTime: () => number };
+export type PlayerControls = { playFrom: (t: number) => void; pause: () => void; currentTime: () => number; playing: () => boolean; rate: () => number };
 
 const positionKey = (songId: string) => `wm-pos:${songId}`;
 const readPosition = (songId?: string) => {
@@ -113,6 +113,8 @@ export const Player = (props: Props) => {
       for (const a of all()) a.pause();
     },
     currentTime: () => audioRef.current?.currentTime ?? 0,
+    playing: () => !!audioRef.current && !audioRef.current.paused,
+    rate: () => speedRef.current / 100,
   }));
 
   // Called on every time update: jumps back to A once playback passes B.
@@ -141,18 +143,24 @@ export const Player = (props: Props) => {
   const wasPlaying = useRef(false);
   wasPlaying.current = playing;
   const sourceKey = tracks.map((t) => t.src).join('|');
-  const resumeAt = useRef<number | null>(readPosition(songId));
+  const resumeAt = useRef<number | null | undefined>(undefined);
+  if (resumeAt.current === undefined) resumeAt.current = readPosition(songId);
+  const loadedOnce = useRef(false);
   const resumePlaying = useRef(false);
   const previousKey = useRef(sourceKey);
   if (previousKey.current !== sourceKey) {
     previousKey.current = sourceKey;
-    resumeAt.current = lastTime.current;
-    resumePlaying.current = wasPlaying.current;
+    // A position still waiting for the first load (the one saved for this song) wins over 0.
+    if (resumeAt.current === null) {
+      resumeAt.current = lastTime.current;
+      resumePlaying.current = wasPlaying.current;
+    }
   }
 
   useEffect(() => {
     if (!songId) return;
     const save = () => {
+      if (!loadedOnce.current) return; // never loaded: keep what was saved before
       try {
         sessionStorage.setItem(positionKey(songId), String(lastTime.current));
       } catch {
@@ -209,7 +217,8 @@ export const Player = (props: Props) => {
 
   const onMasterLoaded = (audio: HTMLAudioElement) => {
     setDuration(audio.duration);
-    if (resumeAt.current === null) return;
+    loadedOnce.current = true;
+    if (resumeAt.current === null || resumeAt.current === undefined) return;
     const t = Math.min(resumeAt.current, Number.isFinite(audio.duration) ? audio.duration : resumeAt.current);
     resumeAt.current = null;
     seekAll(t);
@@ -279,7 +288,17 @@ export const Player = (props: Props) => {
           mirrorPause();
           notify(false);
         }}
-        onEmptied={() => setPlaying(false)}
+        onEmptied={() => {
+          setPlaying(false);
+          notify(false);
+        }}
+        onEnded={() => {
+          // A loop that reaches the end of the song: the element stops before passing B, so restart A here.
+          const l = loopRef.current;
+          if (!l) return;
+          seekAll(l.a);
+          for (const a of all()) void a.play();
+        }}
         onLoadedMetadata={(e) => onMasterLoaded(e.currentTarget)}
         onTimeUpdate={(e) => follow(e.currentTarget.currentTime)}
       />

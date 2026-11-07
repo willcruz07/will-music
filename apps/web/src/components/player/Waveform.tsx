@@ -114,7 +114,7 @@ export const Waveform = ({ peaks, duration, time, loop, onSeek, onSelect }: Prop
         preview.current = null;
         if (!d) return;
         const t = timeAt(e.clientX);
-        if (d.moved && Math.abs(t - d.t) >= 0.5) onSelect(Math.min(d.t, t), Math.max(d.t, t));
+        if (d.moved && Math.abs(t - d.t) >= 1) onSelect(Math.min(d.t, t), Math.max(d.t, t));
         else onSeek(t);
       }}
       onPointerCancel={() => {

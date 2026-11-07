@@ -131,6 +131,10 @@ export const createScoreSynth = () => {
     setEvents(next: SynthEvent[]) {
       events = next;
     },
+    /** Creates and resumes the audio context; call it inside a tap so iOS lets it make sound. */
+    unlock() {
+      void ensure().resume();
+    },
     setVolume(v: number) {
       volume = v;
       if (master) master.gain.value = v;

@@ -13,7 +13,7 @@ export const toChords = (notes: readonly QNote[]): ChordEvent[] => {
   return starts.map((start, i) => {
     const group = byStart.get(start)!;
     const next = starts[i + 1] ?? Number.POSITIVE_INFINITY;
-    return { start, dur: Math.max(1, Math.min(next - start, ...group.map((n) => n.dur))), pitches: [...new Set(group.map((n) => n.pitch))].sort((a, z) => a - z) };
+    return { start, dur: Math.max(1, group.reduce((m, n) => Math.min(m, n.dur), next - start)), pitches: [...new Set(group.map((n) => n.pitch))].sort((a, z) => a - z) };
   });
 };
 
@@ -38,7 +38,13 @@ const TIME = '<time><beats>4</beats><beat-type>4</beat-type></time>';
 const dotXml = (p: Piece) => (p.dot ? '<dot/>' : '');
 
 /** Index of the first bar with content, so a score never opens with bars of silence. */
-const firstBarTick = (ticks: number[]) => (ticks.length ? Math.floor(Math.min(...ticks) / TICKS_PER_BAR) * TICKS_PER_BAR : 0);
+const firstBarTick = (ticks: number[]) => (ticks.length ? Math.floor(ticks.reduce((m, t) => Math.min(m, t), Number.POSITIVE_INFINITY) / TICKS_PER_BAR) * TICKS_PER_BAR : 0);
+// Loops instead of spreads: a dense piano part can exceed the engine's argument limit (65 536 on Safari).
+const maxEnd = (values: Iterable<number>) => {
+  let m = 1;
+  for (const v of values) m = Math.max(m, v);
+  return m;
+};
 
 export type PianoInput = { title: string; artist: string; bpm: number; key?: KeyResult; notes: readonly QNote[]; harmonies: readonly Harmony[] };
 
@@ -51,7 +57,7 @@ export const buildPianoXml = (raw: PianoInput): string => {
   const flats = fifths < 0;
   const { right, left } = splitHands(notes);
   const staves = [toChords(right), toChords(left)];
-  const end = Math.max(1, ...notes.map((n) => n.start + n.dur), ...harmonies.map((h) => h.tick + 1));
+  const end = maxEnd([...notes.map((n) => n.start + n.dur), ...harmonies.map((h) => h.tick + 1)]);
   const bars = Math.ceil(end / TICKS_PER_BAR);
   const total = bars * TICKS_PER_BAR;
   const barLines = Array.from({ length: bars }, (_, i) => i * TICKS_PER_BAR);
@@ -113,7 +119,7 @@ export const buildDrumXml = (raw: DrumInput): string => {
     const barEnd = (Math.floor(start / TICKS_PER_BAR) + 1) * TICKS_PER_BAR;
     return { start, dur: Math.max(1, Math.min(4, (ticks[i + 1] ?? Number.POSITIVE_INFINITY) - start, barEnd - start)), kinds: KIT_ORDER.filter((k) => byTick.get(start)!.has(k)) };
   });
-  const end = Math.max(1, ...events.map((e) => e.start + e.dur));
+  const end = maxEnd(events.map((e) => e.start + e.dur));
   const bars = Math.ceil(end / TICKS_PER_BAR);
   const total = bars * TICKS_PER_BAR;
   const pieces = timeline(events, new Set(Array.from({ length: bars }, (_, i) => i * TICKS_PER_BAR)), total);

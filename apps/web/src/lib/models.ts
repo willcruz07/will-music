@@ -8,22 +8,22 @@ const toHex = (digest: ArrayBuffer): string =>
 const readWithProgress = async (response: Response, total: number, onProgress?: (loaded: number, total: number) => void): Promise<Uint8Array<ArrayBuffer>> => {
   if (!response.body) return new Uint8Array(await response.arrayBuffer());
   const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
+  // One buffer of the pinned size, filled in place: a 285 MB model is never held twice.
+  let out = new Uint8Array(total);
   let loaded = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    chunks.push(value);
+    if (loaded + value.length > out.length) {
+      const bigger = new Uint8Array(Math.max(out.length * 2, loaded + value.length));
+      bigger.set(out.subarray(0, loaded));
+      out = bigger;
+    }
+    out.set(value, loaded);
     loaded += value.length;
     onProgress?.(loaded, total);
   }
-  const out = new Uint8Array(loaded);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return out;
+  return loaded === out.length ? out : out.slice(0, loaded);
 };
 
 /** Model bytes from Cache Storage, or downloaded from the pinned URL and verified by SHA-256 before caching. */

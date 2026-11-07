@@ -1,7 +1,7 @@
 import { ArrowLeft, Download, Music4, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { Player } from '../components/Player.tsx';
+import { Player, type PlayerControls } from '../components/Player.tsx';
 import { ScoreView } from '../components/ScoreView.tsx';
 import { type Analysis, type ScoreRecord, type Song, db } from '../lib/db.ts';
 import {
@@ -58,6 +58,7 @@ const SongScorePage = ({ id }: { id: string }) => {
   const [onlyScore, setOnlyScore] = useState(false);
   const [synthVolume, setSynthVolume] = useState(0.7);
   const synth = useRef<ReturnType<typeof createScoreSynth> | null>(null);
+  const player = useRef<PlayerControls | null>(null);
   const stems = useStems(id, audioUrl);
 
   useEffect(() => {
@@ -130,6 +131,21 @@ const SongScorePage = ({ id }: { id: string }) => {
     void saveScore(next);
   };
 
+  const partEvents = () =>
+    type === 'keys' ? toSynthEvents({ notes: score?.piano?.notes }) : type === 'drums' ? toSynthEvents({ hits: score?.drums?.hits }) : toSynthEvents({ notes: score?.notes });
+
+  // Runs inside the tap: the audio context is created and resumed here (iOS only allows that in a gesture),
+  // and if the music is already playing the notes start right away.
+  const toggleSynth = (on: boolean) => {
+    setSynthOn(on);
+    if (!on) return;
+    synth.current ??= createScoreSynth();
+    synth.current.unlock();
+    synth.current.setVolume(synthVolume);
+    synth.current.setEvents(partEvents());
+    if (player.current?.playing()) synth.current.play(player.current.currentTime(), player.current.rate());
+  };
+
   const ready = hasScoreType(score, type);
   const info = SCORE_TYPES.find((t) => t.type === type)!;
   const sources = onlyScore && synthOn ? stems.sources?.map((s) => ({ ...s, volume: 0 })) : stems.sources;
@@ -140,7 +156,7 @@ const SongScorePage = ({ id }: { id: string }) => {
       {ready ? (
         <div className="space-y-2 text-sm">
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={synthOn} onChange={(e) => setSynthOn(e.target.checked)} className="size-4 accent-[var(--primary)]" />
+            <input type="checkbox" checked={synthOn} onChange={(e) => toggleSynth(e.target.checked)} className="size-4 accent-[var(--primary)]" />
             Tocar as notas da partitura junto com a música
           </label>
           {synthOn && (
@@ -267,13 +283,12 @@ const SongScorePage = ({ id }: { id: string }) => {
             songId={song.id}
             stems={stems}
             extra={synthSection}
+            controls={player}
             onTransport={(t) => {
               if (!synthOn) return;
               synth.current ??= createScoreSynth();
               synth.current.setVolume(synthVolume);
-              synth.current.setEvents(
-                type === 'keys' ? toSynthEvents({ notes: score?.piano?.notes }) : type === 'drums' ? toSynthEvents({ hits: score?.drums?.hits }) : toSynthEvents({ notes: score?.notes }),
-              );
+              synth.current.setEvents(partEvents());
               if (t.playing) synth.current.play(t.time, t.rate);
               else synth.current.stop();
             }}

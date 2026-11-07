@@ -110,13 +110,17 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
     let doneChunks = 0;
     const tick = () => post({ type: 'progress', stage: 'separate', done: ++doneChunks, total: totalChunks });
     const tracks: SeparationTracks = {};
+    // Every model is downloaded and verified before any work starts (so a failed download never throws away
+    // minutes of separation), but each one is read back from the cache only when its turn comes, so the
+    // "full" mode never holds both models (~525 MB) at once.
+    for (const id of ids) await load(id);
 
     try {
       // Demucs first: it reads the mix without changing it (kara2 turns the mix buffer into the instrumental).
       if (needsDemucs) {
         const demucsMode = mode as Exclude<StemMode, 'vocals'>;
-        let model: Uint8Array | null = await load('demucs6s');
         // Already optimized offline; re-optimizing it in the browser only spikes memory.
+        let model: Uint8Array | null = await fetchModel('demucs6s');
         const session = await ort.InferenceSession.create(model, { executionProviders: webgpu(device), graphOptimizationLevel: 'disabled' });
         model = null;
         try {
@@ -129,7 +133,11 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
             if (!(stems instanceof Float32Array)) throw new Error('O modelo de separação não devolveu as faixas.');
             const region = acc.add(i, demucsTracks(demucsMode, stems, DEMUCS.SEGMENT));
             out[DEMUCS.OUTPUT]?.dispose?.();
-            region.stems.forEach((s, k) => encoders[k]!.push(s, region.to - region.from));
+            region.stems.forEach((s, k) => {
+              // Streaming leaves no room for a whole-song limiter: clamp so LAME never wraps around.
+              for (let j = 0; j < s.length; j++) s[j] = Math.max(-0.999, Math.min(0.999, s[j]!));
+              encoders[k]!.push(s, region.to - region.from);
+            });
             tick();
           }
           names.forEach((name, k) => (tracks[name] = encoders[k]!.finish()));
@@ -139,8 +147,8 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
       }
 
       if (needsKara2) {
-        let core: Uint8Array | null = await load('kara2Core');
-        let data: Uint8Array | null = await load('kara2Data');
+        let core: Uint8Array | null = await fetchModel('kara2Core');
+        let data: Uint8Array | null = await fetchModel('kara2Data');
         const session = await ort.InferenceSession.create(core, { executionProviders: webgpu(device), externalData: [{ path: MODELS.kara2Data.file, data }] });
         // The runtime keeps its own copy: release ours (~240 MB) before the chunk loop.
         core = null;
