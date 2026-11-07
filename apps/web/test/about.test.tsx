@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AboutButton } from '../src/components/About.tsx';
@@ -29,5 +29,25 @@ describe('Sobre: bottom sheet about the author', () => {
     write.mockRejectedValueOnce(new Error('denied'));
     await user.click(screen.getByRole('button', { name: /Chave Pix copiada/ }));
     expect(screen.getByRole('status')).toHaveTextContent('A chave é: 21981314531');
+  });
+});
+
+describe('BottomSheet: close button', () => {
+  it('a press on the close button does not start a drag (pointer capture would steal its click)', async () => {
+    const capture = vi.fn();
+    const original = Element.prototype.setPointerCapture;
+    Element.prototype.setPointerCapture = capture;
+    try {
+      render(<AboutButton />);
+      await userEvent.click(screen.getByRole('button', { name: /Will Cruz/ }));
+      const close = within(screen.getByRole('dialog')).getByRole('button', { name: 'Fechar' });
+      fireEvent.pointerDown(close, { pointerId: 1, clientY: 10 });
+      expect(capture).not.toHaveBeenCalled();
+      fireEvent.pointerUp(close, { pointerId: 1, clientY: 10 });
+      await userEvent.click(close);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    } finally {
+      Element.prototype.setPointerCapture = original;
+    }
   });
 });
