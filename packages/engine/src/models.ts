@@ -3,9 +3,12 @@ const SKEY = 'https://huggingface.co/musetric/skey-onnx/resolve/9d90d2a9ff6679df
 
 const BASIC_PITCH_REPO = 'https://huggingface.co/daserge/basic-pitch-onnx/resolve/2633e680fb5a1c551cee4905410115b6715862f6';
 
+// HTDemucs 6s (Meta, MIT), constant-folded for onnxruntime-web WebGPU by kramp (MIT).
+const DEMUCS6S = 'https://huggingface.co/kramp/htdemucs-6s-webgpu-onnx/resolve/0c850a01007f48d94900b21b49a0d0ae1a17239f';
+
 const KARA2 = 'https://huggingface.co/musetric/mel-band-roformer-duality-kara2-student-onnx/resolve/48a53200678a45f88e21dc1af957f1e4b55ba5ae';
 
-export type ModelId = 'chordnet' | 'cqtPlan' | 'skey' | 'kara2Core' | 'kara2Data' | 'basicPitch';
+export type ModelId = 'chordnet' | 'cqtPlan' | 'skey' | 'kara2Core' | 'kara2Data' | 'basicPitch' | 'demucs6s';
 
 /** Pinned model files (revision + SHA-256). Shared by the app and the Phase 0 tool. */
 export const MODELS: Record<ModelId, { url: string; sha256: string; file: string; bytes: number }> = {
@@ -16,6 +19,7 @@ export const MODELS: Record<ModelId, { url: string; sha256: string; file: string
   kara2Data: { url: `${KARA2}/duality_kara2_student_core_t1100.onnx.data`, sha256: '176673d2446d8578976dd1a17ebca5fa0651dd23446967ff44fad5bf22c45d5c', file: 'duality_kara2_student_core_t1100.onnx.data', bytes: 235400588 },
   // Spotify Basic Pitch (Apache-2.0), byte-identical to basic_pitch/saved_models/icassp_2022/nmp.onnx.
   basicPitch: { url: `${BASIC_PITCH_REPO}/nmp.onnx`, sha256: '2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec', file: 'nmp.onnx', bytes: 230444 },
+  demucs6s: { url: `${DEMUCS6S}/htdemucs_6s.onnx`, sha256: 'a3f5050696cda4b2344d465123acb21ee699dad7d0634dba1d282497a04ac86a', file: 'htdemucs_6s.onnx', bytes: 284797240 },
 };
 
 export const modelVersion = (id: ModelId): string => `${MODELS[id].file}@${MODELS[id].sha256.slice(0, 12)}`;

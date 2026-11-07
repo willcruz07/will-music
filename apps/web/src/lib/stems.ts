@@ -1,33 +1,53 @@
-import { SEPARATION_GEOMETRY, modelVersion, toStereoPlanar } from '@will-music/engine';
+import { MODELS, type ModelId, SEPARATION_GEOMETRY, STEM_MODES, type StemMode, modelVersion, toStereoPlanar } from '@will-music/engine';
 import type { SeparationResponse, SeparationTracks } from '../worker/separationProtocol.ts';
-import { type StemsRecord, db, now } from './db.ts';
+import { type StemName, type StemsRecord, db, now } from './db.ts';
 
 export const NO_WEBGPU = 'A separação de faixas precisa de um navegador com WebGPU (Chrome ou Edge atualizados).';
 
 export type SeparationProgress = { stage: 'models' | 'separate'; done: number; total: number };
 
+/** What each separation type gives, what it downloads the first time, and roughly how long it takes. */
+export const MODE_INFO: Record<StemMode, { label: string; description: string; models: ModelId[]; downloadBytes: number; effort: string }> = (() => {
+  const bytes = (ids: ModelId[]) => ids.reduce((sum, id) => sum + MODELS[id].bytes, 0);
+  const kara2: ModelId[] = ['kara2Core', 'kara2Data'];
+  const demucs: ModelId[] = ['demucs6s'];
+  return {
+    vocals: { label: 'Voz e instrumental', description: 'Voz principal, vocais de apoio e instrumental. Para karaokê e para ensaiar o canto.', models: kara2, downloadBytes: bytes(kara2), effort: 'alguns minutos' },
+    four: { label: '4 faixas', description: 'Voz, bateria, baixo e outros. Para tocar junto tirando o seu instrumento.', models: demucs, downloadBytes: bytes(demucs), effort: 'vários minutos' },
+    six: { label: '6 faixas', description: 'Voz, bateria, baixo, violão/guitarra, piano e outros. Para estudar cada instrumento.', models: demucs, downloadBytes: bytes(demucs), effort: 'vários minutos' },
+    full: { label: 'Completa', description: 'As 6 faixas com a voz dividida em principal e apoio (7 faixas). O máximo de controle.', models: [...demucs, ...kara2], downloadBytes: bytes([...demucs, ...kara2]), effort: 'o dobro do tempo' },
+  };
+})();
+
+export const availableModes = (): StemMode[] => ['vocals', 'four', 'six', 'full'];
+
 export const decodeForSeparation = async (blob: Blob): Promise<{ planar: Float32Array; samples: number }> => {
   const context = new OfflineAudioContext(2, 1, SEPARATION_GEOMETRY.sampleRate);
   const buffer = await context.decodeAudioData(await blob.arrayBuffer());
-  // toStereoPlanar copies into one planar buffer; the channel views need no extra copy.
   return toStereoPlanar(Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c)));
 };
 
-export const runSeparationInWorker = (planar: Float32Array, samples: number, onProgress: (p: SeparationProgress) => void): Promise<SeparationTracks> =>
+export const runSeparationInWorker = (planar: Float32Array, samples: number, mode: StemMode, onProgress: (p: SeparationProgress) => void, signal?: AbortSignal): Promise<SeparationTracks> =>
   new Promise((resolve, reject) => {
     const worker = new Worker(new URL('../worker/separation.worker.ts', import.meta.url), { type: 'module' });
+    const stop = () => {
+      worker.terminate();
+      reject(new DOMException('Separação cancelada.', 'AbortError'));
+    };
+    signal?.addEventListener('abort', stop, { once: true });
     worker.onmessage = (event: MessageEvent<SeparationResponse>) => {
       const msg = event.data;
       if (msg.type === 'progress') return onProgress(msg);
+      signal?.removeEventListener('abort', stop);
       worker.terminate();
-      if (msg.type === 'result') resolve(msg);
+      if (msg.type === 'result') resolve(msg.tracks);
       else reject(new Error(msg.message));
     };
     worker.onerror = (event) => {
       worker.terminate();
       reject(new Error(event.message || 'A separação falhou.'));
     };
-    worker.postMessage({ type: 'separate', planar, samples }, [planar.buffer]);
+    worker.postMessage({ type: 'separate', planar, samples, mode }, [planar.buffer]);
   });
 
 type GpuLike = { requestAdapter?: () => Promise<unknown> };
@@ -43,38 +63,61 @@ export const hasUsableWebGpu = async (gpu: GpuLike | undefined): Promise<boolean
 };
 
 type Deps = {
+  mode?: StemMode;
   gpu?: GpuLike;
+  signal?: AbortSignal;
   decode?: (blob: Blob) => Promise<{ planar: Float32Array; samples: number }>;
-  run?: (planar: Float32Array, samples: number, onProgress: (p: SeparationProgress) => void) => Promise<SeparationTracks>;
+  run?: (planar: Float32Array, samples: number, mode: StemMode, onProgress: (p: SeparationProgress) => void, signal?: AbortSignal) => Promise<SeparationTracks>;
 };
 
-/** Separates a song into instrumental, lead and backing and stores them together; on failure nothing is written. */
+/** Separates a song with the chosen mode and stores all its tracks together (MP3); on failure nothing is written. */
 export const separateSong = async (songId: string, onProgress: (p: SeparationProgress) => void, deps: Deps = {}): Promise<void> => {
+  const mode = deps.mode ?? 'vocals';
   const gpu = 'gpu' in deps ? deps.gpu : (navigator as Navigator & { gpu?: GpuLike }).gpu;
   if (!(await hasUsableWebGpu(gpu))) throw new Error(NO_WEBGPU);
   const audio = await db.audio.get(songId);
   if (!audio) throw new Error('Esta música não tem áudio para separar.');
   const { planar, samples } = await (deps.decode ?? decodeForSeparation)(audio.blob);
-  const tracks = await (deps.run ?? runSeparationInWorker)(planar, samples, onProgress);
-  const rate = SEPARATION_GEOMETRY.sampleRate;
+  const tracks = await (deps.run ?? runSeparationInWorker)(planar, samples, mode, onProgress, deps.signal);
+  const names = STEM_MODES[mode].tracks;
+  if (names.some((n) => !tracks[n])) throw new Error('A separação veio incompleta. Tente de novo.');
+  const stamp = now();
   const record: StemsRecord = {
     songId,
-    model: modelVersion('kara2Core'),
-    sampleRate: rate,
-    tracks: [
-      { name: 'instrumental', blob: new Blob([tracks.instrumental], { type: 'audio/wav' }) },
-      { name: 'lead', blob: new Blob([tracks.lead], { type: 'audio/wav' }) },
-      { name: 'backing', blob: new Blob([tracks.backing], { type: 'audio/wav' }) },
-    ],
-    createdAt: now(),
+    mode,
+    model: MODE_INFO[mode].models.filter((m) => m !== 'kara2Data').map((m) => modelVersion(m)).join('+'),
+    sampleRate: SEPARATION_GEOMETRY.sampleRate,
+    tracks: names.map((name) => ({ name: name as StemName, blob: new Blob([tracks[name]!], { type: 'audio/mpeg' }) })),
+    createdAt: stamp,
+    selectedAt: `${stamp}${await laterThanOthers(songId, stamp)}`,
   };
   try {
-    await db.stems.put(record);
+    await db.stemSets.put(record);
   } catch (error) {
     if (error instanceof Error && error.name === 'QuotaExceededError') throw new Error(SEM_ESPACO);
     throw error;
   }
 };
 
-export const getStems = (songId: string): Promise<StemsRecord | undefined> => db.stems.get(songId);
-export const deleteStems = (songId: string): Promise<void> => db.stems.delete(songId);
+export const listStemSets = (songId: string): Promise<StemsRecord[]> => db.stemSets.where('songId').equals(songId).toArray();
+
+/** The separation that plays: the one chosen (or made) last. */
+export const getStems = async (songId: string): Promise<StemsRecord | undefined> =>
+  (await listStemSets(songId)).sort((a, z) => z.selectedAt.localeCompare(a.selectedAt))[0];
+
+/** Suffix that keeps a new selection strictly after every other one, even within the same millisecond. */
+const laterThanOthers = async (songId: string, stamp: string): Promise<string> => {
+  const latest = (await getStems(songId))?.selectedAt ?? '';
+  return stamp > latest ? '' : `${latest.slice(stamp.length)}~`;
+};
+
+export const selectStemSet = async (songId: string, mode: StemMode): Promise<void> => {
+  const stamp = now();
+  await db.stemSets.update([songId, mode], { selectedAt: `${stamp}${await laterThanOthers(songId, stamp)}` });
+};
+
+export const deleteStemSet = (songId: string, mode: StemMode): Promise<void> => db.stemSets.delete([songId, mode]);
+export const deleteStems = (songId: string): Promise<number> => db.stemSets.where('songId').equals(songId).delete();
+
+/** Vocal tracks for transcription: lead and backing, or the whole voice when the mode does not split it. */
+export const findVoiceTracks = (record: StemsRecord | undefined) => record?.tracks.filter((t) => t.name === 'lead' || t.name === 'backing' || t.name === 'vocals') ?? [];

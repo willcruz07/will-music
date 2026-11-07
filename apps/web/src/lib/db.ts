@@ -1,5 +1,5 @@
-import type { ChordSegment, KeyResult, NoteEvent } from '@will-music/engine';
-import Dexie, { type EntityTable } from 'dexie';
+import type { ChordSegment, DrumHit, KeyResult, NoteEvent, StemMode } from '@will-music/engine';
+import Dexie, { type EntityTable, type Table } from 'dexie';
 import { requestPersistence } from './storage.ts';
 
 export type AnalysisStatus = 'pending' | 'running' | 'done' | 'error';
@@ -50,11 +50,26 @@ export type Chart = {
 
 export type AudioRecord = { songId: string; blob: Blob; mimeType: string };
 
-export type StemName = 'instrumental' | 'lead' | 'backing';
-export type StemsRecord = { songId: string; model: string; sampleRate: number; tracks: { name: StemName; blob: Blob }[]; createdAt: string };
+export type StemName = 'instrumental' | 'lead' | 'backing' | 'vocals' | 'drums' | 'bass' | 'guitar' | 'piano' | 'other';
+/** One separation of a song; a song may keep several (one per mode). The most recently selected one plays. */
+export type StemsRecord = { songId: string; mode: StemMode; model: string; sampleRate: number; tracks: { name: StemName; blob: Blob }[]; createdAt: string; selectedAt: string };
+
+/** Waveform peaks for the practice view (computed once per song). */
+export type PeaksRecord = { songId: string; peaks: Float32Array; duration: number };
 
 /** Transcribed melody (raw note times); the MusicXML is rebuilt from it on demand. */
-export type ScoreRecord = { songId: string; notes: NoteEvent[]; bpm: number; source: 'lead' | 'mix'; model: string; createdAt: string };
+export type ScoreRecord = {
+  songId: string;
+  notes: NoteEvent[];
+  bpm: number;
+  source: 'lead' | 'mix';
+  model: string;
+  createdAt: string;
+  /** Polyphonic notes for the keyboard score, and where they came from. */
+  piano?: { notes: NoteEvent[]; source: string };
+  /** Drum hits for the drum score (from a separated drum track). */
+  drums?: { hits: DrumHit[] };
+};
 
 export type SetlistItem = { songId: string; targetKey?: string; note?: string };
 export type Setlist = { id: string; name: string; date?: string; items: SetlistItem[]; createdAt: string; updatedAt: string };
@@ -67,7 +82,8 @@ export const db = new Dexie('will-music') as Dexie & {
   analyses: EntityTable<Analysis, 'id'>;
   charts: EntityTable<Chart, 'id'>;
   setlists: EntityTable<Setlist, 'id'>;
-  stems: EntityTable<StemsRecord, 'songId'>;
+  stemSets: Table<StemsRecord, [string, StemMode]>;
+  peaks: EntityTable<PeaksRecord, 'songId'>;
   scores: EntityTable<ScoreRecord, 'songId'>;
 };
 
@@ -81,6 +97,14 @@ db.version(1).stores({
 db.version(2).stores({ setlists: 'id, updatedAt' });
 db.version(3).stores({ stems: 'songId' });
 db.version(4).stores({ scores: 'songId' });
+// v5: several separations per song. The old single 'stems' rows become the 'vocals' mode; v6 drops the old table.
+db.version(5)
+  .stores({ stemSets: '[songId+mode], songId', peaks: 'songId' })
+  .upgrade(async (tx) => {
+    const old = (await tx.table('stems').toArray()) as Omit<StemsRecord, 'mode' | 'selectedAt'>[];
+    await tx.table('stemSets').bulkPut(old.map((r) => ({ ...r, mode: 'vocals', selectedAt: r.createdAt })));
+  });
+db.version(6).stores({ stems: null });
 
 export const now = (): string => new Date().toISOString();
 
@@ -101,11 +125,12 @@ export const updateSong = async (id: string, patch: Partial<Omit<Song, 'id' | 'c
 };
 
 export const deleteSong = async (id: string): Promise<void> => {
-  await db.transaction('rw', [db.songs, db.audio, db.analyses, db.charts, db.stems, db.scores], async () => {
+  await db.transaction('rw', [db.songs, db.audio, db.analyses, db.charts, db.stemSets, db.scores, db.peaks], async () => {
     await db.songs.delete(id);
     await db.scores.delete(id);
     await db.audio.delete(id);
-    await db.stems.delete(id);
+    await db.stemSets.where('songId').equals(id).delete();
+    await db.peaks.delete(id);
     await db.analyses.where('songId').equals(id).delete();
     await db.charts.where('songId').equals(id).delete();
   });

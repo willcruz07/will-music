@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Player } from '../src/components/Player.tsx';
 import { driftCorrections, mixVolumes } from '../src/lib/mixer.ts';
@@ -19,6 +19,7 @@ describe('mixer', () => {
 
   it('applies speed and seek to every source', () => {
     render(<Player sources={[{ name: 'instrumental', src: 'blob:a', volume: 1 }, { name: 'lead', src: 'blob:b', volume: 0.5 }]} onTime={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir controles' }));
     const audios = [...document.querySelectorAll('audio')];
     expect(audios).toHaveLength(2);
     expect(audios[1]!.volume).toBe(0.5);
@@ -33,6 +34,7 @@ describe('mixer', () => {
 describe('review fixes: mixer', () => {
   it('silences with muted (iOS ignores volume) and mirrors pause to followers', () => {
     render(<Player sources={[{ name: 'instrumental', src: 'blob:a', volume: 1 }, { name: 'lead', src: 'blob:b', volume: 0 }]} onTime={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir controles' }));
     const [master, follower] = [...document.querySelectorAll('audio')];
     expect(follower!.muted).toBe(true);
     expect(master!.muted).toBe(false);
@@ -47,6 +49,7 @@ describe('review fixes: mixer', () => {
 
   it('keeps position and speed when switching between original and tracks', () => {
     const { rerender } = render(<Player src="blob:original" onTime={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir controles' }));
     const master = document.querySelector('audio')!;
     fireEvent.change(document.querySelector('[aria-label="Velocidade"]')!, { target: { value: '80' } });
     master.currentTime = 42;
@@ -57,5 +60,43 @@ describe('review fixes: mixer', () => {
     fireEvent.loadedMetadata(audios[0]!);
     expect(audios.map((a) => a.currentTime)).toEqual([42, 42]);
     expect(audios.map((a) => a.playbackRate)).toEqual([0.8, 0.8]);
+  });
+});
+
+describe('player drawer', () => {
+  it('starts collapsed with play and position, and opens the practice controls', () => {
+    render(<Player src="blob:x" title="Hino" onTime={() => {}} onAutoScrollChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Tocar' })).toBeInTheDocument();
+    expect(screen.getByText('Hino')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Velocidade')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir controles' }));
+    expect(screen.getByLabelText('Velocidade')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rolagem automática')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '75%' }));
+    expect(document.querySelector('audio')!.playbackRate).toBe(0.75);
+    expect(screen.getByRole('button', { name: 'Fechar controles' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('reports play, pause and speed to followers like the score synth', () => {
+    const seen: { playing: boolean; rate: number }[] = [];
+    render(<Player src="blob:x" onTime={() => {}} onTransport={(t) => seen.push({ playing: t.playing, rate: t.rate })} />);
+    const audio = document.querySelector('audio')!;
+    fireEvent.playing(audio);
+    fireEvent.pause(audio);
+    expect(seen).toEqual([
+      { playing: true, rate: 1 },
+      { playing: false, rate: 1 },
+    ]);
+  });
+
+  it('shows steady-scroll speed only for the steady mode', () => {
+    const modes: string[] = [];
+    const { rerender } = render(<Player src="blob:x" onTime={() => {}} onAutoScrollChange={() => {}} scrollMode="follow" onScrollModeChange={(m) => modes.push(m)} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir controles' }));
+    expect(screen.queryByLabelText('Velocidade da rolagem')).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: 'Rolagem contínua' }));
+    expect(modes).toEqual(['steady']);
+    rerender(<Player src="blob:x" onTime={() => {}} onAutoScrollChange={() => {}} scrollMode="steady" onScrollModeChange={() => {}} scrollSpeed={5} />);
+    expect(screen.getByLabelText('Velocidade da rolagem')).toHaveValue('5');
   });
 });

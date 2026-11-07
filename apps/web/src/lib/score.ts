@@ -67,7 +67,8 @@ const runWorker = (pcm: Float32Array, onProgress: (p: ScoreProgress) => void): P
 /** Transcribes the melody (from the separated lead vocal when there is one) and stores it. */
 export const transcribeMelody = async (song: Song, onProgress: (p: ScoreProgress) => void): Promise<ScoreRecord> => {
   onProgress({ stage: 'decode', done: 0, total: 1 });
-  const lead = (await getStems(song.id))?.tracks.find((t) => t.name === 'lead');
+  const tracks = (await getStems(song.id))?.tracks ?? [];
+  const lead = tracks.find((t) => t.name === 'lead') ?? tracks.find((t) => t.name === 'vocals');
   const blob = lead?.blob ?? (await db.audio.get(song.id))?.blob;
   if (!blob) throw new Error('Esta música não tem áudio para transcrever.');
   const pcm = await decodeMono(blob, BASIC_PITCH.SAMPLE_RATE);

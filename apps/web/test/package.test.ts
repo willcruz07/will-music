@@ -106,9 +106,9 @@ describe('review fixes: package replace and stems', () => {
   it('drops old stems when a song is replaced', async () => {
     const song = await seed();
     const zip = await exportSongs([song.id], { includeAudio: false, kind: 'song' });
-    await db.stems.put({ songId: song.id, model: 'x', sampleRate: 44100, tracks: [], createdAt: '' });
+    await db.stemSets.put({ songId: song.id, mode: 'vocals', model: 'x', sampleRate: 44100, tracks: [], createdAt: '', selectedAt: '' });
     await importPackage(await readPackage(zip), async () => 'replace');
-    expect(await db.stems.get(song.id)).toBeUndefined();
+    expect(await db.stemSets.where('songId').equals(song.id).count()).toBe(0);
   });
 });
 

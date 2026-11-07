@@ -18,7 +18,7 @@ import { toDisplayLabel } from '@will-music/engine';
 import { AddToSetlist } from '../components/AddToSetlist.tsx';
 import { ExportButton } from '../components/PackageButtons.tsx';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
-import { TracksSection } from '../components/TracksSection.tsx';
+import { useScrollPrefs, useSteadyScroll } from '../lib/steadyScroll.ts';
 import { TranscribeLyrics } from '../components/TranscribeLyrics.tsx';
 import { useStems } from '../lib/useStems.ts';
 import { ChordPanel, readInstrument } from '../components/ChordPanel.tsx';
@@ -35,6 +35,8 @@ export const Song = () => {
   const [progress, setProgress] = useState<PipelineProgress | null>(null);
   const [activeLine, setActiveLine] = useState(-1);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [scroll, setScroll] = useScrollPrefs();
+  const [isPlaying, setIsPlaying] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [editingInfo, setEditingInfo] = useState(false);
   const [showCurrent, setShowCurrent] = useState(true);
@@ -128,6 +130,7 @@ export const Song = () => {
     },
   });
   const syncing = syncMode.syncing;
+  useSteadyScroll(autoScroll && scroll.mode === 'steady' && isPlaying && !syncing, scroll.speed);
 
   const startSync = () => {
     if (!chart) return;
@@ -325,7 +328,7 @@ export const Song = () => {
             spellKey={shownKey}
             fontSize={chart.fontSize}
             activeLineIndex={syncing ? syncMode.next : activeLine}
-            autoScroll={autoScroll || syncing}
+            autoScroll={(autoScroll && scroll.mode === 'follow') || syncing}
           />
         </div>
       )}
@@ -341,9 +344,23 @@ export const Song = () => {
         </div>
       )}
 
-      {audioUrl && !progress && <TracksSection stems={stems} />}
-
-      {stems.sources && <Player sources={stems.sources} onTime={onTime} autoScroll={autoScroll} onAutoScrollChange={setAutoScroll} controls={player} />}
+      {stems.sources && (
+        <Player
+          sources={stems.sources}
+          onTime={onTime}
+          title={song.title}
+          songId={song.id}
+          autoScroll={autoScroll}
+          onAutoScrollChange={setAutoScroll}
+          scrollMode={scroll.mode}
+          onScrollModeChange={(mode) => setScroll({ mode })}
+          scrollSpeed={scroll.speed}
+          onScrollSpeedChange={(speed) => setScroll({ speed })}
+          stems={progress ? undefined : stems}
+          onTransport={(t) => setIsPlaying(t.playing)}
+          controls={player}
+        />
+      )}
       {stems.sources && <div className="h-32 md:h-24" aria-hidden />}
     </section>
   );
