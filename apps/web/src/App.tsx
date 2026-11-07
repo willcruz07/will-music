@@ -1,7 +1,10 @@
 import { Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Route, Routes } from 'react-router';
+import { BottomNav, TopNav } from './components/AppNav.tsx';
 import { EditChart } from './pages/EditChart.tsx';
+import { SetlistEdit } from './pages/SetlistEdit.tsx';
+import { Setlists } from './pages/Setlists.tsx';
 import { Library } from './pages/Library.tsx';
 import { NewSong } from './pages/NewSong.tsx';
 import { Song } from './pages/Song.tsx';
@@ -43,7 +46,10 @@ export const App = () => (
         <Link to="/" className="text-lg font-bold tracking-tight">
           will-music
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-2">
+          <TopNav />
+          <ThemeToggle />
+        </div>
       </div>
     </header>
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-40 pt-6">
@@ -52,7 +58,10 @@ export const App = () => (
         <Route path="/nova" element={<NewSong />} />
         <Route path="/musica/:id" element={<Song />} />
         <Route path="/musica/:id/editar" element={<EditChart />} />
+        <Route path="/listas" element={<Setlists />} />
+        <Route path="/listas/:id" element={<SetlistEdit />} />
       </Routes>
     </main>
+    <BottomNav />
   </div>
 );

@@ -1,3 +1,4 @@
+import { transposeKey } from './transpose.ts';
 import { type Chart, type Setlist, type SetlistItem, type Song, db, now } from './db.ts';
 
 export const createSetlist = async (name: string): Promise<Setlist> => {
@@ -38,3 +39,6 @@ export const resolveItems = async (setlist: Setlist): Promise<{ item: SetlistIte
       chart: await db.charts.where('songId').equals(item.songId).first(),
     })),
   );
+
+/** The 12 keys of the song's mode, starting at its key, spelled like the rest of the app. */
+export const keyOptions = (songKey: string): string[] => Array.from({ length: 12 }, (_, i) => transposeKey(songKey, i));

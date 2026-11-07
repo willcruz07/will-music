@@ -15,6 +15,7 @@ import { isRunning, startAnalysis, subscribeAnalysis } from '../lib/jobs.ts';
 import { type PipelineProgress, runPipeline } from '../lib/pipeline.ts';
 import { prefersFlats, transposeChord, transposeKey } from '../lib/transpose.ts';
 import { toDisplayLabel } from '@will-music/engine';
+import { AddToSetlist } from '../components/AddToSetlist.tsx';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
 import { ChordPanel, readInstrument } from '../components/ChordPanel.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
@@ -235,6 +236,7 @@ export const Song = () => {
           <Link to={`/musica/${song.id}/editar`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
             <Pencil className="size-4" /> Editar cifra
           </Link>
+          <AddToSetlist songId={song.id} />
           <Button variant="ghost" onClick={() => setEditingInfo((v) => !v)} aria-pressed={editingInfo}>
             <Info className="size-4" /> Dados
           </Button>
