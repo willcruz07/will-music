@@ -130,6 +130,39 @@ h1 {
   display: none;
 }
 
+/* Phones: the bottom bar slides away while reading down (lib/scrollBars.ts sets data-bars), and the
+   floating player moves into its place so play is always at hand. */
+:root {
+  --bar-shift: 0px;
+  --player-shift: 0px;
+}
+:root[data-bars='hidden'] {
+  /* + the raised "+" button, which sits 2rem above the bar */
+  --bar-shift: calc(var(--nav-height) + env(safe-area-inset-bottom) + 3rem);
+  --player-shift: calc(var(--nav-height) + 0.5rem);
+}
+@media (min-width: 768px) {
+  :root[data-bars='hidden'] {
+    --bar-shift: 0px;
+    --player-shift: 0px;
+  }
+}
+.bar-slide,
+.player-slide {
+  transition: transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+.bar-slide {
+  transform: translateY(var(--bar-shift));
+}
+.player-slide {
+  transform: translateY(var(--player-shift));
+}
+/* Reached with the keyboard while hidden: show it. */
+.bar-slide:focus-within {
+  transform: none;
+}
+
 /* Space left at the bottom for the floating nav (mobile) and the safe area. */
 .pb-nav {
   padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 1.5rem);

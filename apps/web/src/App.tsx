@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect } from 'react';
 import { Link, Route, Routes } from 'react-router';
 import { BottomNav, SettingsLink, TopNav } from './components/AppNav.tsx';
 import { InstallBanner, InstallButton, UpdateBanner } from './components/PwaPrompts.tsx';
+import { useAutoHideBars } from './lib/scrollBars.ts';
 import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
 import { Library } from './pages/Library.tsx';
 import { IconButton } from './ui/Button.tsx';
@@ -48,7 +49,9 @@ export const App = () => (
   </Suspense>
 );
 
-const Layout = () => (
+const Layout = () => {
+  useAutoHideBars();
+  return (
   <div className="flex min-h-dvh flex-col">
     <header className="glass sticky top-0 z-20 border-b border-border pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
@@ -89,4 +92,5 @@ const Layout = () => (
     <BottomNav />
     <UpdateBanner />
   </div>
-);
+  );
+};
