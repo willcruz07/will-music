@@ -22,7 +22,7 @@ export default defineConfig({
         id: '/',
         start_url: '/',
         scope: '/',
-        theme_color: '#0b1220',
+        theme_color: '#101829',
         // Black like the icon's backdrop, so the splash screen and the icon read as one.
         background_color: '#000000',
         display: 'standalone',

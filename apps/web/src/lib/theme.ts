@@ -26,9 +26,14 @@ export const applyThemePref = (): void => {
 };
 
 /** Matches the phone's status bar / browser toolbar to the app background (same values as styles.css). */
+/** What the header looks like: 78% of --surface over --background (styles.css .glass), per theme. */
+export const HEADER_DARK = '#101829';
+export const HEADER_LIGHT = '#fdfdfe';
+
 export const paintBrowserBar = (dark: boolean): void => {
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-  if (meta) meta.content = dark ? '#0b1220' : '#f5f7fb';
+  // The header's real color (the glass surface over the page), so the status bar and the header read as one.
+  if (meta) meta.content = dark ? HEADER_DARK : HEADER_LIGHT;
 };
 
 export const setThemePref = (pref: ThemePref): void => {
