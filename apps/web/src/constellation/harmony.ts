@@ -210,14 +210,16 @@ const dominantRules = (current: Chord, center: Center, target?: Chord): Rule[] =
   const resolveTo = (quality: Quality) =>
     S(tAt, quality, (n) => `${n.cur} resolve em ${n.to}: a tensão do trítono se desfaz.${n.next}`, { flat: target?.flat ? true : 'inherit', resolution: true });
   // A substitute resolves where it was aimed; otherwise dark colors (b9, #5) ask for the minor first, clear ones (9, 13)
-  // for the major, and a plain 7 for what its center expects.
+  // for the major, and a plain 7 for what its center expects first and the other mode next (E7 in C: Am7, then A7M,
+  // which closes the cadence in a new key).
+  const expected: Quality = minorDegree(current.root + 5, center) ? 'm7' : '7M';
   const resolutions = target
     ? [resolveTo(target.quality)]
     : isDark(q)
       ? [resolveTo('m7'), resolveTo('7M')]
       : isClear(q)
         ? [resolveTo('7M')]
-        : [resolveTo(minorDegree(current.root + 5, center) ? 'm7' : '7M')];
+        : [resolveTo(expected), resolveTo(expected === 'm7' ? '7M' : 'm7')];
   const mainMinor = groupOf(resolutions[0]!.quality) === 'min';
   // Deceptive cadences: the relative minor and the iii only make sense when the expected resolution is major; bVI always.
   const deceptive = [
@@ -307,7 +309,7 @@ const centerAfter = (to: Chord, center: Center, rule: { resolution?: boolean; ke
 };
 
 const BALLOON: Record<Group, Quality[]> = {
-  maj: ['', '7M', '7', '7(9)', '7(13)', '7(b9)', '7(#5)', '7sus4'],
+  maj: ['', '7M', '6', '7', '7(9)', '7(13)', '7(b9)', '7(#5)', '7sus4'],
   dom: ['', '7M', '7', '7(9)', '7(13)', '7(b9)', '7(#5)', '7sus4'],
   min: ['m7', 'm7(9)', 'm6', 'm', '7'],
   hdim: ['m7(b5)'],
@@ -370,7 +372,7 @@ export const neighbors = (current: Chord, center: Center, resolvesTo?: Chord): M
       ? ` Resolução local: o ${name} já prepara o ${chordName({ root: mod12(root + 5), quality: '7' }, center)}.`
       : sameCenter(nextCenter, center)
         ? ''
-        : ` O centro tonal passa a ser ${centerName(nextCenter)}.`;
+        : ` O centro tonal passa a ser ${chordName({ root, quality: nextCenter.minor ? 'm' : '', ...(flat ? { flat: true } : {}) }, nextCenter)}.`;
     const ctx: Ctx = {
       cur,
       res,

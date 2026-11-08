@@ -233,3 +233,21 @@ describe('altered chords', () => {
     for (const q of ['7', '7(9)', '7(13)', '7sus4', 'm7(b5)', '7M'] as const) expect(isAltered({ root: 7, quality: q }), q).toBe(false);
   });
 });
+
+describe('a plain dominant offers both resolutions', () => {
+  it('E7 in C resolves to Am7 (local) and also to A7M, which moves the center to A', () => {
+    const m = at(neighbors({ root: 4, quality: '7' }, C));
+    expect(m['Am7']!.motion).toBe('resolve');
+    expect(m['A7M']!.motion).toBe('resolve');
+    expect(m['A7M']!.nextCenter).toEqual({ root: 9, minor: false });
+    expect(m['A7M']!.options.map((o) => o.to.quality)).toEqual(expect.arrayContaining(['', '7M', '6']));
+    const resolves = neighbors({ root: 4, quality: '7' }, C).filter((x) => x.motion === 'resolve');
+    expect(chordName(resolves[0]!.to, resolves[0]!.nextCenter)).toBe('Am7');
+  });
+
+  it('G7 in C resolves to C7M first and also to Cm7', () => {
+    const resolves = neighbors({ root: 7, quality: '7' }, C).filter((x) => x.motion === 'resolve').map((x) => chordName(x.to, x.nextCenter));
+    expect(resolves[0]).toBe('C7M');
+    expect(resolves).toContain('Cm7');
+  });
+});
