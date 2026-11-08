@@ -15,6 +15,7 @@ export const CHORD_TYPES: { suffix: string; name: string; intervals: number[]; a
   { suffix: 'sus4', name: 'Suspenso de quarta', intervals: [0, 5, 7], about: 'A terça vira quarta. Costuma resolver no acorde maior.' },
   { suffix: '°', name: 'Diminuto', intervals: [0, 3, 6], about: 'Terça menor e quinta diminuta. Tenso, liga um acorde a outro.' },
   { suffix: '°7', name: 'Diminuto com sétima', intervals: [0, 3, 6, 9], about: 'Empilha terças menores: muito usado como passagem.' },
+  { suffix: 'm(b5)', name: 'Menor com quinta bemol', intervals: [0, 3, 6], about: 'A tríade meio-diminuta: o vii grau do campo maior e o ii do campo menor (Bm(b5) em Dó). Com a sétima menor vira m7(b5).' },
   { suffix: 'm7(b5)', name: 'Meio-diminuto', intervals: [0, 3, 6, 10], about: 'Menor com quinta diminuta e sétima menor. O vii grau do campo maior.' },
   { suffix: '+', name: 'Aumentado', intervals: [0, 4, 8], about: 'Terça maior e quinta aumentada. Som de suspense.' },
   { suffix: 'm(7M)', name: 'Menor com sétima maior', intervals: [0, 3, 7, 11], about: 'Menor com sétima maior: cor de mistério.' },
@@ -126,11 +127,12 @@ const MAJOR_FIELD = [
   ['IV', '', '7M'],
   ['V', '', '7'],
   ['vi', 'm', 'm7'],
-  ['vii°', '°', 'm7(b5)'],
+  // The seventh degree of the major key is half-diminished: Bm(b5), and with its seventh Bm7(b5).
+  ['viiø', 'm(b5)', 'm7(b5)'],
 ] as const;
 const MINOR_FIELD = [
   ['i', 'm', 'm7'],
-  ['ii°', '°', 'm7(b5)'],
+  ['iiø', 'm(b5)', 'm7(b5)'],
   ['III', '', '7M'],
   ['iv', 'm', 'm7'],
   ['v', 'm', 'm7'],
@@ -138,10 +140,10 @@ const MINOR_FIELD = [
   ['VII', '', '7'],
 ] as const;
 
-/** Harmonic minor: the raised seventh makes V major (the V7 that leads home) and vii° a full diminished. */
+/** Harmonic minor: the raised seventh makes V major (the V7 that leads home) and vii a full diminished (vii°7). */
 const HARMONIC_MINOR_FIELD = [
   ['i', 'm', 'm(7M)'],
-  ['ii°', '°', 'm7(b5)'],
+  ['iiø', 'm(b5)', 'm7(b5)'],
   ['III+', '+', '7M(#5)'],
   ['iv', 'm', 'm7'],
   ['V', '', '7'],
@@ -152,11 +154,11 @@ const HARMONIC_MINOR_FIELD = [
 export type FieldMode = 'major' | 'minor' | 'harmonicMinor';
 
 /**
- * Roman numeral of the four-note chord: the triad's numeral plus its seventh. The triad on vii is
- * diminished (vii°), but with its seventh it is half-diminished (viiø7, m7(b5)), not a diminished seventh.
+ * Roman numeral of the four-note chord: the triad's numeral plus its seventh. The vii of the major key (and
+ * the ii of the minor) is half-diminished: viiø, Bm(b5), and viiø7, Bm7(b5) — not the diminished seventh (°7).
  */
 const tetradNumeral = (roman: string, t4: string): string => {
-  const base = roman.replace(/[°+]$/u, '');
+  const base = roman.replace(/[°+ø]$/u, '');
   if (t4 === 'm7(b5)') return `${base}ø7`;
   if (t4 === '°7') return `${base}°7`;
   if (t4 === '7M' || t4 === '7M(#5)') return `${base}${t4 === '7M(#5)' ? '+' : ''}7M`;

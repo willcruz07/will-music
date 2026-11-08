@@ -307,7 +307,7 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
       ? [
           ['i – iv – V', [0, 3, 4]],
           ['i – VI – V', [0, 5, 4]],
-          ['ii° – V – i', [1, 4, 0]],
+          ['iiø – V – i', [1, 4, 0]],
         ]
       : mode === 'major'
     ? [

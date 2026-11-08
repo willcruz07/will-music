@@ -10,7 +10,7 @@ const BASS_NAME: Record<string, string> = {
 };
 // Brazilian suffix → chords-db suffix.
 const SUFFIX: Record<string, string> = {
-  '': 'major', m: 'minor', '7': '7', '7M': 'maj7', maj7: 'maj7', m7: 'm7', 'm7(b5)': 'm7b5', m7b5: 'm7b5', ø: 'm7b5',
+  '': 'major', m: 'minor', '7': '7', '7M': 'maj7', maj7: 'maj7', m7: 'm7', 'm7(b5)': 'm7b5', 'm(b5)': 'dim', m7b5: 'm7b5', ø: 'm7b5',
   '°': 'dim', º: 'dim', dim: 'dim', '°7': 'dim7', º7: 'dim7', dim7: 'dim7', '+': 'aug', aug: 'aug',
   '2': 'sus2', sus2: 'sus2', '4': 'sus4', sus4: 'sus4', sus: 'sus4', '6': '6', m6: 'm6', '9': 'add9', add9: 'add9',
   '7(9)': '9', m9: 'm9', 'm7(9)': 'm9', 'm(9)': 'madd9', madd9: 'madd9', '7M(9)': 'maj9', '11': '11', '13': '13',

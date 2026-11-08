@@ -51,8 +51,8 @@ export const HARMONIA: Lesson[] = [
     title: 'Campo harmônico maior',
     summary: 'Os sete acordes que pertencem a um tom e por que eles soam "em casa".',
     blocks: [
-      t('Empilhando terças só com as notas da escala, cada grau gera um acorde. Na escala maior o resultado é sempre o mesmo padrão: **I maior, ii menor, iii menor, IV maior, V maior, vi menor e vii° diminuto**.'),
-      { kind: 'progression', name: 'Campo harmônico (tríades)', degrees: ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'], key: 'C' },
+      t('Empilhando terças só com as notas da escala, cada grau gera um acorde. Na escala maior o resultado é sempre o mesmo padrão: **I maior, ii menor, iii menor, IV maior, V maior, vi menor e viiø meio-diminuto** (em Dó, Bm(b5)). O vii grau é o **meio-diminuto**: menor com quinta bemol; com a sétima vira Bm7(b5). Não confunda com o **diminuto** (°7), que tem a sétima diminuta.'),
+      { kind: 'progression', name: 'Campo harmônico (tríades)', degrees: ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii(b5)'], key: 'C' },
       t('Os numerais em maiúscula indicam acordes maiores; em minúscula, menores. O "°" indica diminuto. Em Sol, por exemplo: G, Am, Bm, C, D, Em, F#°.'),
       { kind: 'tip', text: 'Quando um acorde de uma música não está no campo harmônico, ele é um "visitante" (dominante secundário, empréstimo modal…). Isso aparece nos próximos níveis.' },
     ],
@@ -95,7 +95,7 @@ export const HARMONIA: Lesson[] = [
     blocks: [
       t('Acrescentando mais uma terça à tríade chega-se à **sétima**. No campo maior as tétrades ficam: **I7M, ii m7, iii m7, IV7M, V7, vi m7 e viiø (m7(b5))**.'),
       { kind: 'progression', name: 'Campo harmônico com tétrades', degrees: ['I7M', 'ii7', 'iii7', 'IV7M', 'V7', 'vi7', 'viiø'], key: 'C' },
-      { kind: 'list', items: ['**7M (sétima maior):** suave, estável (C7M).', '**m7 (menor com sétima):** menor macio (Dm7).', '**7 (dominante):** maior com sétima menor; tenso, pede resolução (G7).', '**m7(b5) (meio-diminuto):** a tétrade do vii grau (Bm7(b5)). A tríade é diminuta, mas a tétrade **não** é o diminuto com sétima (°7).'] },
+      { kind: 'list', items: ['**7M (sétima maior):** suave, estável (C7M).', '**m7 (menor com sétima):** menor macio (Dm7).', '**7 (dominante):** maior com sétima menor; tenso, pede resolução (G7).', '**m7(b5) (meio-diminuto):** o vii grau do campo maior e o ii do campo menor (Bm7(b5) em Dó maior e em Lá menor). **Não** é o diminuto com sétima (°7).'] },
       { kind: 'tip', text: 'O único acorde **dominante (7)** natural do campo maior é o do V grau. Isso o torna o acorde mais "magnético" do tom.' },
     ],
   },
