@@ -13,11 +13,11 @@ describe('ConstellationView', () => {
     const h = handlers();
     const { rerender } = render(<ConstellationView web={web()} selected={null} {...h} />);
     await userEvent.click(screen.getByRole('button', { name: /^Dm7, / }));
-    expect(h.onSelect).toHaveBeenCalledWith('2:m7');
+    expect(h.onSelect).toHaveBeenCalledWith('2:min');
     expect(h.onWalk).not.toHaveBeenCalled();
-    rerender(<ConstellationView web={web()} selected="2:m7" {...h} />);
+    rerender(<ConstellationView web={web()} selected="2:min" {...h} />);
     await userEvent.click(screen.getByRole('button', { name: /^Dm7, / }));
-    expect(h.onWalk).toHaveBeenCalledWith('2:m7');
+    expect(h.onWalk).toHaveBeenCalledWith('2:min');
   });
 
   it('a drag over a star neither selects nor walks', () => {
@@ -40,11 +40,20 @@ describe('ConstellationView', () => {
     expect(ring.querySelector('[role="button"]')).toBeNull();
   });
 
-  it('labels every orbit star with its function, not only color', () => {
-    render(<ConstellationView web={web()} selected={null} {...handlers()} />);
-    expect(screen.getByRole('button', { name: 'G7, dominante' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Am7, tônica' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Dm7, subdominante' })).toBeInTheDocument();
+  it('labels every orbit star with its motion', () => {
+    render(<ConstellationView web={openFocus(startWeb(parseChord('G7')!))} selected={null} {...handlers()} />);
+    expect(screen.getByRole('button', { name: 'C7M, resolve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'C7, tensiona' })).toBeInTheDocument();
+  });
+
+  it('shows the sectors of the current orbit as a legend', () => {
+    const { unmount } = render(<ConstellationView web={web()} selected={null} {...handlers()} />);
+    expect(screen.getByText('Relaxar')).toBeInTheDocument();
+    expect(screen.getByText('Tensionar')).toBeInTheDocument();
+    expect(screen.queryByText('Resolver')).toBeNull();
+    unmount();
+    render(<ConstellationView web={openFocus(startWeb(parseChord('G7')!))} selected={null} {...handlers()} />);
+    expect(screen.getByText('Resolver')).toBeInTheDocument();
   });
 
   it('the orbit is reachable by keyboard and Enter walks', async () => {

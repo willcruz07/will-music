@@ -1,9 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { type Family, chordName } from './harmony.ts';
+import { type Motion, chordName } from './harmony.ts';
 import { type Web, orbit, previewStars } from './web.ts';
 
-const FAMILY_LABEL: Record<Family, string> = { tonica: 'tônica', subdominante: 'subdominante', dominante: 'dominante', alterado: 'alterado' };
-const FAMILY_COLOR: Record<Family, string> = { tonica: 'var(--primary)', subdominante: 'var(--glow)', dominante: '#f59e0b', alterado: '#f472b6' };
+export const MOTION_COLOR: Record<Motion, string> = { resolve: 'var(--primary)', tensiona: '#f59e0b', relaxa: 'var(--glow)' };
+const SECTORS: { motion: Motion; label: string }[] = [
+  { motion: 'resolve', label: 'Resolver' },
+  { motion: 'tensiona', label: 'Tensionar' },
+  { motion: 'relaxa', label: 'Relaxar' },
+];
 
 const TAP_SLOP = 8;
 const MIN_ZOOM = 0.35;
@@ -20,7 +24,6 @@ type Camera = { x: number; y: number; zoom: number };
 export const ConstellationView = ({
   web,
   selected,
-  route = [],
   onSelect,
   onWalk,
   onFocusStar,
@@ -28,7 +31,6 @@ export const ConstellationView = ({
 }: {
   web: Web;
   selected: string | null;
-  route?: string[];
   onSelect: (key: string) => void;
   onWalk: (key: string) => void;
   onFocusStar: (key: string) => void;
@@ -140,7 +142,6 @@ export const ConstellationView = ({
     const n = web.nodes[key]!;
     return chordName(n.chord, web.center);
   };
-  const routeLine = [web.focus, ...route].map((k) => web.nodes[k]).filter(Boolean);
 
   return (
     <div ref={box} className="relative h-full w-full touch-none select-none overflow-hidden">
@@ -163,7 +164,7 @@ export const ConstellationView = ({
             const a = web.nodes[l.from]!;
             const b = web.nodes[l.to]!;
             const live = l.from === web.focus;
-            return <line key={`${l.from}-${l.to}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={live ? FAMILY_COLOR[l.move.family] : 'var(--border)'} strokeOpacity={live ? 0.55 : 0.5} strokeWidth={live ? 2 : 1} />;
+            return <line key={`${l.from}-${l.to}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={live ? MOTION_COLOR[l.move.motion] : 'var(--border)'} strokeOpacity={live ? 0.55 : 0.5} strokeWidth={live ? 2 : 1} />;
           })}
 
           <g data-testid="preview-ring" opacity={0.35}>
@@ -174,7 +175,7 @@ export const ConstellationView = ({
             {/* One bubble per chord, even when several neighbors lead to it. */}
             {[...new Map(ring.filter((s) => !web.nodes[s.key]).map((s) => [s.key, s])).values()].map((s) => (
               <g key={s.key} data-bubble={s.key}>
-                <circle cx={s.x} cy={s.y} r={20} fill="var(--surface)" stroke={FAMILY_COLOR[s.move.family]} strokeDasharray="3 3" />
+                <circle cx={s.x} cy={s.y} r={20} fill="var(--surface)" stroke={MOTION_COLOR[s.move.motion]} strokeDasharray="3 3" />
                 <text x={s.x} y={s.y + 4} textAnchor="middle" fontSize={10} fill="var(--muted-foreground)">
                   {chordName(s.chord, s.center)}
                 </text>
@@ -182,12 +183,9 @@ export const ConstellationView = ({
             ))}
           </g>
 
-          {/* The trail walked so far, and the suggested route in target mode. */}
+          {/* The trail walked so far. */}
           {web.trail.length > 1 && (
             <polyline points={web.trail.map((k) => `${web.nodes[k]!.x},${web.nodes[k]!.y}`).join(' ')} fill="none" stroke="var(--primary)" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
-          )}
-          {routeLine.length > 1 && (
-            <polyline data-testid="route" points={routeLine.map((n) => `${n!.x},${n!.y}`).join(' ')} fill="none" stroke="var(--chord)" strokeWidth={2.5} strokeDasharray="8 6" />
           )}
 
           {Object.values(web.nodes).map((n) => {
@@ -213,19 +211,19 @@ export const ConstellationView = ({
                 tabIndex={i === 0 ? 0 : -1}
                 data-orbit=""
                 data-key={l.to}
-                aria-label={`${label}, ${FAMILY_LABEL[l.move.family]}`}
+                aria-label={`${label}, ${l.move.motion}`}
                 aria-pressed={sel}
                 className="cursor-pointer outline-none [&:focus-visible>circle]:stroke-[var(--foreground)]"
                 onClick={tap(() => (sel ? onWalk(l.to) : onSelect(l.to)))}
                 onPointerEnter={(e) => e.pointerType === 'mouse' && onSelect(l.to)}
                 onKeyDown={(e) => onOrbitKey(e, l.to)}
               >
-                <circle cx={n.x} cy={n.y} r={sel ? 38 : 32} fill="var(--surface)" stroke={FAMILY_COLOR[l.move.family]} strokeWidth={sel ? 4 : 2.5} />
+                <circle cx={n.x} cy={n.y} r={sel ? 38 : 32} fill="var(--surface)" stroke={MOTION_COLOR[l.move.motion]} strokeWidth={sel ? 4 : 2.5} />
                 <text x={n.x} y={n.y + 2} textAnchor="middle" fontSize={15} fontWeight={700} fill="var(--chord)">
                   {label}
                 </text>
                 <text x={n.x} y={n.y + 17} textAnchor="middle" fontSize={9.5} fill="var(--muted-foreground)" aria-hidden>
-                  {FAMILY_LABEL[l.move.family]}
+                  {l.move.motion}
                 </text>
               </g>
             );
@@ -248,6 +246,17 @@ export const ConstellationView = ({
           )}
         </g>
       </svg>
+      {/* Legend: the sectors present in the current orbit (Resolver only when the focus is a tension). */}
+      {links.length > 0 && (
+        <ul aria-label="Movimentos" className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1 rounded-xl bg-background/70 px-2.5 py-2 text-xs backdrop-blur">
+          {SECTORS.filter((s) => links.some((l) => l.move.motion === s.motion)).map((s) => (
+            <li key={s.motion} className="flex items-center gap-1.5">
+              <span aria-hidden className="size-2.5 rounded-full" style={{ background: MOTION_COLOR[s.motion] }} />
+              {s.label}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };
