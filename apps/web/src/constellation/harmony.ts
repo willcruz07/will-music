@@ -105,7 +105,18 @@ const RULES: Record<Role, Rule[]> = {
   ],
 };
 
-const variantsOf = (name: string, quality: Quality): string[] => (quality === '7' ? ['(9)', '(13)', '(b9)', '(#5)'].map((t) => `${name}${t}`) : []);
+/** The tonic of a minor center: the degrees of the minor key (with the V7 of the harmonic minor). */
+const MINOR_TONIC: Rule[] = [
+  R(2, 'm7(b5)', 'iiV', 'subdominante', (n) => `${n.to} é o iiø do tom menor: abre o ii–V–i.`),
+  R(7, '7', 'cadencia', 'dominante', (n) => `${n.to} é o V7 da menor harmônica: o dominante que pede ${n.cur}.`),
+  R(8, '7M', 'relativo', 'subdominante', (n) => `${n.to} é o VI: subdominante com cor maior dentro do tom menor.`),
+  R(10, '7', 'secundario', 'dominante', (n) => `${n.to} é o VII7: dominante do relativo maior.`),
+  R(5, 'm7', 'iiV', 'subdominante', (n) => `${n.to} é o iv: o subdominante do tom menor.`),
+  R(3, '7M', 'relativo', 'tonica', (n) => `${n.to} é o relativo maior: as mesmas notas, com cor clara.`),
+  R(1, '7', 'subV', 'dominante', (n) => `${n.to} é o substituto de trítono do V: o baixo desce meio tom até ${n.cur}.`, true),
+];
+
+const variantsOf =(name: string, quality: Quality): string[] => (quality === '7' ? ['(9)', '(13)', '(b9)', '(#5)'].map((t) => `${name}${t}`) : []);
 
 const centerRules = (center: Center): Rule[] => [
   R(0, center.minor ? 'm7' : '7M', 'volta', 'tonica', (n) => `${n.to} é a tônica do centro ${n.center}: a volta para casa.`),
@@ -130,9 +141,17 @@ export const neighbors = (current: Chord, center: Center): Move[] => {
     seen.add(chordKey(to));
     const name = chordName(to, center);
     const target = chordName({ root: mod12(root + 5), quality: '' }, center);
-    moves.push({ to, kind: rule.kind, family: rule.family, why: rule.why({ cur, to: name, target, res, center: centerName(center) }), nextCenter: center, variants: variantsOf(name, quality) });
+    let why = rule.why({ cur, to: name, target, res, center: centerName(center) });
+    let nextCenter = center;
+    // Tonicization: a dominant that resolves somewhere other than home makes that chord the new center.
+    if (rule.quality === 'resolve' && root !== center.root) {
+      nextCenter = { root, minor: quality === 'm7' };
+      why += ` O centro tonal passa a ser ${centerName(nextCenter)}.`;
+    }
+    moves.push({ to, kind: rule.kind, family: rule.family, why, nextCenter, variants: variantsOf(name, quality) });
   };
-  for (const rule of RULES[roleOf(current.quality)]) add(rule, current.root, MAX_ORBIT);
+  const minorTonic = center.minor && current.root === center.root && roleOf(current.quality) === 'minor';
+  for (const rule of minorTonic ? MINOR_TONIC : RULES[roleOf(current.quality)]) add(rule, current.root, MAX_ORBIT);
   for (const rule of centerRules(center)) add(rule, center.root, MIN_ORBIT);
   return moves;
 };

@@ -73,3 +73,35 @@ describe('harmony engine: explanations', () => {
     expect(engano.why).toMatch(/em vez de C\b/);
   });
 });
+
+describe('harmony engine: centers', () => {
+  it('resolving V→I moves the center (tonicization)', () => {
+    const toF = neighbors({ root: 0, quality: '7' }, C).find((m) => m.kind === 'cadencia')!;
+    expect(chordName(toF.to, C)).toBe('F7M');
+    expect(toF.nextCenter).toEqual({ root: 5, minor: false });
+    expect(toF.why).toMatch(/centro tonal/);
+  });
+
+  it('resolving to the current tonic keeps the center', () => {
+    const toC = neighbors({ root: 7, quality: '7' }, C).find((m) => m.kind === 'cadencia')!;
+    expect(chordName(toC.to, C)).toBe('C7M');
+    expect(toC.nextCenter).toEqual(C);
+  });
+
+  it('a minor center brings the minor relations', () => {
+    const Am = { root: 9, minor: true };
+    const all = neighbors({ root: 9, quality: 'm7' }, Am).map((m) => chordName(m.to, Am));
+    expect(all).toEqual(expect.arrayContaining(['Bm7(b5)', 'E7', 'F7M', 'G7']));
+  });
+
+  it('starts from tricky chords with a coherent center and a valid orbit', () => {
+    expect(startCenter(parseChord('Bm7(b5)')!)).toEqual({ root: 9, minor: true });
+    expect(startCenter(parseChord('C#°7')!)).toEqual({ root: 2, minor: false });
+    expect(startCenter(parseChord('G7')!)).toEqual({ root: 0, minor: false });
+    expect(startCenter(parseChord('Dm7')!)).toEqual({ root: 2, minor: true });
+    for (const n of ['Bm7(b5)', 'C#°7', 'G7', 'Dm7', 'F7M']) {
+      const c = parseChord(n)!;
+      expect(neighbors(c, startCenter(c)).length).toBeGreaterThanOrEqual(6);
+    }
+  });
+});
