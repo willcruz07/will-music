@@ -60,6 +60,17 @@ describe('Constelação de acordes page', () => {
     expect(within(screen.getByRole('list', { name: 'Caminho' })).getAllByRole('listitem')).toHaveLength(2);
   });
 
+  it('each chord in the diary is written in the color of its step (a tension is not green)', async () => {
+    await startAtC();
+    await goTo('Dm7');
+    await goTo('G7');
+    const diary = screen.getByRole('list', { name: 'Caminho' });
+    const g7 = within(diary).getByRole('button', { name: 'Voltar para G7' });
+    const motion = within(g7.closest('li')!).getByText('tensiona');
+    expect(g7.style.color).toBe(motion.style.color);
+    expect(g7.style.color).not.toBe('');
+  });
+
   it('the diary shows the pattern of motions', async () => {
     await startAtC();
     await goTo('Am7');

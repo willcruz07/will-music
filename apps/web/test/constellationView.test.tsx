@@ -129,6 +129,27 @@ describe('the trail in the colors of its actions', () => {
     expect(trail.querySelector('[data-key="0:maj"]')!.getAttribute('data-color')).toBe(colorOf(toC));
   });
 
+  it('the inner ring of a walked star keeps the color of the step that reached it (not always green)', () => {
+    let w = openFocus(startWeb(parseChord('C7M')!));
+    // C7M → G7 → F#7 → F#m7 → B7 → E7M: G7 (reached by a tension) ends up off the orbit, as a trail star.
+    for (const target of ['7:dom', '6:dom', '6:min', '11:dom', '4:maj']) {
+      const link = orbit(w).find((l) => l.to === target)!;
+      w = walk(w, link.move);
+    }
+    render(<ConstellationView web={w} selected={null} {...handlers()} />);
+    const rings = [...document.querySelectorAll('[data-ring]')].filter((el) => w.trail.includes(el.getAttribute('data-ring')!));
+    expect(rings.length).toBeGreaterThan(0);
+    for (const el of rings) {
+      const node = w.nodes[el.getAttribute('data-ring')!]!;
+      expect(el.getAttribute('stroke'), node.key).toBe(node.via ? colorOf(node.via) : 'var(--primary)');
+    }
+    // G7 was reached by a tension: its ring is not green.
+    const g7 = rings.find((el) => el.getAttribute('data-ring') === '7:dom');
+    expect(g7).toBeDefined();
+    expect(g7!.getAttribute('stroke')).toBe(colorOf(w.nodes['7:dom']!.via!));
+    expect(g7!.getAttribute('stroke')).not.toBe('var(--primary)');
+  });
+
   it('always shows the four entries of the legend', () => {
     render(<ConstellationView web={web()} selected={null} {...handlers()} />);
     for (const t of ['Resolver', 'Tensionar', 'Tensão alterada', 'Relaxar']) expect(screen.getByText(t)).toBeInTheDocument();
