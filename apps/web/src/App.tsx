@@ -7,6 +7,7 @@ import { useAutoHideBars } from './lib/scrollBars.ts';
 import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
 import { Library } from './pages/Library.tsx';
 import { DialogHost } from './ui/Dialog.tsx';
+import { APP_VERSION, versionLabel } from './version.ts';
 import { useWakeLock } from './lib/wakeLock.ts';
 import { IconButton } from './ui/Button.tsx';
 
@@ -72,6 +73,9 @@ const Layout = () => {
         <Link to="/" className="inline-flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight">
           <img src={`${import.meta.env.BASE_URL}icons/mark-96.png`} alt="" width={32} height={32} className="size-8 rounded-lg" />
           will-music
+          <span className="rounded-md border border-border px-1.5 py-0.5 font-sans text-[10px] font-semibold leading-none tracking-normal text-muted-foreground" title={`Versão ${APP_VERSION}`}>
+            {versionLabel()}
+          </span>
         </Link>
         <div className="flex items-center gap-2">
           <TopNav />
