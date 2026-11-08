@@ -6,7 +6,7 @@ import { harmonicField } from '../lib/chordTheory.ts';
 import { LessonBlocks, intervalName } from './blocks.tsx';
 import { SCALE_LIBRARY, type ScaleId } from './theory.ts';
 import type { Block } from './types.ts';
-import { useStudySynth } from './widgets.tsx';
+import { SilentModeHint, useStudySynth } from './widgets.tsx';
 import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 const chip = (active: boolean) =>
@@ -77,6 +77,7 @@ export const IntervalTrainer = ({ random = Math.random }: { random?: () => numbe
           <RotateCcw className="size-4" /> Próximo
         </button>
       </div>
+      <SilentModeHint className="mt-1.5" />
       <div role="group" aria-label="Qual é o intervalo?" className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         {SETS[set].semis.map((s) => {
           const state = answer === null ? '' : s === q.semis ? 'border-green-500 bg-green-500/15' : s === answer ? 'border-red-500 bg-red-500/15' : 'opacity-60';

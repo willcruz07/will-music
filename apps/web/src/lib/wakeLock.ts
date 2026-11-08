@@ -22,11 +22,17 @@ export const useWakeLock = (active: boolean): void => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') void acquire();
     };
+    // Some browsers only grant the lock after a tap: try again on the first touch if it is not held.
+    const onTouch = () => {
+      if (!sentinel) void acquire();
+    };
     void acquire();
     document.addEventListener('visibilitychange', onVisible);
+    document.addEventListener('pointerdown', onTouch);
     return () => {
       stopped = true;
       document.removeEventListener('visibilitychange', onVisible);
+      document.removeEventListener('pointerdown', onTouch);
       void sentinel?.release();
     };
   }, [active]);

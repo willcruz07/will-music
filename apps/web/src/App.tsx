@@ -6,6 +6,8 @@ import { InstallBanner, UpdateBanner } from './components/PwaPrompts.tsx';
 import { useAutoHideBars } from './lib/scrollBars.ts';
 import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
 import { Library } from './pages/Library.tsx';
+import { DialogHost } from './ui/Dialog.tsx';
+import { useWakeLock } from './lib/wakeLock.ts';
 import { IconButton } from './ui/Button.tsx';
 
 // The library opens first; every other screen (and its heavy libraries) loads on demand.
@@ -43,13 +45,21 @@ export const ThemeToggle = () => {
 
 const Loading = () => <div className="mt-16 h-1 w-24 animate-pulse rounded-full bg-primary/40" aria-label="Carregando" />;
 
+/** The screen stays on while the app is open (reading a chart, practicing, on stage). */
+const KeepAwake = () => {
+  useWakeLock(true);
+  return null;
+};
+
 export const App = () => (
   <Suspense fallback={<Loading />}>
+    <KeepAwake />
     <Routes>
       <Route path="/palco/lista/:id" element={<Stage mode="list" />} />
       <Route path="/palco/musica/:id" element={<Stage mode="song" />} />
       <Route path="*" element={<Layout />} />
     </Routes>
+    <DialogHost />
   </Suspense>
 );
 

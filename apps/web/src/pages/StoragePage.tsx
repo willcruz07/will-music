@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { formatBytes, storageStatus } from '../lib/storage.ts';
 import { type SongStorage, compactAudio, deleteAllStems, keepOnlyChart, songStorage } from '../lib/storageManager.ts';
 import { Button } from '../ui/Button.tsx';
+import { confirmDialog } from '../ui/Dialog.tsx';
 
 /** Space used per song, with ways to free it without losing the chart, the scores or the lists. */
 export const StoragePage = () => {
@@ -88,7 +89,11 @@ export const StoragePage = () => {
                     variant="ghost"
                     className="min-h-9 px-3"
                     disabled={!!busy}
-                    onClick={() => confirm(`Apagar as faixas separadas de "${r.title}"? Dá para separar de novo depois.`) && act(r.id, 'apagar as faixas', async () => (await deleteAllStems(r.id), 'Faixas apagadas.'))}
+                    onClick={() =>
+                      void confirmDialog({ title: 'Apagar as faixas?', message: `As faixas separadas de "${r.title}" saem do aparelho. Dá para separar de novo depois.`, confirmLabel: 'Apagar' }).then(
+                        (ok) => ok && act(r.id, 'apagar as faixas', async () => (await deleteAllStems(r.id), 'Faixas apagadas.')),
+                      )
+                    }
                   >
                     <Layers className="size-4" /> Apagar faixas
                   </Button>
@@ -98,8 +103,8 @@ export const StoragePage = () => {
                   className="min-h-9 px-3 text-danger"
                   disabled={!!busy}
                   onClick={() =>
-                    confirm(`Manter só a cifra de "${r.title}"? O áudio e as faixas saem do aparelho; a cifra, as partituras e as listas ficam.`) &&
-                    act(r.id, 'liberar o espaço', async () => (await keepOnlyChart(r.id), `"${r.title}" agora guarda só a cifra e as partituras.`))
+                    void confirmDialog({ title: 'Manter só a cifra?', message: `O áudio e as faixas de "${r.title}" saem do aparelho; a cifra, as partituras e as listas ficam.`, confirmLabel: 'Liberar espaço' }).then((ok) => ok &&
+                    act(r.id, 'liberar o espaço', async () => (await keepOnlyChart(r.id), `"${r.title}" agora guarda só a cifra e as partituras.`)))
                   }
                 >
                   <Archive className="size-4" /> Manter só a cifra

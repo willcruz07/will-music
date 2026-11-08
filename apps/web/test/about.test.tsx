@@ -73,6 +73,7 @@ describe('Sobre: first visit', () => {
   it('is a wide sheet on desktop', async () => {
     render(<AboutButton />);
     await userEvent.click(screen.getByRole('button', { name: /Conheça o will-music/ }));
-    expect(screen.getByRole('dialog').className).toContain('md:max-w-4xl');
+    expect(screen.getByRole('dialog').className).not.toMatch(/max-w-/);
+    expect(screen.getByRole('dialog').className).toContain('max-h-[92dvh]');
   });
 });

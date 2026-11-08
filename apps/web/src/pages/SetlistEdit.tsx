@@ -8,6 +8,7 @@ import { type Setlist, type SetlistItem, type Song, db, listSongs } from '../lib
 import { deleteSetlist, keyOptions, moveItem, updateSetlist } from '../lib/setlists.ts';
 import { ExportButton } from '../components/PackageButtons.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
+import { confirmDialog } from '../ui/Dialog.tsx';
 import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 const fold = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
@@ -168,7 +169,11 @@ export const SetlistEdit = () => {
         variant="ghost"
         className="mt-10 text-danger"
         onClick={() => {
-          if (confirm(`Excluir a lista “${setlist.name}”? As músicas continuam na biblioteca.`)) void deleteSetlist(id).then(() => navigate('/listas'));
+          void confirmDialog({ title: 'Excluir a lista?', message: `A lista “${setlist.name}” será excluída. As músicas continuam na biblioteca.`, confirmLabel: 'Excluir' }).then(
+            (ok) => {
+              if (ok) void deleteSetlist(id).then(() => navigate('/listas'));
+            },
+          );
         }}
       >
         <Trash2 className="size-4" /> Excluir lista

@@ -82,6 +82,8 @@ export const BottomSheet = ({
     else setDragY(0);
   };
 
+  const inner = size === 'wide' ? 'max-w-5xl' : 'max-w-3xl';
+
   return createPortal(
     <div className="fixed inset-0 z-[60]">
       <div data-testid="sheet-backdrop" aria-hidden onClick={onClose} className="sheet-backdrop absolute inset-0 bg-black/55 backdrop-blur-sm" />
@@ -91,9 +93,10 @@ export const BottomSheet = ({
         aria-modal="true"
         aria-labelledby={titleId}
         style={dragY ? { transform: `translateY(${dragY}px)`, transition: 'none' } : undefined}
-        className={`sheet-panel absolute inset-x-0 bottom-0 mx-auto flex w-full flex-col rounded-t-3xl border border-b-0 border-border bg-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-16px_48px_-12px_rgb(0_0_0/0.5)] transition-transform ${size === 'wide' ? 'max-h-[92dvh] max-w-lg md:max-w-4xl' : 'max-h-[80dvh] max-w-lg'}`}
+        className={`sheet-panel absolute inset-x-0 bottom-0 flex w-full flex-col rounded-t-3xl border border-b-0 border-border bg-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-16px_48px_-12px_rgb(0_0_0/0.5)] transition-transform ${size === 'wide' ? 'max-h-[92dvh]' : 'max-h-[80dvh]'}`}
       >
-        <div className="touch-none cursor-grab px-4 pt-2.5" onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp} onPointerCancel={onHandleUp}>
+        {/* The panel spans the whole screen; its content stays centered at a comfortable reading width. */}
+        <div className={`mx-auto w-full touch-none cursor-grab px-4 pt-2.5 ${inner}`} onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp} onPointerCancel={onHandleUp}>
           <div aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-muted-foreground/40" />
           <div className="flex items-center justify-between gap-2 py-2">
             <h2 id={titleId} className={hideTitle ? 'sr-only' : 'text-base font-semibold'}>
@@ -104,7 +107,7 @@ export const BottomSheet = ({
             </button>
           </div>
         </div>
-        {children(titleId)}
+        <div className={`mx-auto flex min-h-0 w-full flex-1 flex-col ${inner}`}>{children(titleId)}</div>
       </div>
     </div>,
     document.body,

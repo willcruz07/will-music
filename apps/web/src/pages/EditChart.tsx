@@ -9,6 +9,7 @@ import { restoreGeneratedChart, saveEditedChart } from '../lib/chartEdit.ts';
 import { type Song, db } from '../lib/db.ts';
 import { createHistory } from '../lib/history.ts';
 import { Button, IconButton } from '../ui/Button.tsx';
+import { confirmDialog } from '../ui/Dialog.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
 
 type Format = 'cifra' | 'chordpro';
@@ -137,7 +138,8 @@ export const EditChart = () => {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
   const leave = () => {
-    if (!dirty || confirm('Sair sem salvar as alterações?')) navigate(`/musica/${id}`);
+    if (!dirty) return navigate(`/musica/${id}`);
+    void confirmDialog({ title: 'Sair sem salvar?', message: 'As alterações desta cifra serão perdidas.', confirmLabel: 'Sair sem salvar', cancelLabel: 'Continuar editando' }).then((ok) => ok && navigate(`/musica/${id}`));
   };
 
   if (!song) return null;
@@ -255,12 +257,13 @@ export const EditChart = () => {
           <Button
             variant="ghost"
             onClick={() => {
-              if (confirm('Descartar suas edições e voltar à cifra gerada pela análise?')) {
+              void confirmDialog({ title: 'Voltar à cifra da análise?', message: 'Suas edições serão descartadas e a cifra volta a ser a gerada pela análise.', confirmLabel: 'Descartar edições' }).then((ok) => {
+                if (!ok) return;
                 void restoreGeneratedChart(id).then(() => {
                   setSaved(chordPro);
                   navigate(`/musica/${id}`, { replace: true });
                 });
-              }
+              });
             }}
           >
             Restaurar cifra gerada

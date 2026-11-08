@@ -5,7 +5,7 @@ import { ChordHelp } from '../components/ChordHelp.tsx';
 import { ConstellationView, colorOf } from '../constellation/ConstellationView.tsx';
 import { type Motion, type Move, isAltered, type Quality, QUALITIES, centerName, chordKey, chordName, parseChord } from '../constellation/harmony.ts';
 import { type Web, focusOn, openFocus, orbit, resetWeb, startWeb, walk } from '../constellation/web.ts';
-import { chordEvents, useStudySynth } from '../study/widgets.tsx';
+import { SilentModeHint, chordEvents, useStudySynth } from '../study/widgets.tsx';
 import { Button } from '../ui/Button.tsx';
 import { SheetSelect } from '../ui/SheetSelect.tsx';
 
@@ -214,6 +214,7 @@ export const ConstellationPage = () => {
               <RotateCcw className="size-4" /> Recomeçar
             </Button>
           </div>
+          <SilentModeHint />
 
           <div>
             <h2 className="text-sm font-semibold">Seu caminho</h2>

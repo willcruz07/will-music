@@ -54,10 +54,10 @@ describe('theme color', () => {
     meta.name = 'theme-color';
     document.head.append(meta);
     setThemePref('dark');
-    expect(meta.content).toBe('#0b1220');
+    expect(meta.content).toBe('#101829');
     setThemePref('light');
     applyThemePref();
-    expect(meta.content).toBe('#f5f7fb');
+    expect(meta.content).toBe('#fdfdfe');
     meta.remove();
   });
 });

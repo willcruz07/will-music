@@ -2,16 +2,18 @@
 import { pipeline } from '@huggingface/transformers';
 import type { WhisperChunk } from '../lib/transcript.ts';
 
-export type WhisperRequest = { type: 'transcribe'; audio: Float32Array };
+/** `preload` only downloads and caches the model (first-run setup); `transcribe` runs it on audio. */
+export type WhisperRequest = { type: 'transcribe'; audio: Float32Array } | { type: 'preload' };
 export type WhisperResponse =
   | { type: 'progress'; loaded: number; total: number }
   | { type: 'result'; chunks: WhisperChunk[]; device: 'webgpu' | 'wasm' }
+  | { type: 'ready' }
   | { type: 'error'; message: string };
 
 const post = (m: WhisperResponse) => (self as DedicatedWorkerGlobalScope).postMessage(m);
 
 self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
-  if (event.data.type !== 'transcribe') return;
+  const request = event.data;
   try {
     // A GPU object is not enough (blocklisted GPUs return no adapter); fall back to wasm on any WebGPU failure.
     const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
@@ -40,7 +42,8 @@ self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
       device = 'wasm';
       asr = await load(device);
     }
-    const output = (await asr(event.data.audio, {
+    if (request.type === 'preload') return post({ type: 'ready' });
+    const output = (await asr(request.audio, {
       language: 'portuguese',
       task: 'transcribe',
       return_timestamps: true,

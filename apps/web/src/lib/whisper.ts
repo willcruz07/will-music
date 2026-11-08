@@ -25,7 +25,7 @@ const runWhisper = (audio: Float32Array, onProgress: (loaded: number, total: num
       if (msg.type === 'progress') return onProgress(msg.loaded, msg.total);
       worker.terminate();
       if (msg.type === 'result') resolve(msg);
-      else reject(new Error(msg.message));
+      else reject(new Error(msg.type === 'error' ? msg.message : 'A transcrição falhou.'));
     };
     worker.onerror = (e) => {
       worker.terminate();
@@ -33,6 +33,38 @@ const runWhisper = (audio: Float32Array, onProgress: (loaded: number, total: num
     };
     const request: WhisperRequest = { type: 'transcribe', audio };
     worker.postMessage(request, [audio.buffer]);
+  });
+
+const WHISPER_MODEL = 'whisper-small_timestamped';
+
+/** True when the Whisper model is already in the browser cache (transformers.js keeps it in "transformers-cache"). */
+export const whisperCached = async (): Promise<boolean> => {
+  if (typeof caches === 'undefined') return false;
+  try {
+    const cache = await caches.open('transformers-cache');
+    return (await cache.keys()).some((r) => r.url.includes(WHISPER_MODEL));
+  } catch {
+    return false;
+  }
+};
+
+/** Downloads and caches the Whisper model without transcribing (first-run setup). */
+export const preloadWhisper = (onProgress: (loaded: number, total: number) => void): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('../worker/whisper.worker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (event: MessageEvent<WhisperResponse>) => {
+      const msg = event.data;
+      if (msg.type === 'progress') return onProgress(msg.loaded, msg.total);
+      worker.terminate();
+      if (msg.type === 'ready') resolve();
+      else reject(new Error(msg.type === 'error' ? msg.message : 'O modelo da letra não carregou.'));
+    };
+    worker.onerror = (e) => {
+      worker.terminate();
+      reject(new Error(e.message || 'O modelo da letra não carregou.'));
+    };
+    const request: WhisperRequest = { type: 'preload' };
+    worker.postMessage(request);
   });
 
 /** Transcribes the song (separated vocals when available) into timed lyric lines; throws when nothing useful is heard. */

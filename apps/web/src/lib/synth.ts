@@ -1,3 +1,4 @@
+import { preferPlayback } from './ios.ts';
 import type { DrumKind } from '@will-music/engine';
 
 /** One sound of the score, in song seconds. */
@@ -45,6 +46,7 @@ export const createScoreSynth = () => {
 
   const ensure = () => {
     if (context) return context;
+    preferPlayback();
     context = new AudioContext();
     master = context.createGain();
     master.gain.value = volume;

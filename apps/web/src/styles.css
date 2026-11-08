@@ -229,3 +229,15 @@ h1 {
   border-radius: 9999px;
   background: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
 }
+
+/* Phones and tablets: no visible scrollbars anywhere (the content still scrolls by touch). */
+@media (max-width: 1023px), (pointer: coarse) {
+  *,
+  .thin-scrollbar {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar,
+  .thin-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
