@@ -118,6 +118,8 @@ type Rule = {
   tension?: boolean;
   /** A substitute dominant: where it resolves (the current chord, the key it is the ii of, or the center tonic), not a fourth above. */
   resolvesTo?: 'cur' | 'iiOf' | 'home';
+  /** Forces the motion (a dominant turning into its own minor only loses the tension: it relaxes, it does not resolve). */
+  motion?: Motion;
   why: (n: Ctx) => string;
 };
 
@@ -236,6 +238,9 @@ const dominantRules = (current: Chord, center: Center, target?: Chord): Rule[] =
     ...deceptive,
     S(5, '7', (n) => `${n.to}: ${n.cur} passa a tensão adiante pelo ciclo de quartas, um dominante puxando outro.`, { flat: 'inherit' }),
     S(11, '7', (n) => `${n.to}: aproximação cromática, a tensão desce meio tom para outro dominante.`, { flat: 'inherit' }),
+    S(1, '7', (n) => `${n.to}: aproximação cromática, a tensão sobe meio tom para outro dominante.`, { flat: true }),
+    // G7 → Gm7: the tritone goes away and the chord becomes the ii of a new ii–V (Gm7 → C7 → F).
+    S(0, 'm7', (n) => `${n.to}: ${n.cur} vira menor na mesma nota, perde o trítono e passa a ser o ii de um novo ii–V, que leva a ${n.iiOf}.`, { motion: 'relaxa' }),
   ];
 };
 
@@ -288,7 +293,8 @@ const MIN_ORBIT = 6;
 const MAX_ORBIT = 16;
 const isTension = (c: Chord, rule?: Rule) => ['dom', 'dim'].includes(groupOf(c.quality)) || (groupOf(c.quality) === 'hdim' && !!rule?.tension);
 
-const motionOf = (fromLevel: Level, to: Chord, rule?: Rule): Motion => (isTension(to, rule) ? 'tensiona' : fromLevel === 'tensao' ? 'resolve' : 'relaxa');
+const motionOf = (fromLevel: Level, to: Chord, rule?: Rule): Motion =>
+  rule?.motion ?? (isTension(to, rule) ? 'tensiona' : fromLevel === 'tensao' ? 'resolve' : 'relaxa');
 
 /** The center after a step: resolutions and 7M chords outside the key move it; borrowed and deceptive chords keep it. */
 const centerAfter = (to: Chord, center: Center, rule: { resolution?: boolean; keep?: boolean }): Center => {
