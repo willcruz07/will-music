@@ -6,6 +6,7 @@ import { downloadBlob } from '../../lib/download.ts';
 import { MODE_INFO, availableModes } from '../../lib/stems.ts';
 import type { StemsState } from '../../lib/useStems.ts';
 import { Button } from '../../ui/Button.tsx';
+import { confirmDialog } from '../../ui/Dialog.tsx';
 import { Mixer } from '../Mixer.tsx';
 
 const mb = (n: number) => Math.round(n / 1e6);
@@ -144,7 +145,12 @@ export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; titl
             <Button
               variant="ghost"
               className="text-danger"
-              onClick={() => activeMode && confirm(`Apagar a separação "${MODE_INFO[activeMode].label}" desta música?`) && void remove()}
+              onClick={() =>
+                activeMode &&
+                void confirmDialog({ title: 'Apagar a separação?', message: `A separação "${MODE_INFO[activeMode].label}" desta música sai do aparelho. Dá para separar de novo depois.`, confirmLabel: 'Apagar' }).then((ok) => {
+                  if (ok) void remove();
+                })
+              }
             >
               <Trash2 className="size-4" /> Apagar esta separação
             </Button>

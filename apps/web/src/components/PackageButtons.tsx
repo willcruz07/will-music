@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { type Setlist, db } from '../lib/db.ts';
 import { downloadBlob, exportSongs, importPackage, readPackage, safeFileName } from '../lib/package.ts';
 import { Button } from '../ui/Button.tsx';
+import { alertDialog, confirmDialog } from '../ui/Dialog.tsx';
 
 type ExportProps = { songIds: string[]; title: string; setlist?: Setlist; backup?: boolean; label?: string; onError?: (message: string) => void };
 
@@ -14,7 +15,7 @@ export const ExportButton = ({ songIds, title, setlist, backup = false, label = 
       disabled={busy}
       onClick={() =>
         void (async () => {
-          const includeAudio = confirm('Incluir o áudio no pacote? Fica maior, mas permite tocar e analisar no outro aparelho.');
+          const includeAudio = await confirmDialog({ title: 'Incluir o áudio?', message: 'Fica maior, mas permite tocar e analisar no outro aparelho.', confirmLabel: 'Incluir o áudio', cancelLabel: 'Sem o áudio' });
           setBusy(true);
           try {
             const setlists = backup ? await db.setlists.toArray() : setlist ? [setlist] : [];
@@ -23,7 +24,7 @@ export const ExportButton = ({ songIds, title, setlist, backup = false, label = 
           } catch {
             const message = 'Não foi possível montar o pacote. Se a biblioteca for grande, tente exportar sem o áudio.';
             if (onError) onError(message);
-            else alert(message);
+            else void alertDialog(message);
           } finally {
             setBusy(false);
           }
@@ -59,7 +60,7 @@ export const ImportButton = ({ onImported }: { onImported: (message: string) => 
               const contents = await readPackage(file);
               const result = await importPackage(contents, async (conflicts) => {
                 const names = conflicts.length === 1 ? `“${conflicts[0]!.title}” já está` : `${conflicts.length} músicas do pacote já estão`;
-                return confirm(`${names} na biblioteca. OK substitui pela versão do pacote; Cancelar mantém as duas.`) ? 'replace' : 'keep-both';
+                return (await confirmDialog({ title: 'Já está na biblioteca', message: `${names} na biblioteca. Substituir pela versão do pacote ou manter as duas?`, confirmLabel: 'Substituir', cancelLabel: 'Manter as duas' })) ? 'replace' : 'keep-both';
               });
               const lists = result.setlists.length ? ` e ${result.setlists.length === 1 ? `a lista “${result.setlists[0]!.name}”` : `${result.setlists.length} listas`}` : '';
               onImported(`${result.songs} ${result.songs === 1 ? 'música importada' : 'músicas importadas'}${lists}.`);

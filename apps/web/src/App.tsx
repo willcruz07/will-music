@@ -6,6 +6,7 @@ import { InstallBanner, UpdateBanner } from './components/PwaPrompts.tsx';
 import { useAutoHideBars } from './lib/scrollBars.ts';
 import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
 import { Library } from './pages/Library.tsx';
+import { DialogHost } from './ui/Dialog.tsx';
 import { IconButton } from './ui/Button.tsx';
 
 // The library opens first; every other screen (and its heavy libraries) loads on demand.
@@ -50,6 +51,7 @@ export const App = () => (
       <Route path="/palco/musica/:id" element={<Stage mode="song" />} />
       <Route path="*" element={<Layout />} />
     </Routes>
+    <DialogHost />
   </Suspense>
 );
 

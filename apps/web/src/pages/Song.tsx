@@ -25,6 +25,7 @@ import { TranscribeLyrics } from '../components/TranscribeLyrics.tsx';
 import { useStems } from '../lib/useStems.ts';
 import { ChordPanel, readInstrument } from '../components/ChordPanel.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
+import { confirmDialog } from '../ui/Dialog.tsx';
 
 export const Song = () => {
   const { id = '' } = useParams();
@@ -262,7 +263,11 @@ export const Song = () => {
           <IconButton
             label="Excluir música"
             onClick={() => {
-              if (confirm(`Excluir “${song.title}” da biblioteca?`)) void deleteSong(song.id).then(() => navigate('/'));
+              void confirmDialog({ title: 'Excluir música?', message: `“${song.title}” sai da biblioteca, com o áudio, a cifra e as faixas.`, confirmLabel: 'Excluir' }).then(
+                (ok) => {
+                  if (ok) void deleteSong(song.id).then(() => navigate('/'));
+                },
+              );
             }}
           >
             <Trash2 className="size-4" />

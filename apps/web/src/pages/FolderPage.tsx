@@ -21,6 +21,7 @@ import { exportSongs } from '../lib/package.ts';
 import { downloadBlob } from '../lib/download.ts';
 import { db } from '../lib/db.ts';
 import { Button } from '../ui/Button.tsx';
+import { confirmDialog } from '../ui/Dialog.tsx';
 
 const ICON = { package: Package, chordpro: FileText, musicxml: FileMusic } as const;
 const KIND = { package: 'Pacote', chordpro: 'Cifra', musicxml: 'Partitura' } as const;
@@ -103,7 +104,7 @@ export const FolderPage = () => {
   const restore = (files: FoundFile[]) =>
     run('Restaurando', async () => {
       const result = await restoreFiles(files, async (conflicts) =>
-        confirm(`${conflicts.length} música(s) já estão no app. OK substitui pelas da pasta; Cancelar mantém as duas.`) ? 'replace' : 'keep-both',
+        (await confirmDialog({ title: 'Já estão no app', message: `${conflicts.length} música(s) já estão no app. Substituir pelas da pasta ou manter as duas?`, confirmLabel: 'Substituir', cancelLabel: 'Manter as duas' })) ? 'replace' : 'keep-both',
       );
       return `Restauradas ${result.songs} música(s)${result.lists ? ` e ${result.lists} lista(s)` : ''}.${result.skipped ? ` ${result.skipped} arquivo(s) já estavam no app ou não puderam ser lidos.` : ''}`;
     });

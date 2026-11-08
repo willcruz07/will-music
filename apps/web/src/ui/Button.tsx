@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, ComponentPropsWithRef } from 'react';
 
 type Variant = 'primary' | 'ghost' | 'outline';
 
@@ -12,7 +12,7 @@ export const Button = ({
   variant = 'primary',
   className = '',
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) => (
+}: ComponentPropsWithRef<'button'> & { variant?: Variant }) => (
   <button
     type="button"
     className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm transition-colors disabled:opacity-50 ${styles[variant]} ${className}`}
