@@ -102,3 +102,13 @@ describe('SheetSelect: hints', () => {
     expect(screen.getByRole('option', { name: 'D' })).toHaveAccessibleDescription('Ré');
   });
 });
+
+describe('bottom sheets span the whole screen width', () => {
+  it('has no narrow max width on the panel', async () => {
+    render(<Keys />);
+    await userEvent.click(screen.getByLabelText('Tom'));
+    const panel = screen.getByRole('dialog', { name: 'Tom' });
+    expect(panel.className).not.toMatch(/max-w-/);
+    expect(panel.className).toMatch(/inset-x-0/);
+  });
+});
