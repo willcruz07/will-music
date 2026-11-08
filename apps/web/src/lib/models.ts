@@ -80,11 +80,24 @@ export const deleteCachedModel = async (id: ModelId): Promise<void> => {
   await cache.delete(MODELS[id].url);
 };
 
-/** Downloads every model not yet on the device (for using the app offline later), one at a time. */
-export const downloadAllModels = async (onProgress: (done: number, total: number) => void, fetchFn: typeof fetch = fetch): Promise<void> => {
+/** The models the first actions need: chords and key, the basic voice/instrumental separation, the notes of a score. */
+export const BASIC_MODELS: ModelId[] = ['chordnet', 'cqtPlan', 'skey', 'kara2Core', 'kara2Data', 'basicPitch'];
+
+/** Which of `ids` are not on the device yet. */
+export const missingModels = async (ids: ModelId[] = BASIC_MODELS): Promise<ModelId[]> => {
   const cache = await caches.open(CACHE_NAME);
   const missing: ModelId[] = [];
-  for (const id of Object.keys(MODELS) as ModelId[]) if (!(await cache.match(MODELS[id].url))) missing.push(id);
+  for (const id of ids) if (!(await cache.match(MODELS[id].url))) missing.push(id);
+  return missing;
+};
+
+/** Downloads every model not yet on the device (for using the app offline later), one at a time. */
+export const downloadAllModels = (onProgress: (done: number, total: number) => void, fetchFn: typeof fetch = fetch): Promise<void> =>
+  downloadModels(Object.keys(MODELS) as ModelId[], onProgress, fetchFn);
+
+/** Downloads the given models that are missing, one at a time, reporting overall progress. */
+export const downloadModels = async (ids: ModelId[], onProgress: (done: number, total: number) => void, fetchFn: typeof fetch = fetch): Promise<void> => {
+  const missing = await missingModels(ids);
   const total = missing.reduce((n, id) => n + MODELS[id].bytes, 0);
   let base = 0;
   for (const id of missing) {
