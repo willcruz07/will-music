@@ -167,3 +167,10 @@ describe('harmony v2: spelling and starting chords', () => {
     }
   });
 });
+
+describe('harmony v2: from the relatives', () => {
+  it('a relative minor can go to the V7 of the center (vi → V)', () => {
+    expect(at(neighbors({ root: 9, quality: 'm7' }, C))['G7']!.motion).toBe('tensiona');
+    expect(at(neighbors({ root: 4, quality: 'm7' }, C))['G7']!.motion).toBe('tensiona');
+  });
+});

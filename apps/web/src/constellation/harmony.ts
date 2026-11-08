@@ -162,6 +162,7 @@ const MINOR: Rule[] = [
 
 /** The stable chords of a major center, to relax between them (C7M ↔ Am7 ↔ Em7 ↔ F7M ↔ Dm7). */
 const DIATONIC_REST: Rule[] = [
+  S(7, '7', (n) => `${n.to} é o dominante do centro ${n.center}: do repouso direto para a tensão.`, { from: 'c' }),
   S(0, '7M', (n) => `${n.to} é a tônica do centro ${n.center}: a volta para casa.`, { from: 'c' }),
   S(9, 'm7', (n) => `${n.to} é o relativo menor: continua no repouso.`, { from: 'c' }),
   S(4, 'm7', (n) => `${n.to} é o iii: outro relativo, continua relaxado.`, { from: 'c' }),

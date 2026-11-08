@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConstellationPage } from '../src/pages/ConstellationPage.tsx';
 import { StudyHome } from '../src/pages/StudyHome.tsx';
-import * as route from '../src/constellation/route.ts';
 import { choose } from './choose.ts';
 
 const play = vi.fn();
@@ -12,10 +11,6 @@ vi.mock('../src/study/widgets.tsx', async (orig) => ({
   ...(await orig<typeof import('../src/study/widgets.tsx')>()),
   useStudySynth: () => ({ play, stop: vi.fn(), playing: null }),
 }));
-vi.mock('../src/constellation/route.ts', async (orig) => {
-  const real = await orig<typeof import('../src/constellation/route.ts')>();
-  return { ...real, suggestRoute: vi.fn(real.suggestRoute) };
-});
 
 const open = () =>
   render(
@@ -30,17 +25,14 @@ const startAtC = async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Começar' }));
   await userEvent.click(screen.getByRole('button', { name: /Abrir os caminhos de C7M/ }));
 };
-/** First tap selects, second tap walks (touch-like: no hover). */
+const star = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name.replace(/[()]/g, '\\$&')}, `) });
+/** First tap selects (touch-like: no hover), then "Ir" walks with the suggested type. */
 const goTo = async (name: string) => {
-  const star = screen.getByRole('button', { name: new RegExp(`^${name.replace(/[()]/g, '\\$&')}, `) });
-  await userEvent.pointer({ keys: '[TouchA]', target: star });
+  await userEvent.pointer({ keys: '[TouchA]', target: star(name) });
   await userEvent.click(screen.getByRole('button', { name: 'Ir' }));
 };
 
-beforeEach(() => {
-  play.mockClear();
-  vi.mocked(route.suggestRoute).mockClear();
-});
+beforeEach(() => play.mockClear());
 
 describe('Constelação de acordes page', () => {
   it('starts from a chosen chord and opens its orbit on tap', async () => {
@@ -53,83 +45,53 @@ describe('Constelação de acordes page', () => {
     expect(within(screen.getByRole('group', { name: /Constelação/ })).getAllByRole('button').length).toBeGreaterThanOrEqual(6);
   });
 
+  it('starts from Db', async () => {
+    open();
+    await choose('Fundamental', 'Db');
+    await userEvent.click(screen.getByRole('button', { name: 'Começar' }));
+    expect(screen.getByRole('button', { name: /Abrir os caminhos de Db7M/ })).toBeInTheDocument();
+  });
+
   it('walking writes one short line per step in the path diary', async () => {
     await startAtC();
     await goTo('Dm7');
     await goTo('G7');
-    const diary = screen.getByRole('list', { name: 'Caminho' });
     expect(screen.getByTestId('progression')).toHaveTextContent('C7M → Dm7 → G7');
-    expect(within(diary).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(screen.getByRole('list', { name: 'Caminho' })).getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('the diary shows the pattern of motions', async () => {
+    await startAtC();
+    await goTo('Am7');
+    await goTo('G7');
+    await goTo('C7M');
+    expect(screen.getByTestId('pattern')).toHaveTextContent('relaxa → tensiona → resolve');
+  });
+
+  it('the balloon lists the types of the chosen root with a hint, and choosing one only selects', async () => {
+    await startAtC();
+    await userEvent.pointer({ keys: '[TouchA]', target: star('G7') });
+    const balloon = screen.getByRole('dialog', { name: /G/ });
+    expect(within(balloon).getByRole('radio', { name: /^G7,/ })).toBeChecked();
+    await userEvent.click(within(balloon).getByRole('radio', { name: /^G7\(b9\)/ }));
+    expect(within(balloon).getByRole('radio', { name: /^G7\(b9\)/ })).toBeChecked();
+    expect(within(balloon).getByText(/tensão escura/)).toBeInTheDocument();
+    expect(play).toHaveBeenLastCalledWith(expect.any(String), expect.any(Array));
+    expect(screen.getByTestId('progression')).toHaveTextContent(/^C7M$/);
+    await userEvent.click(within(balloon).getByRole('button', { name: 'Ir' }));
+    expect(screen.getByTestId('progression')).toHaveTextContent('C7M → G7(b9)');
+    // The dark color asks for the minor resolution first.
+    expect(screen.getByRole('button', { name: 'Cm7, resolve' })).toBeInTheDocument();
   });
 
   it('plays the chord when selecting and the whole trail on demand', async () => {
     await startAtC();
-    await userEvent.pointer({ keys: '[TouchA]', target: screen.getByRole('button', { name: /^Dm7, / }) });
+    await userEvent.pointer({ keys: '[TouchA]', target: star('Dm7') });
     expect(play).toHaveBeenLastCalledWith(expect.any(String), expect.any(Array));
     await userEvent.click(screen.getByRole('button', { name: 'Ir' }));
     await userEvent.click(screen.getByRole('button', { name: 'Ouvir o caminho' }));
     const events = play.mock.lastCall![1] as { time: number }[];
     expect(new Set(events.map((e) => e.time)).size).toBe(2);
-  });
-
-  it('target mode suggests a route and recalculates after a detour', async () => {
-    await startAtC();
-    await choose('Alvo: fundamental', 'Bb');
-    await choose('Alvo: tipo', 'Sétima maior');
-    expect(screen.getByTestId('suggestion')).toHaveTextContent(/Bb7M$/);
-    const calls = vi.mocked(route.suggestRoute).mock.calls.length;
-    await goTo('Am7');
-    expect(vi.mocked(route.suggestRoute).mock.calls.length).toBeGreaterThan(calls);
-    expect(screen.getByTestId('suggestion')).toHaveTextContent(/^Sugestão até Bb7M: Am7 →/);
-  });
-
-  it('says so when the target is the current chord or unreachable', async () => {
-    await startAtC();
-    await choose('Alvo: fundamental', 'C');
-    await choose('Alvo: tipo', 'Sétima maior');
-    expect(screen.getByTestId('suggestion')).toHaveTextContent('Você já está em C7M.');
-    vi.mocked(route.suggestRoute).mockReturnValueOnce(null);
-    await choose('Alvo: fundamental', 'F#');
-    expect(screen.getByTestId('suggestion')).toHaveTextContent('Não encontrei um caminho até F#7M em 8 passos.');
-  });
-
-  it('reset clears the trail back to the starting chord', async () => {
-    await startAtC();
-    await goTo('Dm7');
-    await goTo('G7');
-    await userEvent.click(screen.getByRole('button', { name: 'Recomeçar' }));
-    expect(screen.getByTestId('progression')).toHaveTextContent(/^C7M$/);
-  });
-
-  it('is reachable from the Estudo home', () => {
-    render(
-      <MemoryRouter>
-        <StudyHome />
-      </MemoryRouter>,
-    );
-    const link = screen.getByRole('link', { name: /Constelação/ });
-    expect(link).toHaveAttribute('href', '/estudo/constelacao');
-    expect(link).toHaveTextContent('Explore caminhos de rearmonização');
-  });
-});
-
-describe('Constelação: review fixes', () => {
-  it('target mode explains every suggested step', async () => {
-    await startAtC();
-    await choose('Alvo: fundamental', 'Bb');
-    await choose('Alvo: tipo', 'Sétima maior');
-    const steps = within(screen.getByRole('list', { name: 'Passos sugeridos' })).getAllByRole('listitem');
-    expect(steps.length).toBeGreaterThanOrEqual(2);
-    for (const s of steps) expect(s.textContent!.length).toBeGreaterThan(15);
-  });
-
-  it('offers only target types the constellation can reach', async () => {
-    await startAtC();
-    await userEvent.click(screen.getByLabelText('Alvo: tipo'));
-    const options = screen.getAllByRole('option').map((o) => o.textContent);
-    expect(options.some((o) => o!.startsWith('Maior'))).toBe(false);
-    expect(options.some((o) => o!.startsWith('Sétima com quarta'))).toBe(false);
-    expect(options.some((o) => o!.startsWith('Sétima maior'))).toBe(true);
   });
 
   it('lets keyboard users go back to an earlier chord from the diary', async () => {
@@ -141,10 +103,28 @@ describe('Constelação: review fixes', () => {
     expect(screen.getByTestId('progression')).not.toHaveTextContent('G7');
   });
 
-  it('starts from Db', async () => {
-    open();
-    await choose('Fundamental', 'Db');
-    await userEvent.click(screen.getByRole('button', { name: 'Começar' }));
-    expect(screen.getByRole('button', { name: /Abrir os caminhos de Db7M/ })).toBeInTheDocument();
+  it('reset clears the trail back to the starting chord', async () => {
+    await startAtC();
+    await goTo('Dm7');
+    await goTo('G7');
+    await userEvent.click(screen.getByRole('button', { name: 'Recomeçar' }));
+    expect(screen.getByTestId('progression')).toHaveTextContent(/^C7M$/);
+  });
+
+  it('has no target mode', async () => {
+    await startAtC();
+    expect(screen.queryByLabelText(/Alvo/)).toBeNull();
+    expect(screen.queryByText(/Chegar em um acorde/)).toBeNull();
+  });
+
+  it('is reachable from the Estudo home', () => {
+    render(
+      <MemoryRouter>
+        <StudyHome />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: /Constelação/ });
+    expect(link).toHaveAttribute('href', '/estudo/constelacao');
+    expect(link).toHaveTextContent('Explore caminhos de rearmonização');
   });
 });
