@@ -1,3 +1,4 @@
+import { isIOS } from './ios.ts';
 import { MODELS, type ModelId, SEPARATION_GEOMETRY, STEM_MODES, type StemMode, modelVersion, toStereoPlanar } from '@will-music/engine';
 import type { SeparationResponse, SeparationTracks } from '../worker/separationProtocol.ts';
 import { type StemName, type StemsRecord, db, now } from './db.ts';
@@ -9,6 +10,9 @@ export const NO_WEBGPU = 'A separação de faixas precisa de um navegador com We
 export type SeparationProgress = { stage: 'models' | 'separate'; done: number; total: number };
 
 /** What each separation type gives, what it downloads the first time, and roughly how long it takes. */
+/** The 4/6-track model (285 MB) usually runs out of memory in Safari on iPhone and iPad: warn before separating. */
+export const heavyOnThisDevice = (mode: StemMode): boolean => isIOS() && MODE_INFO[mode].models.includes('demucs6s');
+
 export const MODE_INFO: Record<StemMode, { label: string; description: string; models: ModelId[]; downloadBytes: number; effort: string }> = (() => {
   const bytes = (ids: ModelId[]) => ids.reduce((sum, id) => sum + MODELS[id].bytes, 0);
   const kara2: ModelId[] = ['kara2Core', 'kara2Data'];

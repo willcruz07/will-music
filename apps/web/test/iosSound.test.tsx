@@ -31,3 +31,16 @@ describe('sound on iPhone', () => {
     expect(() => preferPlayback()).not.toThrow();
   });
 });
+
+describe('heavy separation on iPhone and iPad', () => {
+  it('flags the 4/6-track modes (285 MB model) as heavy on iOS only', async () => {
+    const { heavyOnThisDevice } = await import('../src/lib/stems.ts');
+    asIphone();
+    expect(heavyOnThisDevice('six')).toBe(true);
+    expect(heavyOnThisDevice('four')).toBe(true);
+    expect(heavyOnThisDevice('vocals')).toBe(false);
+    vi.restoreAllMocks();
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130');
+    expect(heavyOnThisDevice('six')).toBe(false);
+  });
+});

@@ -3,7 +3,7 @@ import { Download, Layers, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatBytes, requestPersistence, storageStatus } from '../../lib/storage.ts';
 import { downloadBlob } from '../../lib/download.ts';
-import { MODE_INFO, availableModes } from '../../lib/stems.ts';
+import { MODE_INFO, availableModes, heavyOnThisDevice } from '../../lib/stems.ts';
 import type { StemsState } from '../../lib/useStems.ts';
 import { Button } from '../../ui/Button.tsx';
 import { confirmDialog } from '../../ui/Dialog.tsx';
@@ -87,6 +87,9 @@ export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; titl
               </span>
               <span className="mt-1 block text-xs text-muted-foreground">{info.description}</span>
               {!done && <span className="mt-1 block text-xs text-muted-foreground">Leva {info.effort}.</span>}
+              {!done && heavyOnThisDevice(mode) && (
+                <span className="mt-1 block text-xs text-danger">Pesado para iPhone e iPad: pode fechar o app. Prefira separar no computador e trazer a música pelo pacote.</span>
+              )}
             </button>
           </li>
         );
