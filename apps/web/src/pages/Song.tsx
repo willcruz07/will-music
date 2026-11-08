@@ -2,7 +2,7 @@ import { ArrowLeft, FileText, Info, Minus, MonitorPlay, Music4, Pencil, Plus, Re
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
-import { AnalysisProgress } from '../components/AnalysisProgress.tsx';
+import { AnalysisProgress, LyricsSkeleton, TranscribingBar } from '../components/AnalysisProgress.tsx';
 import { ChartView } from '../components/ChartView.tsx';
 import { LyricsPanel } from '../components/LyricsPanel.tsx';
 import { chartLineStarts, lyricTexts } from '../lib/lineTimes.ts';
@@ -62,13 +62,22 @@ export const Song = () => {
   }, [id]);
 
   // Follows the analysis through the module-level job registry, so leaving and reopening the page keeps showing it.
+  // Once only the lyrics are left (the chart with the chords is saved), the chords show while Whisper listens.
+  const chartShown = useRef(false);
   const follow = useCallback(
     () =>
       subscribeAnalysis(id, (event) => {
         if (event === 'done') {
+          chartShown.current = false;
           setProgress(null);
           void load();
-        } else setProgress(event);
+          return;
+        }
+        if (event.lyricsPending && !chartShown.current) {
+          chartShown.current = true;
+          void load();
+        }
+        setProgress(event);
       }),
     [id, load],
   );
@@ -121,6 +130,9 @@ export const Song = () => {
     setChart({ ...chart, ...patch });
     await db.charts.update(chart.id, { ...patch, updatedAt: new Date().toISOString() });
   };
+
+  const lyricsPending = !!progress?.lyricsPending;
+  const showChart = !progress || lyricsPending;
 
   const shownKey = useMemo(() => (song?.key ? transposeKey(song.key, chart?.transpose ?? 0) : undefined), [song?.key, chart?.transpose]);
 
@@ -275,7 +287,8 @@ export const Song = () => {
         </ScrollStrip>
       )}
 
-      {progress && <AnalysisProgress progress={progress} />}
+      {progress && !lyricsPending && <AnalysisProgress progress={progress} />}
+      {progress && lyricsPending && <TranscribingBar progress={progress} />}
 
       {!progress && song.analysisStatus === 'error' && (
         <div className="mt-8 max-w-lg rounded-lg border border-danger/40 p-4">
@@ -334,7 +347,9 @@ export const Song = () => {
         </div>
       )}
 
-      {chart && !progress && (
+      {chart && lyricsPending && <LyricsSkeleton />}
+
+      {chart && showChart && (
         <div className={`mt-6 ${syncing ? 'cursor-pointer select-none' : ''}`} onClick={syncing ? syncMode.mark : undefined}>
           <ChartView
             chordPro={chart.chordPro}
@@ -351,7 +366,7 @@ export const Song = () => {
 
       {help && <ChordHelp chord={help.chord} anchor={help.anchor} onClose={closeHelp} />}
 
-      {chart && !progress && <ChordPanel chordPro={chart.chordPro} transpose={chart.transpose} spellKey={shownKey} />}
+      {chart && showChart && <ChordPanel chordPro={chart.chordPro} transpose={chart.transpose} spellKey={shownKey} />}
 
       {audioUrl && currentRaw && showCurrent && (
         <div className="glass fixed right-4 z-30 rounded-xl border border-border p-3 shadow-sm bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+9rem)] lg:bottom-28">

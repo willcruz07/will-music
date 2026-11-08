@@ -2,7 +2,7 @@ import type { WhisperRequest, WhisperResponse } from '../worker/whisper.worker.t
 import { db } from './db.ts';
 import { notifyModelsChanged } from './modelsReminder.ts';
 import { findVoiceTracks, getStems } from './stems.ts';
-import { type WhisperChunk, isUsefulTranscript, leadingSilence, transcriptToLines, wordsToSegments } from './transcript.ts';
+import { type TranscribeProgress, type WhisperChunk, isUsefulTranscript, leadingSilence, transcriptToLines, wordsToSegments } from './transcript.ts';
 import type { LyricLine } from './db.ts';
 import { type WhisperDevice, detectWhisperDevice, whisperModelFor } from './whisperModel.ts';
 
@@ -19,12 +19,18 @@ const decodeMono16k = async (blob: Blob): Promise<Float32Array> => {
   return out;
 };
 
-const runWhisper = (audio: Float32Array, onProgress: (loaded: number, total: number) => void): Promise<{ chunks: WhisperChunk[]; device: string; words: boolean }> =>
+const runWhisper = (
+  audio: Float32Array,
+  cached: boolean,
+  onProgress: (p: TranscribeProgress) => void,
+): Promise<{ chunks: WhisperChunk[]; device: string; words: boolean }> =>
   new Promise((resolve, reject) => {
     const worker = new Worker(new URL('../worker/whisper.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (event: MessageEvent<WhisperResponse>) => {
       const msg = event.data;
-      if (msg.type === 'progress') return onProgress(msg.loaded, msg.total);
+      // A model already on the device also reports file progress while it is read: that is not a download.
+      if (msg.type === 'progress') return onProgress(cached ? { stage: 'load' } : { stage: 'download', loaded: msg.loaded, total: msg.total });
+      if (msg.type === 'transcribing') return onProgress({ stage: 'listen', done: msg.done, total: msg.total, heard: msg.heard });
       worker.terminate();
       if (msg.type === 'result') resolve(msg);
       else reject(new Error(msg.type === 'error' ? msg.message : 'A transcrição falhou.'));
@@ -76,8 +82,10 @@ export const preloadWhisper = (onProgress: (loaded: number, total: number) => vo
 /** Transcribes the song (separated vocals when available) into timed lyric lines; throws when nothing useful is heard. */
 export const transcribeSong = async (
   songId: string,
-  onProgress: (loaded: number, total: number) => void,
+  onProgress: (p: TranscribeProgress) => void,
 ): Promise<{ lines: LyricLine[]; usedVocals: boolean }> => {
+  const cached = await whisperCached();
+  onProgress(cached ? { stage: 'load' } : { stage: 'download', loaded: 0, total: 0 });
   const stems = await getStems(songId);
   const vocalTracks = findVoiceTracks(stems);
   let audio: Float32Array;
@@ -92,7 +100,7 @@ export const transcribeSong = async (
   }
   // Skip the silent intro: Whisper tends to loop on a made-up phrase over silence. Timestamps are shifted back.
   const offset = leadingSilence(audio, RATE);
-  const { chunks: raw, words } = await runWhisper(offset ? audio.slice(Math.round(offset * RATE)) : audio, onProgress);
+  const { chunks: raw, words } = await runWhisper(offset ? audio.slice(Math.round(offset * RATE)) : audio, cached, onProgress);
   const chunks = words ? wordsToSegments(raw) : raw;
   const lines = transcriptToLines(chunks.map((c) => ({
     text: c.text,

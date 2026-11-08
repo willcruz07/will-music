@@ -121,3 +121,37 @@ export const wordsToSegments = (words: readonly WhisperChunk[]): WhisperChunk[] 
   return out;
 };
 
+/** How many 30 s windows (5 s overlap each side, so 20 s apart) the pipeline cuts the audio into. */
+export const windowCount = (samples: number, rate: number): number => {
+  const window = rate * 30;
+  const jump = window - 2 * rate * 5;
+  let count = 0;
+  for (let offset = 0; ; offset += jump) {
+    count++;
+    if (offset + window >= samples) return count;
+  }
+};
+
+/** What the transcription is doing: downloading the model, opening the one already on the device, or listening. */
+export type TranscribeProgress =
+  | { stage: 'download'; loaded: number; total: number }
+  | { stage: 'load' }
+  | { stage: 'listen'; done: number; total: number; heard: string };
+
+const MB = (bytes: number) => `${Math.round(bytes / 1e6)} MB`;
+
+/** Label, bar fraction and the latest words heard (proof it is not stuck) for a transcription step. */
+export const describeTranscription = (p: TranscribeProgress): { label: string; fraction?: number; detail?: string } => {
+  if (p.stage === 'download') {
+    return p.total
+      ? { label: `Baixando o modelo da letra (${MB(p.loaded)} de ${MB(p.total)})`, fraction: p.loaded / p.total }
+      : { label: 'Baixando o modelo da letra' };
+  }
+  if (p.stage === 'load') return { label: 'Preparando o modelo da letra' };
+  const part = Math.min(p.done + 1, p.total);
+  return {
+    label: p.done >= p.total ? 'Transcrevendo a letra: finalizando' : `Transcrevendo a letra: trecho ${part} de ${p.total}`,
+    fraction: p.total ? p.done / p.total : undefined,
+    detail: p.heard ? `“…${p.heard}”` : undefined,
+  };
+};

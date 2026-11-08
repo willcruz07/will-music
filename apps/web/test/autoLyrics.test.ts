@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createSong, db } from '../src/lib/db.ts';
-import { runPipeline } from '../src/lib/pipeline.ts';
+import { type PipelineProgress, runPipeline } from '../src/lib/pipeline.ts';
 import * as lrclib from '../src/lib/lrclib.ts';
 import * as whisper from '../src/lib/whisper.ts';
 
@@ -22,10 +22,18 @@ beforeEach(async () => {
 describe('an audio always ends up with chords and lyrics', () => {
   it('transcribes the lyrics with Whisper when the lyrics search finds nothing', async () => {
     const song = await createSong({ title: 'Inédita', artist: 'Banda', durationSec: 8 }, new Blob(['x'], { type: 'audio/mpeg' }));
-    const labels: string[] = [];
-    await runPipeline(song.id, (p) => labels.push(p.label));
+    let chartWhileListening: unknown;
+    vi.mocked(whisper.transcribeSong).mockImplementationOnce(async (id, onProgress) => {
+      chartWhileListening = await db.charts.where('songId').equals(id).first();
+      onProgress({ stage: 'listen', done: 1, total: 3, heard: 'olha que coisa' });
+      return { lines: [{ start: 0, text: 'Olha que coisa mais linda' }], usedVocals: false };
+    });
+    const events: PipelineProgress[] = [];
+    await runPipeline(song.id, (p) => events.push(p));
     expect(whisper.transcribeSong).toHaveBeenCalledWith(song.id, expect.any(Function));
-    expect(labels.some((l) => /letra/i.test(l) && /Transcrev/i.test(l))).toBe(true);
+    // The chart with the chords is saved before Whisper starts, so the song page can show it meanwhile.
+    expect(chartWhileListening).toBeDefined();
+    expect(events.at(-1)).toEqual({ label: 'Transcrevendo a letra: trecho 2 de 3', fraction: 1 / 3, detail: '“…olha que coisa”', lyricsPending: true });
     const chart = await db.charts.where('songId').equals(song.id).first();
     expect(chart!.chordPro).toContain('Olha que coisa mais linda');
   });

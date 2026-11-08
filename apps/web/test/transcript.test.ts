@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUsefulTranscript, leadingSilence, transcriptToLines, wordsToSegments } from '../src/lib/transcript.ts';
+import { describeTranscription, isUsefulTranscript, leadingSilence, transcriptToLines, windowCount, wordsToSegments } from '../src/lib/transcript.ts';
 
 describe('whisper transcript', () => {
   it('turns whisper chunks into timed lines', () => {
@@ -91,5 +91,24 @@ describe('word timestamps to lines', () => {
     expect(segments.length).toBeGreaterThan(1);
     for (const s of segments) expect(s.text.length).toBeLessThanOrEqual(45);
     expect(segments[1]!.timestamp[0]).toBe(words[segments[0]!.text.split(' ').length]!.timestamp[0]);
+  });
+});
+
+describe('transcription progress', () => {
+  it('counts the 30 s windows the pipeline cuts (20 s apart)', () => {
+    expect(windowCount(16000 * 25, 16000)).toBe(1);
+    expect(windowCount(16000 * 30, 16000)).toBe(1);
+    expect(windowCount(16000 * 31, 16000)).toBe(2);
+    expect(windowCount(16000 * 180, 16000)).toBe(9);
+  });
+
+  it('a model already on the device is "preparing", not downloading', () => {
+    expect(describeTranscription({ stage: 'load' })).toEqual({ label: 'Preparando o modelo da letra' });
+    expect(describeTranscription({ stage: 'download', loaded: 40e6, total: 80e6 })).toEqual({ label: 'Baixando o modelo da letra (40 MB de 80 MB)', fraction: 0.5 });
+  });
+
+  it('shows which part is being listened to and the latest words', () => {
+    expect(describeTranscription({ stage: 'listen', done: 0, total: 9, heard: '' })).toEqual({ label: 'Transcrevendo a letra: trecho 1 de 9', fraction: 0, detail: undefined });
+    expect(describeTranscription({ stage: 'listen', done: 9, total: 9, heard: 'aleluia' })).toEqual({ label: 'Transcrevendo a letra: finalizando', fraction: 1, detail: '“…aleluia”' });
   });
 });
