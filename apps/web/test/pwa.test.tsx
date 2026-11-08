@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { InstallApp, InstallBanner, InstallButton, UpdateBanner } from '../src/components/PwaPrompts.tsx';
+import { InstallApp, InstallBanner, UpdateBanner } from '../src/components/PwaPrompts.tsx';
 import { notifyNeedRefresh, notifyOfflineReady, resetPwaState } from '../src/lib/pwa.ts';
 import { applyThemePref, setThemePref } from '../src/lib/theme.ts';
 
@@ -100,28 +100,11 @@ describe('install banner', () => {
     expect(persist).toHaveBeenCalled();
   });
 
-  it('keeps an install button next to the theme toggle and installs when the browser allows it', async () => {
-    render(<InstallButton />);
-    const prompt = offer();
-    await userEvent.click(screen.getByRole('button', { name: /Instalar app/ }));
-    expect(prompt).toHaveBeenCalled();
-  });
-
-  it('explains how to install when the browser offers no prompt', async () => {
-    render(<InstallButton />);
-    await userEvent.click(screen.getByRole('button', { name: /Instalar app/ }));
-    expect(screen.getByRole('dialog', { name: /Instalar o will-music/ })).toBeInTheDocument();
-    expect(screen.getAllByText(/menu do navegador/).length).toBeGreaterThan(0);
-    await userEvent.click(screen.getByRole('button', { name: 'Fechar' }));
-    expect(screen.queryByRole('dialog')).toBeNull();
-  });
-
-  it('sits in the header next to the theme toggle', async () => {
+  it('is not in the header (the installed app would not need it)', async () => {
     const { App } = await import('../src/App.tsx');
     const { MemoryRouter } = await import('react-router');
     render(<MemoryRouter><App /></MemoryRouter>);
-    const install = await screen.findByRole('button', { name: /Instalar app/ });
-    const theme = screen.getByRole('button', { name: /Usar tema/ });
-    expect(install.parentElement!.nextElementSibling).toBe(theme);
+    await screen.findByText('will-music');
+    expect(screen.queryByRole('button', { name: /Instalar app/ })).toBeNull();
   });
 });

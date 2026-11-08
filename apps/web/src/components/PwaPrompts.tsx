@@ -97,36 +97,3 @@ const InstallSteps = () =>
       <p className="mt-2">No Android: menu do navegador → “Instalar app” ou “Adicionar à tela inicial”.</p>
     </>
   );
-
-/** Install button for the top bar, next to the theme toggle. Installs directly when the browser allows it, otherwise shows the steps. */
-export const InstallButton = () => {
-  const { canInstall, install } = useInstallPrompt();
-  const [open, setOpen] = useState(false);
-  if (isStandalone()) return null;
-  return (
-    <span className="relative">
-      <button
-        type="button"
-        aria-label="Instalar app"
-        title="Instalar o will-music neste aparelho"
-        onClick={() => (canInstall ? void install() : setOpen((v) => !v))}
-        className="inline-flex size-10 items-center justify-center gap-1.5 rounded-lg text-foreground hover:bg-muted md:w-auto md:rounded-full md:border md:border-border md:px-3 md:text-sm"
-      >
-        <MonitorDown className="size-5 md:size-4" />
-        <span className="hidden md:inline">Instalar app</span>
-      </button>
-      {open && (
-        <div role="dialog" aria-label="Instalar o will-music" className="absolute right-0 top-12 z-40 w-72 rounded-xl border border-border bg-surface p-4 text-sm shadow-[0_12px_40px_-16px_rgb(0_0_0/0.5)]">
-          <p className="font-semibold">Instalar o will-music</p>
-          <div className="mt-2 text-muted-foreground">
-            <InstallSteps />
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">Instalado, abre em tela cheia, funciona sem internet e o navegador protege seus dados.</p>
-          <Button variant="ghost" className="mt-2 min-h-9 px-3" onClick={() => setOpen(false)}>
-            Fechar
-          </Button>
-        </div>
-      )}
-    </span>
-  );
-};

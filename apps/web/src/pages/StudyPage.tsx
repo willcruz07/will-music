@@ -15,7 +15,7 @@ const TABS: { id: Tab; aba: string; label: string }[] = [
   { id: 'chords', aba: 'acordes', label: 'Acordes' },
   { id: 'theory', aba: 'formacao', label: 'Formação' },
   { id: 'scales', aba: 'escalas', label: 'Escalas e campo harmônico' },
-  { id: 'circle', aba: 'ciclo', label: 'Ciclo de quintas' },
+  { id: 'circle', aba: 'ciclo', label: 'Ciclo de quintas e quartas' },
   { id: 'progressions', aba: 'progressoes', label: 'Progressões' },
   { id: 'fretboard', aba: 'braco', label: 'Escalas no braço' },
   { id: 'ear', aba: 'intervalos', label: 'Treino de ouvido' },
@@ -448,7 +448,7 @@ export const StudyPage = () => {
           <Mic className="size-4" /> Afinador e microfone
         </Link>
       </div>
-      <p className="mt-2 max-w-2xl text-muted-foreground">Acordes no violão, no teclado e no cavaquinho, formação, campo harmônico, ciclo de quintas, progressões, escalas no braço e treino de ouvido.</p>
+      <p className="mt-2 max-w-2xl text-muted-foreground">Acordes no violão, no teclado e no cavaquinho, formação, campo harmônico, ciclo de quintas e quartas, progressões, escalas no braço e treino de ouvido.</p>
       <ScrollStrip className="mt-4" role="tablist" label="Assunto" selected={tab} onKeyDown={rovingKeys} innerClassName="rounded-xl border border-border bg-surface p-1">
           {TABS.map((t) => (
             <button

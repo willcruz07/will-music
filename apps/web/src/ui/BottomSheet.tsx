@@ -13,7 +13,7 @@ export const BottomSheet = ({
   children,
   initialFocus,
   hideTitle = false,
-  panelClassName = '',
+  size = 'default',
 }: {
   title: string;
   onClose: () => void;
@@ -21,7 +21,8 @@ export const BottomSheet = ({
   initialFocus?: (panel: HTMLElement) => HTMLElement | null | undefined;
   /** Keep the title for screen readers only (the content shows its own heading). */
   hideTitle?: boolean;
-  panelClassName?: string;
+  /** `wide`: taller, and much wider on desktop (content sheets like Sobre); `default` fits a list of options. */
+  size?: 'default' | 'wide';
 }) => {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
@@ -90,7 +91,7 @@ export const BottomSheet = ({
         aria-modal="true"
         aria-labelledby={titleId}
         style={dragY ? { transform: `translateY(${dragY}px)`, transition: 'none' } : undefined}
-        className={`sheet-panel absolute inset-x-0 bottom-0 mx-auto flex max-h-[80dvh] w-full max-w-lg flex-col rounded-t-3xl border border-b-0 border-border bg-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-16px_48px_-12px_rgb(0_0_0/0.5)] transition-transform ${panelClassName}`}
+        className={`sheet-panel absolute inset-x-0 bottom-0 mx-auto flex w-full flex-col rounded-t-3xl border border-b-0 border-border bg-surface pb-[env(safe-area-inset-bottom)] shadow-[0_-16px_48px_-12px_rgb(0_0_0/0.5)] transition-transform ${size === 'wide' ? 'max-h-[92dvh] max-w-lg md:max-w-4xl' : 'max-h-[80dvh] max-w-lg'}`}
       >
         <div className="touch-none cursor-grab px-4 pt-2.5" onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp} onPointerCancel={onHandleUp}>
           <div aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-muted-foreground/40" />

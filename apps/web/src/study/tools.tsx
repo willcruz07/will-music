@@ -137,7 +137,7 @@ export const CircleOfFifths = ({ onChord }: { onChord: (chord: string) => void }
   return (
     <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,22rem)_1fr]">
       <div>
-        <h2 className="text-xl font-semibold">Ciclo de quintas</h2>
+        <h2 className="text-xl font-semibold">Ciclo de quintas e quartas</h2>
         <p className="mt-1 text-sm text-muted-foreground">No sentido horário cada tom fica uma quinta acima (ganha um sustenido); no anti-horário, uma quarta acima (ganha um bemol). Dentro, o relativo menor.</p>
         <div role="radiogroup" aria-label="Tom no ciclo" className="relative mx-auto mt-4 aspect-square w-full max-w-[20rem]" onKeyDown={rovingKeys}>
           <div className="absolute inset-[12%] rounded-full border border-border" aria-hidden />

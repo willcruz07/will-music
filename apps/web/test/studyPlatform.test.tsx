@@ -98,7 +98,7 @@ describe('lesson page', () => {
 describe('study tools', () => {
   it('opens the tab asked for in the link', () => {
     open('/estudo/ferramentas?aba=ciclo');
-    expect(screen.getByRole('tab', { name: 'Ciclo de quintas' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Ciclo de quintas e quartas' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('shows the key signature and relative minor on the circle of fifths', async () => {

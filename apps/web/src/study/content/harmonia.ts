@@ -164,7 +164,7 @@ export const HARMONIA: Lesson[] = [
       t('Subindo de **quinta em quinta** (C, G, D, A, E, B, F#…), cada tom novo ganha um sustenido. Subindo de **quarta em quarta** (C, F, Bb, Eb, Ab…), cada tom ganha um bemol. Depois de 12 passos você volta ao início: é um **ciclo**.'),
       { kind: 'list', items: ['**Vizinhos no ciclo** são tons próximos: modular de C para G ou F é suave.', '**No sentido das quartas** está o movimento de resolução (V → I): G7 → C, C7 → F… Por isso músicas e estudos de jazz percorrem o ciclo de quartas.', '**O relativo menor** de cada tom fica ao lado no círculo interno (C/Am, G/Em…).'] },
       { kind: 'progression', name: 'Dominantes em cadeia pelo ciclo de quartas', degrees: ['V7/ii', 'V7/V', 'V7', 'I'], key: 'C', caption: 'A7 → D7 → G7 → C: cada dominante resolve no próximo.' },
-      { kind: 'tip', text: 'Use a ferramenta **Ciclo de quintas** (em Ferramentas) para ver as armaduras e o campo harmônico de cada tom.' },
+      { kind: 'tip', text: 'Use a ferramenta **Ciclo de quintas e quartas** (em Ferramentas) para ver as armaduras e o campo harmônico de cada tom.' },
     ],
   },
   {

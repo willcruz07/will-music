@@ -119,7 +119,7 @@ export const Library = () => {
       </ul>
       {songs && songs.length > 0 && visible.length === 0 && <p className="mt-6 text-muted-foreground">Nenhuma música encontrada para “{query}”.</p>}
 
-      <AboutButton />
+      <AboutButton autoOpenOnce />
     </section>
   );
 };
