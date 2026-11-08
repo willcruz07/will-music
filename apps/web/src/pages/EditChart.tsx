@@ -242,7 +242,7 @@ export const EditChart = () => {
 
   return (
     <section>
-      <Link to={`/musica/${id}`} className="-ml-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link to={`/musica/${id}`} className="-ml-1 inline-flex items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
         <ArrowLeft className="size-4" /> {song.title}
       </Link>
       <div className="mt-3 flex flex-wrap items-center gap-2">

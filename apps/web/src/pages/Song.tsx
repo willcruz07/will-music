@@ -170,7 +170,7 @@ export const Song = () => {
 
   return (
     <section>
-      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
         <ArrowLeft className="size-4" /> Biblioteca
       </Link>
 

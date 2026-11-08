@@ -127,14 +127,14 @@ export const StudyHome = () => {
 const NotFound = ({ what }: { what: string }) => (
   <section>
     <p className="text-lg font-semibold">{what} não encontrada.</p>
-    <Link to="/estudo" className="mt-2 inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline">
+    <Link to="/estudo" className="mt-2 inline-flex items-center gap-1 font-semibold text-chord underline-offset-2 hover:underline">
       <ArrowLeft className="size-4" /> Voltar para o Estudo
     </Link>
   </section>
 );
 
 const BackLink = ({ to, label }: { to: string; label: string }) => (
-  <Link to={to} className="inline-flex min-h-10 items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+  <Link to={to} className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
     <ArrowLeft className="size-4" /> {label}
   </Link>
 );

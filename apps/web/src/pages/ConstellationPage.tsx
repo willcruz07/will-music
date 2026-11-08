@@ -68,7 +68,7 @@ export const ConstellationPage = () => {
   if (!web) {
     return (
       <section className="max-w-xl">
-        <Link to="/estudo" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/estudo" className="inline-flex items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
           <ArrowLeft className="size-4" /> Estudo
         </Link>
         <h1 className="mt-2 flex items-center gap-2 text-3xl font-bold tracking-tight">
