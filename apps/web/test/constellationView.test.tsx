@@ -134,3 +134,47 @@ describe('the trail in the colors of its actions', () => {
     for (const t of ['Resolver', 'Tensionar', 'Tensão alterada', 'Relaxar']) expect(screen.getByText(t)).toBeInTheDocument();
   });
 });
+
+describe('ConstellationView zoom', () => {
+  const zoomValue = () => Number((screen.getByRole('slider', { name: 'Zoom' }) as HTMLInputElement).value);
+
+  it('the zoom bar zooms in and out and centers back on the chord', async () => {
+    render(<ConstellationView web={web()} selected={null} {...handlers()} />);
+    const start = zoomValue();
+    await userEvent.click(screen.getByRole('button', { name: 'Aumentar o zoom' }));
+    expect(zoomValue()).toBeGreaterThan(start);
+    await userEvent.click(screen.getByRole('button', { name: 'Diminuir o zoom' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Diminuir o zoom' }));
+    expect(zoomValue()).toBeLessThan(start);
+    await userEvent.click(screen.getByRole('button', { name: 'Centralizar no acorde' }));
+    expect(zoomValue()).toBe(start);
+  });
+
+  it('the slider sets the zoom', () => {
+    render(<ConstellationView web={web()} selected={null} {...handlers()} />);
+    fireEvent.change(screen.getByRole('slider', { name: 'Zoom' }), { target: { value: '90' } });
+    expect(zoomValue()).toBe(90);
+  });
+
+  it('pinching with two fingers zooms (spreading in, closing out)', () => {
+    render(<ConstellationView web={web()} selected={null} {...handlers()} />);
+    const svg = screen.getByRole('group', { name: /Constelação/ }).closest('svg')!;
+    const start = zoomValue();
+    const touch = (type: 'pointerDown' | 'pointerMove' | 'pointerUp', id: number, x: number) => fireEvent[type](svg, { pointerId: id, pointerType: 'touch', clientX: x, clientY: 200 });
+    touch('pointerDown', 1, 200);
+    touch('pointerDown', 2, 260);
+    touch('pointerMove', 2, 280); // past the tap slop: the pinch starts here
+    touch('pointerMove', 2, 340);
+    touch('pointerMove', 1, 140);
+    expect(zoomValue()).toBeGreaterThan(start);
+    touch('pointerUp', 1, 140);
+    touch('pointerUp', 2, 340);
+    const spread = zoomValue();
+    touch('pointerDown', 1, 100);
+    touch('pointerDown', 2, 400);
+    touch('pointerMove', 2, 380);
+    touch('pointerMove', 2, 300);
+    touch('pointerMove', 1, 200);
+    expect(zoomValue()).toBeLessThan(spread);
+  });
+});
