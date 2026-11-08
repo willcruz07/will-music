@@ -3,36 +3,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ChordHelp } from '../components/ChordHelp.tsx';
 import { ConstellationView, colorOf, motionLabel, textColorOf } from '../constellation/ConstellationView.tsx';
-import { type Motion, type Move, isAltered, type Quality, QUALITIES, centerName, chordKey, chordName, parseChord } from '../constellation/harmony.ts';
+import { type Motion, type Move, isAltered, centerName, chordKey, chordName, parseChord } from '../constellation/harmony.ts';
+import { type StartChoice, StartPicker, startChord } from '../constellation/StartPicker.tsx';
 import { type Web, focusOn, openFocus, orbit, resetWeb, startWeb, walk } from '../constellation/web.ts';
 import { SilentModeHint, chordEvents, useStudySynth } from '../study/widgets.tsx';
 import { Button } from '../ui/Button.tsx';
-import { SheetSelect } from '../ui/SheetSelect.tsx';
-
-const ROOTS = ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-const QUALITY_NAMES: Record<Quality, string> = {
-  '7M': 'Sétima maior',
-  '': 'Maior',
-  '6': 'Sexta',
-  '7M(9)': 'Sétima maior e nona',
-  '6(9)': 'Sexta e nona',
-  m7: 'Menor com sétima',
-  m: 'Menor',
-  m6: 'Menor com sexta',
-  'm7(9)': 'Menor com sétima e nona',
-  'm(7M)': 'Menor com sétima maior',
-  '7': 'Sétima (dominante)',
-  '7(9)': 'Sétima e nona',
-  '7(13)': 'Sétima e décima terceira',
-  '7(b9)': 'Sétima e nona menor',
-  '7(#5)': 'Sétima com quinta aumentada',
-  '7sus4': 'Sétima com quarta suspensa',
-  'm7(b5)': 'Meio-diminuto',
-  '°7': 'Diminuto com sétima',
-};
-
-const rootOptions = ROOTS.map((r) => ({ value: r, label: r }));
-const qualityOptions = QUALITIES.map((q) => ({ value: q, label: QUALITY_NAMES[q], hint: q ? `ex.: C${q}` : 'ex.: C' }));
 
 /** `color`: the line and ring color of the step; `text`: the same color for words (darker on light themes). */
 type Step = { name: string; motion: Motion; label: string; why: string; color: string; text: string };
@@ -43,8 +18,7 @@ type Step = { name: string; motion: Motion; label: string; why: string; color: s
  * G7(b9)…) is chosen: that choice is an intention, and it shapes the next orbit.
  */
 export const ConstellationPage = () => {
-  const [root, setRoot] = useState('C');
-  const [quality, setQuality] = useState<Quality>('7M');
+  const [start, setStart] = useState<StartChoice>({ pc: 0, mode: 'major' });
   const [web, setWeb] = useState<Web | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -78,16 +52,7 @@ export const ConstellationPage = () => {
         <p className="mt-2 text-muted-foreground">
           Escolha um acorde e veja, em volta dele, para onde a harmonia pode ir: relaxar, tensionar ou resolver. Ande pela constelação ouvindo cada passo, escolhendo o tipo de cada acorde e lendo por que ele funciona.
         </p>
-        <div className="mt-6 flex flex-wrap items-end gap-3">
-          <label className="grid gap-1 text-sm">
-            <span className="text-muted-foreground">Acorde de partida</span>
-            <span className="flex gap-2">
-              <SheetSelect label="Fundamental" value={root} onChange={setRoot} options={rootOptions} className="w-20" />
-              <SheetSelect label="Tipo" value={quality} onChange={(q) => setQuality(q as Quality)} options={qualityOptions} className="w-56" />
-            </span>
-          </label>
-          <Button onClick={() => setWeb(startWeb(parseChord(`${root}${quality}`)!))}>Começar</Button>
-        </div>
+        <StartPicker value={start} onChange={setStart} onStart={() => setWeb(startWeb(parseChord(startChord(start))!))} />
       </section>
     );
   }

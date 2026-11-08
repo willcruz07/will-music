@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConstellationPage } from '../src/pages/ConstellationPage.tsx';
 import { StudyHome } from '../src/pages/StudyHome.tsx';
-import { choose } from './choose.ts';
 
 const play = vi.fn();
 vi.mock('../src/study/widgets.tsx', async (orig) => ({
@@ -22,7 +21,7 @@ const open = () =>
 /** Starts at C7M and opens its orbit. */
 const startAtC = async () => {
   open();
-  await userEvent.click(screen.getByRole('button', { name: 'Começar' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Começar em C7M' }));
   await userEvent.click(screen.getByRole('button', { name: /Abrir os caminhos de C7M/ }));
 };
 const star = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name.replace(/[()]/g, '\\$&')}, `) });
@@ -37,9 +36,8 @@ beforeEach(() => play.mockClear());
 describe('Constelação de acordes page', () => {
   it('starts from a chosen chord and opens its orbit on tap', async () => {
     open();
-    await choose('Fundamental', 'D');
-    await choose('Tipo', 'Menor com sétima');
-    await userEvent.click(screen.getByRole('button', { name: 'Começar' }));
+    await userEvent.click(screen.getByRole('radio', { name: /^Dm7,/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Começar em Dm7' }));
     expect(screen.queryByRole('button', { name: /^G7, / })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /Abrir os caminhos de Dm7/ }));
     expect(within(screen.getByRole('group', { name: /Constelação/ })).getAllByRole('button').length).toBeGreaterThanOrEqual(6);
@@ -47,9 +45,18 @@ describe('Constelação de acordes page', () => {
 
   it('starts from Db', async () => {
     open();
-    await choose('Fundamental', 'Db');
-    await userEvent.click(screen.getByRole('button', { name: 'Começar' }));
+    await userEvent.click(screen.getByRole('radio', { name: /^Db7M,/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Começar em Db7M' }));
     expect(screen.getByRole('button', { name: /Abrir os caminhos de Db7M/ })).toBeInTheDocument();
+  });
+
+  it('the start lists the twelve notes, each only major or minor, spelled the way its key is written', () => {
+    open();
+    expect(screen.getAllByRole('radio')).toHaveLength(24);
+    expect(screen.getByRole('radio', { name: /^C7M,/ })).toBeChecked();
+    for (const name of ['Db7M', 'C#m7', 'Ab7M', 'G#m7', 'Bbm7', 'F#7M']) expect(screen.getByRole('radio', { name: new RegExp(`^${name},`) })).toBeInTheDocument();
+    // No list of every chord type at the start any more.
+    expect(screen.queryByLabelText('Tipo')).toBeNull();
   });
 
   it('walking writes one short line per step in the path diary', async () => {
