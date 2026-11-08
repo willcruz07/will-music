@@ -25,13 +25,14 @@ describe('scales and harmonic field', () => {
 
   it('builds the harmonic field of a major key', () => {
     const field = harmonicField('C', 'major');
-    expect(field.map((d) => d.roman)).toEqual(['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°']);
-    expect(field.map((d) => d.triad)).toEqual(['C', 'Dm', 'Em', 'F', 'G', 'Am', 'B°']);
+    expect(field.map((d) => d.roman)).toEqual(['I', 'ii', 'iii', 'IV', 'V', 'vi', 'viiø']);
+    expect(field.map((d) => d.triad)).toEqual(['C', 'Dm', 'Em', 'F', 'G', 'Am', 'Bm(b5)']);
     expect(field.map((d) => d.tetrad)).toEqual(['C7M', 'Dm7', 'Em7', 'F7M', 'G7', 'Am7', 'Bm7(b5)']);
   });
 
   it('builds the harmonic field of a minor key', () => {
-    expect(harmonicField('A', 'minor').map((d) => d.triad)).toEqual(['Am', 'B°', 'C', 'Dm', 'Em', 'F', 'G']);
+    expect(harmonicField('A', 'minor').map((d) => d.triad)).toEqual(['Am', 'Bm(b5)', 'C', 'Dm', 'Em', 'F', 'G']);
+    expect(harmonicField('A', 'minor')[1]!.roman).toBe('iiø');
   });
 });
 
@@ -66,7 +67,7 @@ describe('pending fixes: theory', () => {
 
   it('builds the harmonic field of the harmonic minor (with the major V)', () => {
     const field = harmonicField('A', 'harmonicMinor');
-    expect(field.map((d) => d.triad)).toEqual(['Am', 'B°', 'C+', 'Dm', 'E', 'F', 'G#°']);
+    expect(field.map((d) => d.triad)).toEqual(['Am', 'Bm(b5)', 'C+', 'Dm', 'E', 'F', 'G#°']);
     expect(field[4]!.tetrad).toBe('E7');
     expect(field[6]!.tetrad).toBe('G#°7');
   });
@@ -81,9 +82,19 @@ describe('pending fixes: theory', () => {
 describe('fix: half-diminished seventh degree', () => {
   it('names the four-note chord of the seventh degree as half-diminished (viiø7)', () => {
     const vii = harmonicField('C', 'major')[6]!;
-    expect(vii).toMatchObject({ roman: 'vii°', triad: 'B°', tetrad: 'Bm7(b5)', tetradRoman: 'viiø7' });
+    expect(vii).toMatchObject({ roman: 'viiø', triad: 'Bm(b5)', tetrad: 'Bm7(b5)', tetradRoman: 'viiø7' });
     expect(harmonicField('A', 'minor')[1]!.tetradRoman).toBe('iiø7');
     expect(harmonicField('A', 'harmonicMinor')[6]!.tetradRoman).toBe('vii°7');
     expect(harmonicField('C', 'major')[4]!.tetradRoman).toBe('V7');
+  });
+});
+
+describe('the half-diminished triad m(b5)', () => {
+  it('is its own chord in the dictionary and has guitar shapes', async () => {
+    const { parseStudyChord } = await import('../src/pages/StudyPage.tsx');
+    const { dbKeyFor } = await import('../src/lib/chordShapes.ts');
+    expect(parseStudyChord('Bm(b5)')).toEqual({ root: 'B', suffix: 'm(b5)' });
+    expect(dbKeyFor('Bm(b5)')).toEqual({ key: 'B', suffix: 'dim' });
+    expect(chordFormation('B', 'm(b5)').notes).toEqual(['B', 'D', 'F']);
   });
 });

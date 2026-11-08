@@ -41,7 +41,7 @@ describe('study section', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Escalas e campo harmônico' }));
     await choose('Tom', 'G');
     const field = screen.getByRole('list', { name: 'Campo harmônico' });
-    expect(within(field).getAllByRole('button', { name: /^Tríade/ }).map((b) => b.textContent)).toEqual(['G', 'Am', 'Bm', 'C', 'D', 'Em', 'F#°']);
+    expect(within(field).getAllByRole('button', { name: /^Tríade/ }).map((b) => b.textContent)).toEqual(['G', 'Am', 'Bm', 'C', 'D', 'Em', 'F#m(b5)']);
     expect(within(field).getByRole('button', { name: 'Tétrade F#m7(b5)' })).toBeInTheDocument();
     expect(screen.getByText(/G · A · B · C · D · E · F#/)).toBeInTheDocument();
   });
