@@ -2,7 +2,7 @@ import { ArrowLeft, Guitar, Play, RotateCcw, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ChordHelp } from '../components/ChordHelp.tsx';
-import { ConstellationView, colorOf } from '../constellation/ConstellationView.tsx';
+import { ConstellationView, colorOf, textColorOf } from '../constellation/ConstellationView.tsx';
 import { type Motion, type Move, isAltered, type Quality, QUALITIES, centerName, chordKey, chordName, parseChord } from '../constellation/harmony.ts';
 import { type Web, focusOn, openFocus, orbit, resetWeb, startWeb, walk } from '../constellation/web.ts';
 import { SilentModeHint, chordEvents, useStudySynth } from '../study/widgets.tsx';
@@ -34,7 +34,8 @@ const QUALITY_NAMES: Record<Quality, string> = {
 const rootOptions = ROOTS.map((r) => ({ value: r, label: r }));
 const qualityOptions = QUALITIES.map((q) => ({ value: q, label: QUALITY_NAMES[q], hint: q ? `ex.: C${q}` : 'ex.: C' }));
 
-type Step = { name: string; motion: Motion; why: string; color: string };
+/** `color`: the line and ring color of the step; `text`: the same color for words (darker on light themes). */
+type Step = { name: string; motion: Motion; why: string; color: string; text: string };
 
 /**
  * The Constelação de acordes: pick a chord, open its orbit and walk through the harmony by relaxing,
@@ -111,7 +112,7 @@ export const ConstellationPage = () => {
   const go = (move: Move) => {
     const next = walk(web, move);
     const name = chordName(move.to, move.nextCenter);
-    setSteps((s) => [...s, { name, motion: move.motion, why: move.why, color: colorOf(move) }]);
+    setSteps((s) => [...s, { name, motion: move.motion, why: move.why, color: colorOf(move), text: textColorOf(move) }]);
     setWeb(next);
     setSelected(null);
     setChosen(null);
@@ -124,7 +125,7 @@ export const ConstellationPage = () => {
   const refocus = (key: string) => {
     const next = focusOn(web, key);
     const at = web.trail.indexOf(key);
-    setSteps((s) => (at >= 0 ? s.slice(0, at) : [...s, { name: nameOf(key), motion: 'relaxa', why: `Você voltou para ${nameOf(key)} e continua daqui.`, color: 'var(--glow)' }]));
+    setSteps((s) => (at >= 0 ? s.slice(0, at) : [...s, { name: nameOf(key), motion: 'relaxa', why: `Você voltou para ${nameOf(key)} e continua daqui.`, color: 'var(--glow)', text: 'var(--motion-relax-text)' }]));
     setWeb(next);
     setSelected(null);
     setChosen(null);
@@ -225,7 +226,7 @@ export const ConstellationPage = () => {
                 return (
                   <span key={`${i}-${name}`}>
                     {i > 0 && <span className="text-muted-foreground"> → </span>}
-                    <span data-testid="chord" data-motion={step?.motion} style={step ? { color: step.color } : undefined}>
+                    <span data-testid="chord" data-motion={step?.motion} style={step ? { color: step.text } : undefined}>
                       {name}
                     </span>
                   </span>
@@ -240,10 +241,10 @@ export const ConstellationPage = () => {
             <ol aria-label="Caminho" className="mt-3 space-y-2 text-sm">
               {steps.map((s, i) => (
                 <li key={`${i}-${s.name}`} className="border-l-2 pl-3" style={{ borderColor: s.color }}>
-                  <button type="button" aria-label={`Voltar para ${s.name}`} title={`Voltar para ${s.name}`} onClick={() => refocus(web.trail[i + 1]!)} className="rounded font-semibold underline-offset-4 hover:underline" style={{ color: s.color }}>
+                  <button type="button" aria-label={`Voltar para ${s.name}`} title={`Voltar para ${s.name}`} onClick={() => refocus(web.trail[i + 1]!)} className="rounded font-semibold underline-offset-4 hover:underline" style={{ color: s.text }}>
                     {s.name}
                   </button>{' '}
-                  <span className="text-xs font-semibold" style={{ color: s.color }}>
+                  <span className="text-xs font-semibold" style={{ color: s.text }}>
                     {s.motion}
                   </span>{' '}
                   <span className="text-muted-foreground">{s.why}</span>
