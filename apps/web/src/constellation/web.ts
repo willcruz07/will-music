@@ -1,4 +1,4 @@
-import { type Center, type Chord, type Move, chordKey, neighbors, startCenter } from './harmony.ts';
+import { type Center, type Chord, type Motion, type Move, chordKey, neighbors, startCenter } from './harmony.ts';
 
 /**
  * The state of a constellation: the stars opened so far, the links between them, the trail walked, the
@@ -16,6 +16,7 @@ const ORBIT_RADIUS = 220;
 const PREVIEW_RADIUS = 120;
 const MIN_GAP = 90;
 const STEP = Math.PI / 6;
+const SECTOR = (Math.PI * 2) / 3;
 
 export const startWeb = (chord: Chord): Web => {
   const key = chordKey(chord);
@@ -42,15 +43,18 @@ export const openFocus = (web: Web): Web => {
   const focus = web.nodes[web.focus]!;
   const nodes = { ...web.nodes, [focus.key]: { ...focus, center: web.center } };
   const links = web.links.filter((l) => l.from !== focus.key);
-  // Grow away from where we came from: the opposite side of the previous star in the trail.
+  // Grow away from where we came from (the heading), with one sector per motion: resolve ahead, tension to one side, relax to the other.
   const prev = web.trail.length > 1 ? nodes[web.trail[web.trail.length - 2]!] : undefined;
-  let angle = prev && (prev.x !== focus.x || prev.y !== focus.y) ? Math.atan2(focus.y - prev.y, focus.x - prev.x) : -Math.PI / 2;
+  const heading = prev && (prev.x !== focus.x || prev.y !== focus.y) ? Math.atan2(focus.y - prev.y, focus.x - prev.x) : -Math.PI / 2;
+  const next: Record<Motion, number> = { resolve: heading, tensiona: heading + SECTOR, relaxa: heading - SECTOR };
   for (const move of neighbors(focus.chord, web.center)) {
     const key = chordKey(move.to);
     if (!nodes[key]) {
-      const spot = freeSpot(Object.values(nodes), focus, angle);
+      const spot = freeSpot(Object.values(nodes), focus, next[move.motion]);
       nodes[key] = { key, chord: move.to, center: move.nextCenter, ...spot };
-      angle = Math.atan2(spot.y - focus.y, spot.x - focus.x) + STEP;
+      // The next star of the same motion goes beside this one, away from the other sectors.
+      const side = move.motion === 'relaxa' ? -1 : 1;
+      next[move.motion] = Math.atan2(spot.y - focus.y, spot.x - focus.x) + side * STEP * 0.75;
     }
     links.push({ from: focus.key, to: key, move });
   }
@@ -81,11 +85,11 @@ export const previewStars = (web: Web): PreviewStar[] => {
   return stars;
 };
 
-export const preview = (web: Web): Link[] => previewStars(web).map((s) => ({ from: s.from, to: s.key, move: s.move }));
-
 export const walk = (web: Web, move: Move): Web => {
   const key = chordKey(move.to);
-  const nodes = web.nodes[key] ? web.nodes : { ...web.nodes, [key]: { key, chord: move.to, center: move.nextCenter, ...freeSpot(Object.values(web.nodes), web.nodes[web.focus]!, 0) } };
+  const at = web.nodes[key] ?? { key, ...freeSpot(Object.values(web.nodes), web.nodes[web.focus]!, 0) };
+  // The type the student chose (G7(b9) instead of G7) is what the star now holds.
+  const nodes = { ...web.nodes, [key]: { ...at, key, chord: move.to, center: move.nextCenter } };
   return openFocus({ ...web, nodes, trail: [...web.trail, key], focus: key, center: move.nextCenter });
 };
 
