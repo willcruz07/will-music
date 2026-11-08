@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ConstellationView, colorOf } from '../src/constellation/ConstellationView.tsx';
+import { ConstellationView, colorOf, textColorOf } from '../src/constellation/ConstellationView.tsx';
 import { chordName, parseChord } from '../src/constellation/harmony.ts';
 import { openFocus, orbit, previewStars, startWeb, walk } from '../src/constellation/web.ts';
 
@@ -148,6 +148,16 @@ describe('the trail in the colors of its actions', () => {
     expect(g7).toBeDefined();
     expect(g7!.getAttribute('stroke')).toBe(colorOf(w.nodes['7:dom']!.via!));
     expect(g7!.getAttribute('stroke')).not.toBe('var(--primary)');
+  });
+
+  it('the chord name inside each orbit star is in the color of its move (a tension is not green)', () => {
+    const w = openFocus(startWeb(parseChord('G7')!));
+    render(<ConstellationView web={w} selected={null} {...handlers()} />);
+    const links = orbit(w);
+    expect(new Set(links.map((l) => l.move.motion)).size).toBeGreaterThan(1);
+    for (const l of links) expect(document.querySelector(`[data-label="${l.to}"]`)!.getAttribute('fill'), l.to).toBe(textColorOf(l.move));
+    const tension = links.find((l) => l.move.motion === 'tensiona')!;
+    expect(textColorOf(tension.move)).not.toBe('var(--motion-resolve-text)');
   });
 
   it('always shows the four entries of the legend', () => {

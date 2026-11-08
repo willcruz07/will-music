@@ -9,6 +9,10 @@ export const ALTERED_COLOR = '#f472b6';
 /** Motion color, with altered tensions (b9, #5, °7) in pink so the spice of the reharmonization stands out. */
 export const colorOf = (m: Move): string => (m.motion === 'tensiona' && isAltered(m.to) ? ALTERED_COLOR : MOTION_COLOR[m.motion]);
 
+const MOTION_TEXT: Record<Motion, string> = { resolve: 'var(--motion-resolve-text)', tensiona: 'var(--motion-tension-text)', relaxa: 'var(--motion-relax-text)' };
+/** The same color for text (chord names): a darker tone on light themes, so it reads on white. */
+export const textColorOf = (m: Move): string => (m.motion === 'tensiona' && isAltered(m.to) ? 'var(--motion-altered-text)' : MOTION_TEXT[m.motion]);
+
 /** The legend always shows the four actions. */
 const LEGEND: { label: string; color: string }[] = [
   { label: 'Resolver', color: MOTION_COLOR.resolve },
@@ -266,7 +270,7 @@ export const ConstellationView = ({
                 onKeyDown={(e) => onOrbitKey(e, l.to)}
               >
                 <circle cx={n.x} cy={n.y} r={sel ? 38 : 32} fill="var(--surface)" stroke={colorOf(l.move)} strokeWidth={sel ? 4 : 2.5} />
-                <text x={n.x} y={n.y + 2} textAnchor="middle" fontSize={15} fontWeight={700} fill="var(--chord)">
+                <text x={n.x} y={n.y + 2} textAnchor="middle" fontSize={15} fontWeight={700} fill={textColorOf(l.move)} data-label={l.to}>
                   {label}
                 </text>
                 <text x={n.x} y={n.y + 17} textAnchor="middle" fontSize={9.5} fill="var(--muted-foreground)" aria-hidden>

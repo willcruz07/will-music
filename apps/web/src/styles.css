@@ -19,6 +19,11 @@
   --primary-foreground: #ffffff;
   --chord: #047857;
   --glow: #0891b2;
+  /* Text in the color of a constellation move: darker on light surfaces so small labels stay readable. */
+  --motion-resolve-text: #047857;
+  --motion-tension-text: #b45309;
+  --motion-altered-text: #be185d;
+  --motion-relax-text: #0e7490;
   --danger: #b42318;
   --radius: 0.75rem;
   --nav-height: 4.5rem;
@@ -36,6 +41,10 @@
   --primary-foreground: #03130d;
   --chord: #34d399;
   --glow: #22d3ee;
+  --motion-resolve-text: #34d399;
+  --motion-tension-text: #fbbf24;
+  --motion-altered-text: #f472b6;
+  --motion-relax-text: #22d3ee;
   --danger: #f97066;
 }
 
