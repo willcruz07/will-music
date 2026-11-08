@@ -92,3 +92,14 @@ describe('constellation v2', () => {
     expect(Math.min(gap, 2 * Math.PI - gap)).toBeGreaterThan(Math.PI / 3);
   });
 });
+
+describe('review 2 fixes: web', () => {
+  it('walking to a substitute dominant keeps where it resolves (C7M → Db7 → C7M)', () => {
+    let w = openFocus(startWeb(parseChord('C7M')!));
+    const db7 = orbit(w).find((l) => chordName(l.move.to, l.move.nextCenter) === 'Db7')!.move;
+    w = walk(w, db7);
+    const back = orbit(w).find((l) => chordName(l.move.to, l.move.nextCenter) === 'C7M');
+    expect(back?.move.motion).toBe('resolve');
+    expect(previewStars(openFocus(startWeb(parseChord('C7M')!))).some((s) => s.from === '1:dom' && s.key === '0:maj' && s.move.motion === 'resolve')).toBe(true);
+  });
+});

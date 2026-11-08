@@ -115,12 +115,13 @@ describe('harmony v2: relax, tension, resolution', () => {
     expect(chordKey({ root: 7, quality: '7' })).not.toBe(chordKey({ root: 7, quality: '7M' }));
   });
 
-  it('every move explains itself and the orbit stays within 6 to 14 chords', () => {
+  it('every move explains itself and the orbit stays within 6 to 16 chords', () => {
     for (const n of ['C7M', 'Dm7', 'G7', 'G', 'F7M', 'Am7', 'Bm7(b5)', 'C#°7', 'E7(b9)']) {
       const c = parseChord(n)!;
       const moves = neighbors(c, startCenter(c));
-      expect(moves.length, n).toBeGreaterThanOrEqual(6);
-      expect(moves.length, n).toBeLessThanOrEqual(14);
+      // A tension only resolves or passes the tension on: a focused orbit (at least 5); stable chords open at least 6.
+      expect(moves.length, n).toBeGreaterThanOrEqual(levelOf(c, startCenter(c)) === 'tensao' ? 5 : 6);
+      expect(moves.length, n).toBeLessThanOrEqual(16);
       for (const m of moves) expect(m.why.length).toBeGreaterThan(10);
     }
   });
@@ -172,5 +173,54 @@ describe('harmony v2: from the relatives', () => {
   it('a relative minor can go to the V7 of the center (vi → V)', () => {
     expect(at(neighbors({ root: 9, quality: 'm7' }, C))['G7']!.motion).toBe('tensiona');
     expect(at(neighbors({ root: 4, quality: 'm7' }, C))['G7']!.motion).toBe('tensiona');
+  });
+});
+
+describe('review 2 fixes: harmony', () => {
+  const step = (from: Chord, center: { root: number; minor: boolean }, name: string) => at(neighbors(from, center))[name]!;
+
+  it('a substitute dominant resolves where its own text says it goes', () => {
+    for (const [from, sub] of [['C7M', 'Db7'], ['C7M', 'Bb7'], ['Dm7', 'Db7']] as const) {
+      const s = step(parseChord(from)!, C, sub);
+      expect(s, `${from} → ${sub}`).toBeDefined();
+      const next = at(neighbors(s.to, s.nextCenter, s.resolvesTo));
+      expect(next['C7M']?.motion, `${from} → ${sub} → C7M`).toBe('resolve');
+    }
+  });
+
+  it('deceptive cadences follow a minor resolution (no major-key relatives)', () => {
+    const Am = { root: 9, minor: true };
+    const names = neighbors({ root: 4, quality: '7(b9)' }, Am).map((m) => chordName(m.to, m.nextCenter));
+    expect(names).not.toContain('F#m7');
+    expect(names).not.toContain('C#m7');
+    expect(names).toContain('F7M');
+  });
+
+  it('the iv goes home by the plagal cadence and borrowed chords keep the center', () => {
+    const fm6 = parseChord('Fm6')!;
+    const m = at(neighbors(fm6, C));
+    expect(m['C7M']!.motion).toBe('relaxa');
+    expect(m['C7M']!.why).toMatch(/plagal/);
+    if (m['Ab7M']) {
+      expect(m['Ab7M']!.nextCenter).toEqual(C);
+      expect(m['Ab7M']!.why).not.toMatch(/mesmas notas/);
+    }
+  });
+
+  it('balloon options of a tension continuation never claim to resolve', () => {
+    const f7 = at(neighbors({ root: 7, quality: '7' }, C))['F#7']!;
+    expect(f7.options.some((o) => o.motion === 'resolve')).toBe(false);
+  });
+
+  it('offers the V7 of the V and names the minor targets of secondary dominants', () => {
+    const m = at(neighbors({ root: 0, quality: '7M' }, C));
+    expect(m['D7']!.motion).toBe('tensiona');
+    expect(m['A7']!.why).toMatch(/\bDm\b/);
+    expect(m['E7']!.why).toMatch(/\bAm\b/);
+  });
+
+  it('never states that F7M shares three notes with Bm7(b5)', () => {
+    const bm = parseChord('Bm7(b5)')!;
+    for (const m of neighbors(bm, startCenter(bm))) expect(m.why).not.toMatch(/três notas/);
   });
 });

@@ -125,7 +125,9 @@ export const ConstellationView = ({
   const onOrbitKey = (e: React.KeyboardEvent, key: string) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onWalk(key);
+      // Like a tap: the first press selects (opens the balloon), the second walks.
+      if (selected === key) onWalk(key);
+      else onSelect(key);
       return;
     }
     if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
@@ -138,9 +140,10 @@ export const ConstellationView = ({
     if (k) onSelect(k);
   };
 
+  /** Each star is spelled in the center it lives in (the same spelling the diary and the balloon use). */
   const name = (key: string) => {
     const n = web.nodes[key]!;
-    return chordName(n.chord, web.center);
+    return key === web.focus ? chordName(n.chord, web.center) : chordName(n.chord, n.center);
   };
 
   return (
@@ -202,7 +205,7 @@ export const ConstellationView = ({
 
           {links.map((l, i) => {
             const n = web.nodes[l.to]!;
-            const label = name(l.to);
+            const label = chordName(l.move.to, l.move.nextCenter);
             const sel = selected === l.to;
             return (
               <g

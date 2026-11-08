@@ -1,5 +1,5 @@
 import { ArrowLeft, Guitar, Play, RotateCcw, Sparkles, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ChordHelp } from '../components/ChordHelp.tsx';
 import { ConstellationView, MOTION_COLOR } from '../constellation/ConstellationView.tsx';
@@ -53,6 +53,18 @@ export const ConstellationPage = () => {
 
   const hear = (id: string, names: string[], beats = 4) => synth.play(id, chordEvents(names, 80, beats));
 
+  // Escape closes the balloon wherever the focus is.
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setSelected(null);
+      setChosen(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selected]);
+
   if (!web) {
     return (
       <section className="max-w-xl">
@@ -86,7 +98,8 @@ export const ConstellationPage = () => {
 
   const select = (key: string) => {
     const link = links.find((l) => l.to === key);
-    if (!link) return;
+    // Already open (a hover after choosing a type in the balloon): keep the choice, no replay.
+    if (!link || key === selected) return;
     setSelected(key);
     setChosen(link.move);
     hear(`sel-${key}`, [chordName(link.move.to, link.move.nextCenter)]);
@@ -144,12 +157,6 @@ export const ConstellationPage = () => {
             <div
               role="dialog"
               aria-label={`Tipos de ${rootName}`}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setSelected(null);
-                  setChosen(null);
-                }
-              }}
               className="absolute inset-x-3 bottom-3 max-h-[70%] overflow-y-auto rounded-2xl border border-border bg-surface/95 p-4 shadow-[0_12px_40px_-12px_rgb(0_0_0/0.6)] backdrop-blur md:inset-x-auto md:right-3 md:w-96"
             >
               <div className="flex items-start gap-2">

@@ -34,7 +34,7 @@ export type Group = 'maj' | 'min' | 'dom' | 'hdim' | 'dim';
 export type Level = 'repouso' | 'afastamento' | 'tensao';
 export type Motion = 'relaxa' | 'tensiona' | 'resolve';
 /** A step: where to, the motion, why it works, the center after it, and the other types of that root (the balloon). */
-export type Move = { to: Chord; motion: Motion; why: string; nextCenter: Center; options: Move[] };
+export type Move = { to: Chord; motion: Motion; why: string; nextCenter: Center; options: Move[]; resolvesTo?: Chord };
 
 export const QUALITIES: readonly Quality[] = ['7M', '', '6', '7M(9)', '6(9)', 'm7', 'm', 'm6', 'm7(9)', 'm(7M)', '7', '7(9)', '7(13)', '7(b9)', '7(#5)', '7sus4', 'm7(b5)', '°7'];
 
@@ -114,6 +114,8 @@ type Rule = {
   keep?: boolean;
   /** A half-diminished that works as a dominant substitute (counts as tension). */
   tension?: boolean;
+  /** A substitute dominant: where it resolves (the current chord, the key it is the ii of, or the center tonic), not a fourth above. */
+  resolvesTo?: 'cur' | 'iiOf' | 'home';
   why: (n: Ctx) => string;
 };
 
@@ -124,10 +126,11 @@ const S = (at: number, quality: Quality, why: Rule['why'], extra: Omit<Rule, 'at
 const REST_MAJOR: Rule[] = [
   S(7, '7', (n) => `${n.to} é o dominante: a tensão que pede ${n.cur} de volta.`),
   S(11, 'm7(b5)', (n) => `${n.to} tem o mesmo trítono do dominante: tensão com outra cor, resolve em ${n.cur}.`, { tension: true }),
-  S(1, '7', (n) => `${n.to} é o substituto de trítono: mesma tensão do dominante, o baixo desce meio tom até ${n.cur}.`, { flat: true }),
-  S(9, '7', (n) => `${n.to} é o dominante de ${n.target}: tensão de fora do tom que puxa para o ii.`),
-  S(4, '7', (n) => `${n.to} é o dominante de ${n.target}: tensão que puxa para o relativo menor.`),
-  S(10, '7', (n) => `${n.to} vem do tom menor (bVII7): o dominante "pela porta dos fundos", resolve em ${n.cur} com cor de gospel.`, { flat: true }),
+  S(1, '7', (n) => `${n.to} é o substituto de trítono: mesma tensão do dominante, o baixo desce meio tom até ${n.cur}.`, { flat: true, resolvesTo: 'cur' }),
+  S(9, '7', (n) => `${n.to} é o dominante de ${n.target}m: tensão de fora do tom que puxa para o ii.`),
+  S(2, '7', (n) => `${n.to} é o V7 do V: o dominante do dominante, puxa para ${n.target}.`),
+  S(4, '7', (n) => `${n.to} é o dominante de ${n.target}m: tensão que puxa para o relativo menor.`),
+  S(10, '7', (n) => `${n.to} vem do tom menor (bVII7): o dominante "pela porta dos fundos", resolve em ${n.cur} com cor de gospel.`, { flat: true, resolvesTo: 'cur' }),
   S(0, '7', (n) => `${n.to}: ${n.cur} ganha sétima menor e vira tensão que pede ${n.target}.`),
   S(1, '°7', (n) => `${n.to} é diminuto de passagem: tensão que sobe meio tom até o ii.`),
   S(2, 'm7', (n) => `${n.to} é o ii: afasta do repouso e prepara a tensão.`),
@@ -142,7 +145,7 @@ const REST_MAJOR: Rule[] = [
 const AWAY_MAJOR: Rule[] = [
   S(7, '7', (n) => `${n.to} é o dominante do centro ${n.center}: da subdominante para a tensão.`, { from: 'c' }),
   S(11, 'm7(b5)', (n) => `${n.to} tem o trítono do dominante de ${n.center}: tensão com outra cor.`, { from: 'c', tension: true }),
-  S(1, '7', (n) => `${n.to} é o substituto de trítono do dominante de ${n.center}.`, { from: 'c', flat: true }),
+  S(1, '7', (n) => `${n.to} é o substituto de trítono do dominante de ${n.center}.`, { from: 'c', flat: true, resolvesTo: 'home' }),
   S(1, '°7', (n) => `${n.to} é diminuto de passagem: sobe meio tom rumo ao V.`),
   S(0, '7', (n) => `${n.to}: ganha sétima menor e vira tensão que pede ${n.target}.`),
   S(0, '7M', (n) => `${n.to}: cadência plagal, o IV volta ao repouso (o "amém").`, { from: 'c' }),
@@ -154,11 +157,14 @@ const AWAY_MAJOR: Rule[] = [
 const MINOR: Rule[] = [
   S(5, '7', (n) => `${n.cur} funciona como ii: com ${n.to} forma o ii–V que leva a ${n.iiOf}.`),
   S(9, 'm7(b5)', (n) => `${n.to} tem o trítono do V de ${n.iiOf}: tensão com outra cor.`, { tension: true }),
-  S(11, '7', (n) => `${n.to} é o substituto de trítono do V de ${n.iiOf}: o baixo desce em semitons.`, { flat: true }),
+  S(11, '7', (n) => `${n.to} é o substituto de trítono do V de ${n.iiOf}: o baixo desce em semitons.`, { flat: true, resolvesTo: 'iiOf' }),
   S(7, '7', (n) => `${n.to} é o dominante de ${n.cur}: tensão que volta para ele.`),
   S(5, 'm7', (n) => `${n.to} é o ii de ${n.toKey}: a cadeia de ii andando pelo ciclo de quartas.`),
-  S(3, '7M', (n) => `${n.to} é o relativo maior de ${n.cur}: as mesmas notas, com cor clara.`),
+  S(3, '7M', (n) => `${n.to} é o relativo maior de ${n.cur}: a mesma região, com cor clara.`, { keep: true }),
 ];
+
+/** The minor subdominant (iv, or any m6 in a major center) goes home by the plagal cadence. */
+const PLAGAL_MINOR: Rule[] = [S(0, '7M', (n) => `${n.to}: cadência plagal menor (iv → I), o "amém" que volta para casa.`, { from: 'c' })];
 
 /** The stable chords of a major center, to relax between them (C7M ↔ Am7 ↔ Em7 ↔ F7M ↔ Dm7). */
 const DIATONIC_REST: Rule[] = [
@@ -173,7 +179,7 @@ const DIATONIC_REST: Rule[] = [
 /** The tonic of a minor center (Am7 in A minor). */
 const MINOR_TONIC: Rule[] = [
   S(7, '7(b9)', (n) => `${n.to} é o V7 da menor harmônica: a tensão que pede ${n.cur}.`),
-  S(1, '7', (n) => `${n.to} é o substituto de trítono do V: o baixo desce meio tom até ${n.cur}.`, { flat: true }),
+  S(1, '7', (n) => `${n.to} é o substituto de trítono do V: o baixo desce meio tom até ${n.cur}.`, { flat: true, resolvesTo: 'cur' }),
   S(10, '7', (n) => `${n.to} é o VII7: tensão que leva ao relativo maior.`),
   S(5, '7', (n) => `${n.cur} também funciona como ii: com ${n.to} forma o ii–V que leva a ${n.iiOf}.`),
   S(2, 'm7(b5)', (n) => `${n.to} é o iiø do tom menor: afasta e prepara o V.`),
@@ -185,28 +191,45 @@ const MINOR_TONIC: Rule[] = [
 /** A half-diminished that prepares (iiø of a minor key). */
 const AWAY_HDIM: Rule[] = [
   S(5, '7(b9)', (n) => `${n.cur} é o iiø e ${n.to} o V: o ii–V do tom menor.`),
-  S(11, '7', (n) => `${n.to} é o substituto de trítono do V: mesmo trítono, outro baixo.`, { flat: true }),
+  S(11, '7', (n) => `${n.to} é o substituto de trítono do V: mesmo trítono, outro baixo.`, { flat: true, resolvesTo: 'home' }),
   S(3, 'm6', (n) => `${n.to} tem as mesmas notas de ${n.cur}: só muda o baixo, continua relaxado.`),
   S(8, '7', (n) => `${n.cur} é ${n.to}(9) sem a fundamental: vira essa tensão, que pede ${n.target}.`),
-  S(6, '7M', (n) => `${n.to} divide três notas com ${n.cur}: relaxa sem passar pela tensão.`, { keep: true }),
+  S(6, '7M', (n) => `${n.to} divide notas com ${n.cur}: relaxa sem passar pela tensão.`, { keep: true }),
 ];
 
 /** The dominants: resolve, cheat, or hand the tension on. Never their own substitutes. */
-const dominantRules = (current: Chord, center: Center): Rule[] => {
+/**
+ * The dominants: resolve, cheat, or hand the tension on. Never their own substitutes. A substitute (Db7
+ * reached as the subV of C, Bb7 as the backdoor of C) resolves where it was meant to: `target`.
+ */
+const dominantRules = (current: Chord, center: Center, target?: Chord): Rule[] => {
   const q = current.quality;
+  const tAt = target ? mod12(target.root - current.root) : 5;
   const resolveTo = (quality: Quality) =>
-    S(5, quality, (n) => `${n.cur} resolve em ${n.to}: a tensão do trítono se desfaz.${n.next}`, { flat: 'inherit', resolution: true });
-  // Dark colors (b9, #5) ask for the minor resolution first; clear ones (9, 13) for the major; a plain 7 for what its center expects.
-  const resolutions = isDark(q)
-    ? [resolveTo('m7'), resolveTo('7M')]
-    : isClear(q)
-      ? [resolveTo('7M')]
-      : [resolveTo(minorDegree(current.root + 5, center) ? 'm7' : '7M')];
+    S(tAt, quality, (n) => `${n.cur} resolve em ${n.to}: a tensão do trítono se desfaz.${n.next}`, { flat: target?.flat ? true : 'inherit', resolution: true });
+  // A substitute resolves where it was aimed; otherwise dark colors (b9, #5) ask for the minor first, clear ones (9, 13)
+  // for the major, and a plain 7 for what its center expects.
+  const resolutions = target
+    ? [resolveTo(target.quality)]
+    : isDark(q)
+      ? [resolveTo('m7'), resolveTo('7M')]
+      : isClear(q)
+        ? [resolveTo('7M')]
+        : [resolveTo(minorDegree(current.root + 5, center) ? 'm7' : '7M')];
+  const mainMinor = groupOf(resolutions[0]!.quality) === 'min';
+  // Deceptive cadences: the relative minor and the iii only make sense when the expected resolution is major; bVI always.
+  const deceptive = [
+    ...(mainMinor
+      ? []
+      : [
+          S(tAt + 9, 'm7', (n) => `${n.to}: cadência de engano, em vez de ${n.res} vai para o relativo menor.`, { flat: 'inherit', keep: true }),
+          S(tAt + 4, 'm7', (n) => `${n.to}: engano no iii, repousa sem chegar em ${n.res}.`, { flat: 'inherit', keep: true }),
+        ]),
+    S(tAt + 8, '7M', (n) => `${n.to}: engano no bVI, uma resolução de surpresa no lugar de ${n.res}.`, { flat: true, keep: true }),
+  ];
   return [
     ...resolutions,
-    S(2, 'm7', (n) => `${n.to}: cadência de engano, em vez de ${n.res} vai para o relativo menor.`, { flat: 'inherit', keep: true }),
-    S(9, 'm7', (n) => `${n.to}: engano no iii, repousa sem chegar em ${n.res}.`, { flat: 'inherit', keep: true }),
-    S(1, '7M', (n) => `${n.to}: engano no bVI, uma resolução de surpresa no lugar de ${n.res}.`, { flat: true, keep: true }),
+    ...deceptive,
     S(5, '7', (n) => `${n.to}: ${n.cur} passa a tensão adiante pelo ciclo de quartas, um dominante puxando outro.`, { flat: 'inherit' }),
     S(11, '7', (n) => `${n.to}: aproximação cromática, a tensão desce meio tom para outro dominante.`, { flat: 'inherit' }),
   ];
@@ -236,17 +259,18 @@ const TRIAD: Rule[] = [
   S(4, 'm7', (n) => `${n.to} divide notas com ${n.cur}: continua relaxado.`),
 ];
 
-const rulesFor = (current: Chord, center: Center): Rule[] => {
+const rulesFor = (current: Chord, center: Center, target?: Chord): Rule[] => {
   const level = levelOf(current, center);
   switch (groupOf(current.quality)) {
     case 'dom':
-      return dominantRules(current, center);
+      return dominantRules(current, center, target);
     case 'dim':
       return DIMINISHED;
     case 'hdim':
       return level === 'tensao' ? TENSION_HDIM : AWAY_HDIM;
     case 'min':
       if (center.minor && degree(current.root, center) === 0) return MINOR_TONIC;
+      if (!center.minor && (degree(current.root, center) === 5 || current.quality === 'm6')) return [...PLAGAL_MINOR, ...MINOR];
       return level === 'repouso' && !center.minor ? [...MINOR, ...DIATONIC_REST] : MINOR;
     case 'maj':
       if (current.quality === '') return TRIAD;
@@ -257,7 +281,7 @@ const rulesFor = (current: Chord, center: Center): Rule[] => {
 /* ---------- Building moves ---------- */
 
 const MIN_ORBIT = 6;
-const MAX_ORBIT = 14;
+const MAX_ORBIT = 16;
 const isTension = (c: Chord, rule?: Rule) => ['dom', 'dim'].includes(groupOf(c.quality)) || (groupOf(c.quality) === 'hdim' && !!rule?.tension);
 
 const motionOf = (fromLevel: Level, to: Chord, rule?: Rule): Motion => (isTension(to, rule) ? 'tensiona' : fromLevel === 'tensao' ? 'resolve' : 'relaxa');
@@ -322,12 +346,13 @@ const hint = (to: Chord, motion: Motion, name: string, res: string, nextCenter: 
   }
 };
 
-export const neighbors = (current: Chord, center: Center): Move[] => {
+/** The next steps from `current` in `center`. `resolvesTo` is where a substitute dominant was aimed (see Move.resolvesTo). */
+export const neighbors = (current: Chord, center: Center, resolvesTo?: Chord): Move[] => {
   const level = levelOf(current, center);
   const moves: Move[] = [];
   const seen = new Set([chordKey(current)]);
   const cur = chordName(current, center);
-  const res = chordName({ root: mod12(current.root + 5), quality: '', ...(current.flat ? { flat: true } : {}) }, center);
+  const res = resolvesTo ? chordName(resolvesTo, center) : chordName({ root: mod12(current.root + 5), quality: '', ...(current.flat ? { flat: true } : {}) }, center);
 
   const build = (rule: Rule) => {
     const root = mod12((rule.from === 'c' ? center.root : current.root) + rule.at);
@@ -355,22 +380,33 @@ export const neighbors = (current: Chord, center: Center): Move[] => {
       center: centerName(center),
       root: chordName({ root, quality: '' }, nextCenter),
     };
-    const move: Move = { to, motion, why: rule.why(ctx), nextCenter, options: [] };
+    // Where a substitute dominant is aimed: the current chord, the key it is the ii of, or the center tonic.
+    const aim: Chord | undefined =
+      rule.resolvesTo === 'cur'
+        ? { root: current.root, quality: current.quality, ...(current.flat ? { flat: true } : {}) }
+        : rule.resolvesTo === 'iiOf'
+          ? { root: mod12(current.root + 10), quality: '7M' }
+          : rule.resolvesTo === 'home'
+            ? { root: center.root, quality: center.minor ? 'm7' : '7M' }
+            : undefined;
+    const move: Move = { to, motion, why: rule.why(ctx), nextCenter, options: [], ...(aim ? { resolvesTo: aim } : {}) };
     // The balloon: the other types of this root, each with its own motion, center and hint.
+    // A tension that only passes the tension on (G7 → F#7) offers only other dominant colors: a stable type there would not be a resolution.
+    const onlyTension = level === 'tensao' && motion === 'tensiona';
     const others = BALLOON[groupOf(rule.quality)]
-      .filter((q) => q !== rule.quality)
+      .filter((q) => q !== rule.quality && (!onlyTension || groupOf(q) === 'dom'))
       .map((q): Move => {
         const alt: Chord = { root, quality: q, ...(flat ? { flat: true } : {}) };
         const altMotion = motionOf(level, alt);
         const altCenter = centerAfter(alt, center, { resolution: rule.resolution && groupOf(q) !== 'dom', keep: rule.keep });
         const altName = chordName(alt, altCenter);
-        return { to: alt, motion: altMotion, why: hint(alt, altMotion, altName, ctx.target, altCenter, center), nextCenter: altCenter, options: [] };
+        return { to: alt, motion: altMotion, why: hint(alt, altMotion, altName, ctx.target, altCenter, center), nextCenter: altCenter, options: [], ...(aim && groupOf(q) === 'dom' ? { resolvesTo: aim } : {}) };
       });
     move.options = [{ ...move, options: [] }, ...others];
     moves.push(move);
   };
 
-  for (const rule of rulesFor(current, center)) build(rule);
+  for (const rule of rulesFor(current, center, resolvesTo)) build(rule);
   // Stable chords with few paths still get the center's essentials (home, its V7, its ii).
   if (level !== 'tensao' && moves.length < MIN_ORBIT) {
     for (const rule of [

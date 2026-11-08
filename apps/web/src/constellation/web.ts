@@ -7,7 +7,8 @@ import { type Center, type Chord, type Motion, type Move, chordKey, neighbors, s
  * never moves once placed.
  */
 
-export type StarNode = { key: string; chord: Chord; center: Center; x: number; y: number };
+/** `resolvesTo`: where a substitute dominant was aimed when it was reached (Db7 as the subV of C). */
+export type StarNode = { key: string; chord: Chord; center: Center; x: number; y: number; resolvesTo?: Chord };
 export type Link = { from: string; to: string; move: Move };
 export type Web = { nodes: Record<string, StarNode>; links: Link[]; trail: string[]; focus: string; center: Center; opened: boolean };
 export type PreviewStar = { key: string; chord: Chord; center: Center; x: number; y: number; from: string; move: Move };
@@ -47,11 +48,11 @@ export const openFocus = (web: Web): Web => {
   const prev = web.trail.length > 1 ? nodes[web.trail[web.trail.length - 2]!] : undefined;
   const heading = prev && (prev.x !== focus.x || prev.y !== focus.y) ? Math.atan2(focus.y - prev.y, focus.x - prev.x) : -Math.PI / 2;
   const next: Record<Motion, number> = { resolve: heading, tensiona: heading + SECTOR, relaxa: heading - SECTOR };
-  for (const move of neighbors(focus.chord, web.center)) {
+  for (const move of neighbors(focus.chord, web.center, focus.resolvesTo)) {
     const key = chordKey(move.to);
     if (!nodes[key]) {
       const spot = freeSpot(Object.values(nodes), focus, next[move.motion]);
-      nodes[key] = { key, chord: move.to, center: move.nextCenter, ...spot };
+      nodes[key] = { key, chord: move.to, center: move.nextCenter, ...spot, ...(move.resolvesTo ? { resolvesTo: move.resolvesTo } : {}) };
       // The next star of the same motion goes beside this one, away from the other sectors.
       const side = move.motion === 'relaxa' ? -1 : 1;
       next[move.motion] = Math.atan2(spot.y - focus.y, spot.x - focus.x) + side * STEP * 0.75;
@@ -73,7 +74,7 @@ export const previewStars = (web: Web): PreviewStar[] => {
   for (const link of orbit(web)) {
     const from = web.nodes[link.to]!;
     const out = Math.atan2(from.y - focus.y, from.x - focus.x);
-    const next = neighbors(from.chord, link.move.nextCenter).filter((m) => chordKey(m.to) !== focus.key);
+    const next = neighbors(from.chord, link.move.nextCenter, link.move.resolvesTo).filter((m) => chordKey(m.to) !== focus.key || m.motion === 'resolve');
     next.forEach((m, i) => {
       const key = chordKey(m.to);
       const a = out + (i - (next.length - 1) / 2) * (Math.PI / 2 / Math.max(1, next.length - 1));
@@ -89,7 +90,8 @@ export const walk = (web: Web, move: Move): Web => {
   const key = chordKey(move.to);
   const at = web.nodes[key] ?? { key, ...freeSpot(Object.values(web.nodes), web.nodes[web.focus]!, 0) };
   // The type the student chose (G7(b9) instead of G7) is what the star now holds.
-  const nodes = { ...web.nodes, [key]: { ...at, key, chord: move.to, center: move.nextCenter } };
+  const { resolvesTo: _old, ...rest } = at as StarNode;
+  const nodes = { ...web.nodes, [key]: { ...rest, key, chord: move.to, center: move.nextCenter, ...(move.resolvesTo ? { resolvesTo: move.resolvesTo } : {}) } };
   return openFocus({ ...web, nodes, trail: [...web.trail, key], focus: key, center: move.nextCenter });
 };
 

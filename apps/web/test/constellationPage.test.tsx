@@ -128,3 +128,24 @@ describe('Constelação de acordes page', () => {
     expect(link).toHaveTextContent('Explore caminhos de rearmonização');
   });
 });
+
+describe('review 2 fixes: page', () => {
+  it('hovering the selected star again keeps the type chosen in the balloon', async () => {
+    await startAtC();
+    await userEvent.pointer({ keys: '[TouchA]', target: star('G7') });
+    const balloon = screen.getByRole('dialog', { name: /G/ });
+    await userEvent.click(within(balloon).getByRole('radio', { name: /^G7\(b9\)/ }));
+    play.mockClear();
+    await userEvent.hover(star('G7'));
+    expect(within(screen.getByRole('dialog', { name: /G/ })).getByRole('radio', { name: /^G7\(b9\)/ })).toBeChecked();
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it('Escape closes the balloon from anywhere', async () => {
+    await startAtC();
+    await userEvent.pointer({ keys: '[TouchA]', target: star('G7') });
+    expect(screen.getByRole('dialog', { name: /G/ })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: /G/ })).toBeNull();
+  });
+});

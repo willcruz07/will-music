@@ -2,8 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ConstellationView } from '../src/constellation/ConstellationView.tsx';
-import { parseChord } from '../src/constellation/harmony.ts';
-import { openFocus, previewStars, startWeb } from '../src/constellation/web.ts';
+import { chordName, parseChord } from '../src/constellation/harmony.ts';
+import { openFocus, orbit, previewStars, startWeb, walk } from '../src/constellation/web.ts';
 
 const web = () => openFocus(startWeb(parseChord('C7M')!));
 const handlers = () => ({ onSelect: vi.fn(), onWalk: vi.fn(), onFocusStar: vi.fn(), onOpen: vi.fn() });
@@ -56,16 +56,33 @@ describe('ConstellationView', () => {
     expect(screen.getByText('Resolver')).toBeInTheDocument();
   });
 
-  it('the orbit is reachable by keyboard and Enter walks', async () => {
+  it('the orbit is reachable by keyboard: Enter selects first, then walks', async () => {
     const h = handlers();
-    render(<ConstellationView web={web()} selected={null} {...h} />);
+    const { rerender } = render(<ConstellationView web={web()} selected={null} {...h} />);
     await userEvent.tab();
     const first = document.activeElement as HTMLElement;
     expect(first.getAttribute('role')).toBe('button');
     await userEvent.keyboard('{ArrowRight}');
-    expect(document.activeElement).not.toBe(first);
+    const second = document.activeElement as HTMLElement;
+    expect(second).not.toBe(first);
+    h.onSelect.mockClear();
     await userEvent.keyboard('{Enter}');
-    expect(h.onWalk).toHaveBeenCalledTimes(1);
+    expect(h.onWalk).not.toHaveBeenCalled();
+    expect(h.onSelect).toHaveBeenCalledWith(second.getAttribute('data-key'));
+    rerender(<ConstellationView web={web()} selected={second.getAttribute('data-key')} {...h} />);
+    second.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(h.onWalk).toHaveBeenCalledWith(second.getAttribute('data-key'));
+  });
+
+  it('spells every orbit star the way its step is spelled, two steps away from C7M', () => {
+    const start = openFocus(startWeb(parseChord('C7M')!));
+    for (const first of orbit(start)) {
+      const w = walk(start, first.move);
+      const { unmount } = render(<ConstellationView web={w} selected={null} {...handlers()} />);
+      for (const l of orbit(w)) expect(screen.getByRole('button', { name: `${chordName(l.move.to, l.move.nextCenter)}, ${l.move.motion}` })).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it('a closed starting star opens its orbit when tapped', async () => {
