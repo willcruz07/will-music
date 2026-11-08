@@ -26,6 +26,7 @@ const StudyHome = named(() => import('./pages/StudyHome.tsx'), 'StudyHome');
 const TrackPage = named(() => import('./pages/StudyHome.tsx'), 'TrackPage');
 const LessonPage = named(() => import('./pages/StudyHome.tsx'), 'LessonPage');
 const MicPage = named(() => import('./pages/MicPage.tsx'), 'MicPage');
+const ConstellationPage = named(() => import('./pages/ConstellationPage.tsx'), 'ConstellationPage');
 const Stage = named(() => import('./pages/Stage.tsx'), 'Stage');
 
 // Reads the saved preference, never the <html> class (the stage forces dark while it is open).
@@ -83,6 +84,7 @@ const Layout = () => {
           <Route path="/microfone" element={<MicPage />} />
           <Route path="/estudo" element={<StudyHome />} />
           <Route path="/estudo/ferramentas" element={<StudyPage />} />
+          <Route path="/estudo/constelacao" element={<ConstellationPage />} />
           <Route path="/estudo/trilha/:id" element={<TrackPage />} />
           <Route path="/estudo/aula/:id" element={<LessonPage />} />
           <Route path="/armazenamento" element={<StoragePage />} />

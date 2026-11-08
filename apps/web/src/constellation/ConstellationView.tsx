@@ -133,6 +133,7 @@ export const ConstellationView = ({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        role="group"
         aria-label={`Constelação a partir de ${name(web.focus)}`}
       >
         <g
