@@ -1,10 +1,11 @@
-import { FolderOpen, Music, Plus, Search } from 'lucide-react';
+import { FolderOpen, Music, Plus, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AboutButton } from '../components/About.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { Link } from 'react-router';
 import { ImportButton } from '../components/PackageButtons.tsx';
-import { type Song, listSongs } from '../lib/db.ts';
+import { type Song, deleteSong, listSongs } from '../lib/db.ts';
+import { confirmDialog } from '../ui/Dialog.tsx';
 
 const STATUS: Record<Song['analysisStatus'], string | null> = {
   pending: 'Aguardando análise',
@@ -99,8 +100,8 @@ export const Library = () => {
 
       <ul className="mt-4 divide-y divide-border">
         {visible.map((song) => (
-          <li key={song.id}>
-            <Link to={`/musica/${song.id}`} className="-mx-3 flex items-center gap-4 rounded-xl px-3 py-3.5 transition-colors hover:bg-surface-2 active:bg-surface-2">
+          <li key={song.id} className="-mx-3 flex items-center gap-1 rounded-xl pr-1 transition-colors hover:bg-surface-2">
+            <Link to={`/musica/${song.id}`} className="flex min-w-0 flex-1 items-center gap-4 rounded-xl px-3 py-3.5 active:bg-surface-2">
               <span className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-2 font-[family-name:var(--font-display)] text-base font-semibold text-chord">
                 {song.key ?? '–'}
               </span>
@@ -114,6 +115,21 @@ export const Library = () => {
                 </span>
               </span>
             </Link>
+            <button
+              type="button"
+              aria-label={`Excluir “${song.title}”`}
+              title="Excluir da biblioteca"
+              onClick={() =>
+                void confirmDialog({ title: 'Excluir música?', message: `“${song.title}” sai da biblioteca, com o áudio, a cifra e as faixas.`, confirmLabel: 'Excluir' }).then(async (ok) => {
+                  if (!ok) return;
+                  await deleteSong(song.id);
+                  setSongs((list) => list?.filter((x) => x.id !== song.id) ?? null);
+                })
+              }
+              className="flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-danger"
+            >
+              <Trash2 className="size-4" />
+            </button>
           </li>
         ))}
       </ul>
