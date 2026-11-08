@@ -77,3 +77,14 @@ describe('Sobre: first visit', () => {
     expect(screen.getByRole('dialog').className).toContain('max-h-[92dvh]');
   });
 });
+
+describe('Sobre: logo', () => {
+  it('points to a logo that exists in public/', async () => {
+    const { existsSync } = await import('node:fs');
+    render(<AboutButton />);
+    await userEvent.click(screen.getByRole('button', { name: /Conheça o will-music/ }));
+    const logo = screen.getByRole('img', { name: /Will-Music/ });
+    const file = logo.getAttribute('src')!.replace(/^\//, '');
+    expect(existsSync(`${process.cwd()}/public/${file}`), file).toBe(true);
+  });
+});
