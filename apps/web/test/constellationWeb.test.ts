@@ -79,7 +79,7 @@ describe('constellation v2', () => {
     const g = orbit(w).find((l) => chordName(l.move.to, l.move.nextCenter) === 'G7')!.move;
     const dark = g.options.find((o) => o.to.quality === '7(b9)')!;
     w = walk(w, dark);
-    expect(Object.keys(w.nodes).filter((k) => k.startsWith('7:'))).toHaveLength(1);
+    expect(Object.keys(w.nodes).filter((k) => k === '7:dom')).toHaveLength(1);
     expect(w.nodes[w.focus]!.chord.quality).toBe('7(b9)');
   });
 

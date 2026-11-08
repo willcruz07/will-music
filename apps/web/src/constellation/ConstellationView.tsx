@@ -234,9 +234,11 @@ export const ConstellationView = ({
 
           {Object.values(web.nodes).map((n) => {
             if (n.key === web.focus || orbitKeys.has(n.key)) return null;
+            // On the trail, the inner ring takes the color of the step that reached the star, like its halo.
+            const ring = trailSet.has(n.key) ? (n.via ? colorOf(n.via) : 'var(--primary)') : 'var(--border)';
             return (
               <g key={n.key} role="button" aria-label={`${name(n.key)}, voltar a este acorde`} className="cursor-pointer" onClick={tap(() => onFocusStar(n.key))}>
-                <circle cx={n.x} cy={n.y} r={22} fill="var(--surface)" stroke={trailSet.has(n.key) ? 'var(--primary)' : 'var(--border)'} strokeWidth={trailSet.has(n.key) ? 2.5 : 1} opacity={trailSet.has(n.key) ? 0.9 : 0.5} />
+                <circle data-ring={n.key} cx={n.x} cy={n.y} r={22} fill="var(--surface)" stroke={ring} strokeWidth={trailSet.has(n.key) ? 2.5 : 1} opacity={trailSet.has(n.key) ? 0.9 : 0.5} />
                 <text x={n.x} y={n.y + 4} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)">
                   {name(n.key)}
                 </text>

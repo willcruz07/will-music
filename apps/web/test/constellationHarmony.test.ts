@@ -251,3 +251,35 @@ describe('a plain dominant offers both resolutions', () => {
     expect(resolves).toContain('Cm7');
   });
 });
+
+describe('every tension: resolve, chromatic approach above and below, or turn into its own minor', () => {
+  it('G7 offers Ab7 and F#7 (chromatic approach) and Gm7 (relaxes into the ii of F)', () => {
+    const m = at(neighbors({ root: 7, quality: '7' }, C));
+    expect(m['Ab7']!.motion).toBe('tensiona');
+    expect(m['Ab7']!.why).toMatch(/sobe meio tom/);
+    expect(m['F#7']!.why).toMatch(/desce meio tom/);
+    expect(m['Gm7']!.motion).toBe('relaxa');
+    expect(m['Gm7']!.why).toMatch(/ii de um novo ii–V, que leva a F/);
+    // From Gm7 the new ii–V continues: C7, which resolves in F.
+    const fromGm = at(neighbors(m['Gm7']!.to, m['Gm7']!.nextCenter));
+    expect(fromGm['C7']!.motion).toBe('tensiona');
+  });
+
+  it('walks C7M → C#°7 → Dm7 → G7(13) → F#7(13) → F#m7 → B7 → E7M', () => {
+    const path = ['C#°7', 'Dm7', 'G7', 'F#7', 'F#m7', 'B7', 'E7M'];
+    let chord: Chord = { root: 0, quality: '7M' };
+    let center = C;
+    const walked: string[] = [];
+    for (const name of path) {
+      const moves = neighbors(chord, center);
+      const move = moves.flatMap((mv) => mv.options.length ? mv.options : [mv]).find((mv) => chordName(mv.to, mv.nextCenter) === name);
+      expect(move, `${walked.join(' → ')} → ${name}`).toBeDefined();
+      walked.push(name);
+      chord = move!.to;
+      center = move!.nextCenter;
+    }
+    // The 13th colors are in the balloons of G7 and F#7.
+    const g7 = neighbors({ root: 2, quality: 'm7' }, C).find((mv) => chordKey(mv.to) === '7:dom')!;
+    expect(g7.options.map((o) => chordName(o.to, o.nextCenter))).toContain('G7(13)');
+  });
+});

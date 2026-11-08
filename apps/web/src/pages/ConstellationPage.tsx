@@ -240,7 +240,7 @@ export const ConstellationPage = () => {
             <ol aria-label="Caminho" className="mt-3 space-y-2 text-sm">
               {steps.map((s, i) => (
                 <li key={`${i}-${s.name}`} className="border-l-2 pl-3" style={{ borderColor: s.color }}>
-                  <button type="button" aria-label={`Voltar para ${s.name}`} title={`Voltar para ${s.name}`} onClick={() => refocus(web.trail[i + 1]!)} className="rounded font-semibold text-chord underline-offset-4 hover:underline">
+                  <button type="button" aria-label={`Voltar para ${s.name}`} title={`Voltar para ${s.name}`} onClick={() => refocus(web.trail[i + 1]!)} className="rounded font-semibold underline-offset-4 hover:underline" style={{ color: s.color }}>
                     {s.name}
                   </button>{' '}
                   <span className="text-xs font-semibold" style={{ color: s.color }}>
