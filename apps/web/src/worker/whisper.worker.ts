@@ -7,7 +7,7 @@ import { whisperModelFor } from '../lib/whisperModel.ts';
 export type WhisperRequest = { type: 'transcribe'; audio: Float32Array } | { type: 'preload' };
 export type WhisperResponse =
   | { type: 'progress'; loaded: number; total: number }
-  | { type: 'result'; chunks: WhisperChunk[]; device: 'webgpu' | 'wasm' }
+  | { type: 'result'; chunks: WhisperChunk[]; device: 'webgpu' | 'wasm'; words: boolean }
   | { type: 'ready' }
   | { type: 'error'; message: string };
 
@@ -45,14 +45,18 @@ self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
       asr = await load(device);
     }
     if (request.type === 'preload') return post({ type: 'ready' });
-    const output = (await asr(request.audio, {
-      language: 'portuguese',
-      task: 'transcribe',
-      return_timestamps: true,
-      chunk_length_s: 30,
-      stride_length_s: 5,
-    })) as { chunks?: WhisperChunk[] };
-    post({ type: 'result', chunks: output.chunks ?? [], device });
+    const run = (timestamps: true | 'word') =>
+      asr(request.audio, { language: 'portuguese', task: 'transcribe', return_timestamps: timestamps, chunk_length_s: 30, stride_length_s: 5 }) as Promise<{ chunks?: WhisperChunk[] }>;
+    // Word timestamps put each line where its first word is sung; segment timestamps are the fallback.
+    let words = true;
+    let output: { chunks?: WhisperChunk[] };
+    try {
+      output = await run('word');
+    } catch {
+      words = false;
+      output = await run(true);
+    }
+    post({ type: 'result', chunks: output.chunks ?? [], device, words });
   } catch (error) {
     post({ type: 'error', message: error instanceof Error ? error.message : String(error) });
   }

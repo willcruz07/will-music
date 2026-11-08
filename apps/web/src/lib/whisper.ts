@@ -1,7 +1,7 @@
 import type { WhisperRequest, WhisperResponse } from '../worker/whisper.worker.ts';
 import { db } from './db.ts';
 import { findVoiceTracks, getStems } from './stems.ts';
-import { type WhisperChunk, isUsefulTranscript, transcriptToLines } from './transcript.ts';
+import { type WhisperChunk, isUsefulTranscript, leadingSilence, transcriptToLines, wordsToSegments } from './transcript.ts';
 import type { LyricLine } from './db.ts';
 import { type WhisperDevice, detectWhisperDevice, whisperModelFor } from './whisperModel.ts';
 
@@ -18,7 +18,7 @@ const decodeMono16k = async (blob: Blob): Promise<Float32Array> => {
   return out;
 };
 
-const runWhisper = (audio: Float32Array, onProgress: (loaded: number, total: number) => void): Promise<{ chunks: WhisperChunk[]; device: string }> =>
+const runWhisper = (audio: Float32Array, onProgress: (loaded: number, total: number) => void): Promise<{ chunks: WhisperChunk[]; device: string; words: boolean }> =>
   new Promise((resolve, reject) => {
     const worker = new Worker(new URL('../worker/whisper.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (event: MessageEvent<WhisperResponse>) => {
@@ -86,8 +86,14 @@ export const transcribeSong = async (
     if (!original) throw new Error('Esta música não tem áudio para transcrever.');
     audio = await decodeMono16k(original.blob);
   }
-  const { chunks } = await runWhisper(audio, onProgress);
-  const lines = transcriptToLines(chunks);
+  // Skip the silent intro: Whisper tends to loop on a made-up phrase over silence. Timestamps are shifted back.
+  const offset = leadingSilence(audio, RATE);
+  const { chunks: raw, words } = await runWhisper(offset ? audio.slice(Math.round(offset * RATE)) : audio, onProgress);
+  const chunks = words ? wordsToSegments(raw) : raw;
+  const lines = transcriptToLines(chunks.map((c) => ({
+    text: c.text,
+    timestamp: [c.timestamp[0] + offset, c.timestamp[1] === null ? null : c.timestamp[1] + offset] as WhisperChunk['timestamp'],
+  })));
   if (!isUsefulTranscript(lines)) throw new Error('Não deu para entender a letra neste áudio.');
   return { lines, usedVocals: vocalTracks.length > 0 };
 };
