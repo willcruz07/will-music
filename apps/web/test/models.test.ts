@@ -6,7 +6,9 @@ const store = new Map<string, Response>();
 const fakeCaches = {
   open: async () => ({
     match: async (url: string) => store.get(url)?.clone(),
-    put: async (url: string, response: Response) => void store.set(url, response),
+    put: async (url: string, response: Response) => void store.set(url, new Response(await response.arrayBuffer())),
+    delete: async (url: string) => store.delete(url),
+    keys: async () => [...store.keys()].map((url) => new Request(url)),
   }),
 };
 
@@ -19,6 +21,19 @@ beforeEach(() => {
 });
 
 describe('fetchModel', () => {
+  it('streams a download into the cache without hashing the whole model in one buffer (iPad memory)', async () => {
+    const bytes = new TextEncoder().encode('modelo grande'.repeat(1000));
+    const original = MODELS.skey.sha256;
+    MODELS.skey.sha256 = await sha256(bytes);
+    const digest = vi.spyOn(crypto.subtle, 'digest');
+    const out = await fetchModel('skey', undefined, vi.fn(async () => new Response(bytes)));
+    expect(out.length).toBe(bytes.length);
+    expect(digest).not.toHaveBeenCalled();
+    expect(store.size).toBe(1);
+    digest.mockRestore();
+    MODELS.skey.sha256 = original;
+  });
+
   it('downloads once, verifies the hash and serves later calls from the cache', async () => {
     const bytes = new TextEncoder().encode('modelo de teste');
     const original = MODELS.skey.sha256;

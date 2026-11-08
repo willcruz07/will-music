@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import { pipeline } from '@huggingface/transformers';
 import type { WhisperChunk } from '../lib/transcript.ts';
+import { whisperModelFor } from '../lib/whisperModel.ts';
 
 /** `preload` only downloads and caches the model (first-run setup); `transcribe` runs it on audio. */
 export type WhisperRequest = { type: 'transcribe'; audio: Float32Array } | { type: 'preload' };
@@ -19,7 +20,8 @@ self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
     const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
     let device: 'webgpu' | 'wasm' = (await gpu?.requestAdapter().catch(() => null)) ? 'webgpu' : 'wasm';
     const files = new Map<string, { loaded: number; total: number }>();
-    const load = (dev: 'webgpu' | 'wasm') => pipeline('automatic-speech-recognition', 'onnx-community/whisper-small_timestamped', {
+    // The model follows the device: small on the GPU, the lighter base on the processor (see whisperModel.ts).
+    const load = (dev: 'webgpu' | 'wasm') => pipeline('automatic-speech-recognition', whisperModelFor(dev), {
       device: dev,
       dtype: { encoder_model: 'q4', decoder_model_merged: 'q4' },
       progress_callback: (p: { status: string; file?: string; loaded?: number; total?: number }) => {

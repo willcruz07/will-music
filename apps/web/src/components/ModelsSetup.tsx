@@ -3,21 +3,20 @@ import { useEffect, useState } from 'react';
 import { MODELS } from '@will-music/engine';
 import { BASIC_MODELS, downloadModels, missingModels } from '../lib/models.ts';
 import { formatBytes } from '../lib/storage.ts';
-import { preloadWhisper, whisperCached } from '../lib/whisper.ts';
+import { WHISPER_BYTES, detectWhisperDevice, preloadWhisper, whisperCached } from '../lib/whisper.ts';
 import { BottomSheet } from '../ui/BottomSheet.tsx';
 import { Button } from '../ui/Button.tsx';
 
 const ASKED_KEY = 'wm-models-asked';
-const WHISPER_BYTES = 300 * 1024 * 1024;
 const mb = (bytes: number) => formatBytes(bytes);
 
-const ITEMS = [
+// The lyrics model depends on the device (lighter where there is no WebGPU); the list shows the larger one until known.
+const items = (whisperBytes: number) => [
   { label: 'Acordes e tom', about: 'para montar a cifra de cada música', bytes: MODELS.chordnet.bytes + MODELS.cqtPlan.bytes + MODELS.skey.bytes },
   { label: 'Separar voz e instrumental', about: 'para ouvir e treinar cada parte', bytes: MODELS.kara2Core.bytes + MODELS.kara2Data.bytes },
-  { label: 'Transcrição da letra', about: 'quando a letra não é encontrada na internet', bytes: WHISPER_BYTES },
+  { label: 'Transcrição da letra', about: 'quando a letra não é encontrada na internet', bytes: whisperBytes },
   { label: 'Notas da partitura', about: 'para gerar partituras e tablaturas', bytes: MODELS.basicPitch.bytes },
 ];
-const TOTAL = ITEMS.reduce((n, i) => n + i.bytes, 0);
 
 const asked = () => {
   try {
@@ -42,6 +41,14 @@ type Phase = { kind: 'ask' } | { kind: 'installing'; label: string; fraction: nu
  */
 export const ModelsSetup = () => {
   const [phase, setPhase] = useState<Phase | null>(null);
+  const [whisperBytes, setWhisperBytes] = useState(WHISPER_BYTES.webgpu);
+  useEffect(() => {
+    void detectWhisperDevice()
+      .then((d) => setWhisperBytes(WHISPER_BYTES[d]))
+      .catch(() => {});
+  }, []);
+  const ITEMS = items(whisperBytes);
+  const TOTAL = ITEMS.reduce((n, i) => n + i.bytes, 0);
 
   useEffect(() => {
     if (asked()) return;

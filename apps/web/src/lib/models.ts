@@ -1,9 +1,7 @@
 import { MODELS, type ModelId } from '@will-music/engine';
+import { createSha256 } from './sha256.ts';
 
 const CACHE_NAME = 'wm-models-v1';
-
-const toHex = (digest: ArrayBuffer): string =>
-  Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 
 const readWithProgress = async (response: Response, total: number, onProgress?: (loaded: number, total: number) => void): Promise<Uint8Array<ArrayBuffer>> => {
   if (!response.body) return new Uint8Array(await response.arrayBuffer());
@@ -26,7 +24,74 @@ const readWithProgress = async (response: Response, total: number, onProgress?: 
   return loaded === out.length ? out : out.slice(0, loaded);
 };
 
-/** Model bytes from Cache Storage, or downloaded from the pinned URL and verified by SHA-256 before caching. */
+const download = async (id: ModelId, fetchFn: typeof fetch): Promise<Response> => {
+  let response: Response;
+  try {
+    response = await fetchFn(MODELS[id].url);
+  } catch {
+    throw new Error(`Não foi possível baixar o modelo ${id}. Verifique a conexão e tente de novo.`);
+  }
+  if (!response.ok) throw new Error(`Não foi possível baixar o modelo ${id} (HTTP ${response.status}).`);
+  return response;
+};
+
+const corrupted = (id: ModelId) => new Error(`Modelo corrompido: ${id}. Tente de novo.`);
+
+/**
+ * Downloads a model straight into Cache Storage, hashing it chunk by chunk on the way: memory stays at a few
+ * chunks instead of the whole file (a 235 MB model held, hashed and copied whole used to kill the page on iPad).
+ * A model whose SHA-256 does not match is removed again. Returns the bytes only when the cache refused to store
+ * them (storage full, private window), from an in-memory fallback download.
+ */
+export const cacheModel = async (
+  id: ModelId,
+  onProgress?: (loaded: number, total: number) => void,
+  fetchFn: typeof fetch = fetch,
+): Promise<Uint8Array<ArrayBuffer> | null> => {
+  const model = MODELS[id];
+  const cache = await caches.open(CACHE_NAME);
+  const response = await download(id, fetchFn);
+  const hash = createSha256();
+  if (response.body) {
+    const reader = response.body.getReader();
+    let loaded = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        const { done, value } = await reader.read();
+        if (done) return controller.close();
+        hash.update(value);
+        loaded += value.length;
+        onProgress?.(loaded, model.bytes);
+        controller.enqueue(value);
+      },
+      cancel(reason) {
+        void reader.cancel(reason);
+      },
+    });
+    let stored = true;
+    try {
+      await cache.put(model.url, new Response(stream));
+    } catch (error) {
+      console.warn(`Modelo ${id} não foi guardado no aparelho`, error);
+      stored = false;
+    }
+    if (stored) {
+      if (hash.hex() !== model.sha256) {
+        await cache.delete(model.url);
+        throw corrupted(id);
+      }
+      return null;
+    }
+  }
+  // The cache refused the model: download it again into memory so it still works now (it is fetched again next time).
+  const bytes = await readWithProgress(response.bodyUsed ? await download(id, fetchFn) : response, model.bytes, onProgress);
+  const check = createSha256();
+  check.update(bytes);
+  if (check.hex() !== model.sha256) throw corrupted(id);
+  return bytes;
+};
+
+/** Model bytes from Cache Storage, or downloaded (streamed into the cache, verified by SHA-256) first. */
 export const fetchModel = async (
   id: ModelId,
   onProgress?: (loaded: number, total: number) => void,
@@ -40,23 +105,11 @@ export const fetchModel = async (
     onProgress?.(bytes.length, bytes.length);
     return bytes;
   }
-  let response: Response;
-  try {
-    response = await fetchFn(model.url);
-  } catch {
-    throw new Error(`Não foi possível baixar o modelo ${id}. Verifique a conexão e tente de novo.`);
-  }
-  if (!response.ok) throw new Error(`Não foi possível baixar o modelo ${id} (HTTP ${response.status}).`);
-  const bytes = await readWithProgress(response, model.bytes, onProgress);
-  const actual = toHex(await crypto.subtle.digest('SHA-256', bytes));
-  if (actual !== model.sha256) throw new Error(`Modelo corrompido: ${id}. Tente de novo.`);
-  try {
-    await cache.put(model.url, new Response(bytes));
-  } catch (error) {
-    // Storage full (e.g. a private window): the verified model still works now, it is just downloaded again next time.
-    console.warn(`Modelo ${id} não foi guardado no aparelho`, error);
-  }
-  return bytes;
+  const kept = await cacheModel(id, onProgress, fetchFn);
+  if (kept) return kept;
+  const stored = await cache.match(model.url);
+  if (!stored) throw new Error(`O modelo ${id} não ficou guardado no aparelho. Tente de novo.`);
+  return new Uint8Array(await stored.arrayBuffer());
 };
 
 export const listCachedModels = async (): Promise<{ id: ModelId; bytes: number }[]> => {
@@ -101,7 +154,8 @@ export const downloadModels = async (ids: ModelId[], onProgress: (done: number, 
   const total = missing.reduce((n, id) => n + MODELS[id].bytes, 0);
   let base = 0;
   for (const id of missing) {
-    await fetchModel(id, (loaded) => onProgress(base + loaded, total), fetchFn);
+    // Straight into the cache: nothing is read back, so the page never holds a whole model in memory.
+    await cacheModel(id, (loaded) => onProgress(base + loaded, total), fetchFn);
     base += MODELS[id].bytes;
   }
   onProgress(total, total);
