@@ -1,3 +1,4 @@
+import { isIOS } from '../lib/ios.ts';
 import { Pause, Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { chordNotes } from '../lib/chordNotation.ts';
@@ -119,7 +120,12 @@ export const useStudySynth = () => {
   return { play, stop, playing };
 };
 
+/** iPhone only: Web Audio is muted by the silent switch, so say so under every button that plays a sound. */
+export const SilentModeHint = ({ className = '' }: { className?: string }) =>
+  isIOS() ? <span className={`block text-xs text-danger ${className}`}>Se não estiver ouvindo, verifique se o iPhone está no silencioso.</span> : null;
+
 export const PlayButton = ({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) => (
+  <span className="inline-flex flex-col items-start gap-1">
   <button
     type="button"
     onClick={onClick}
@@ -128,4 +134,6 @@ export const PlayButton = ({ active, onClick, label }: { active: boolean; onClic
   >
     {active ? <Pause className="size-4" /> : <Play className="size-4" />} {active ? 'Parar' : 'Ouvir'}
   </button>
+  <SilentModeHint />
+  </span>
 );
