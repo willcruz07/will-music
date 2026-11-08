@@ -149,3 +149,15 @@ describe('review 2 fixes: page', () => {
     expect(screen.queryByRole('dialog', { name: /G/ })).toBeNull();
   });
 });
+
+describe('the progression in the colors of its actions', () => {
+  it('colors each chord of "Seu caminho" with its step', async () => {
+    await startAtC();
+    await goTo('Am7');
+    await goTo('G7');
+    const chords = within(screen.getByTestId('progression')).getAllByTestId('chord');
+    expect(chords.map((c) => c.textContent)).toEqual(['C7M', 'Am7', 'G7']);
+    expect(chords[1]!.getAttribute('data-motion')).toBe('relaxa');
+    expect(chords[2]!.getAttribute('data-motion')).toBe('tensiona');
+  });
+});

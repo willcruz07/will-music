@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ConstellationView } from '../src/constellation/ConstellationView.tsx';
+import { ConstellationView, colorOf } from '../src/constellation/ConstellationView.tsx';
 import { chordName, parseChord } from '../src/constellation/harmony.ts';
 import { openFocus, orbit, previewStars, startWeb, walk } from '../src/constellation/web.ts';
 
@@ -50,10 +50,7 @@ describe('ConstellationView', () => {
     const { unmount } = render(<ConstellationView web={web()} selected={null} {...handlers()} />);
     expect(screen.getByText('Relaxar')).toBeInTheDocument();
     expect(screen.getByText('Tensionar')).toBeInTheDocument();
-    expect(screen.queryByText('Resolver')).toBeNull();
     unmount();
-    render(<ConstellationView web={openFocus(startWeb(parseChord('G7')!))} selected={null} {...handlers()} />);
-    expect(screen.getByText('Resolver')).toBeInTheDocument();
   });
 
   it('the orbit is reachable by keyboard: Enter selects first, then walks', async () => {
@@ -116,5 +113,24 @@ describe('altered tensions in pink', () => {
     expect(screen.getByRole('button', { name: 'C#°7, tensiona, alterado' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'G7, tensiona' })).toBeInTheDocument();
     expect(screen.getByText('Tensão alterada')).toBeInTheDocument();
+  });
+});
+
+describe('the trail in the colors of its actions', () => {
+  it('colors each walked star with the action that reached it', () => {
+    let w = openFocus(startWeb(parseChord('C7M')!));
+    const toG7 = orbit(w).find((l) => l.to === '7:dom')!.move;
+    w = walk(w, toG7);
+    const toC = orbit(w).find((l) => l.to === '0:maj')!.move;
+    w = walk(w, toC);
+    render(<ConstellationView web={w} selected={null} {...handlers()} />);
+    const trail = screen.getByTestId('trail');
+    expect(trail.querySelector('[data-key="7:dom"]')!.getAttribute('data-color')).toBe(colorOf(toG7));
+    expect(trail.querySelector('[data-key="0:maj"]')!.getAttribute('data-color')).toBe(colorOf(toC));
+  });
+
+  it('always shows the four entries of the legend', () => {
+    render(<ConstellationView web={web()} selected={null} {...handlers()} />);
+    for (const t of ['Resolver', 'Tensionar', 'Tensão alterada', 'Relaxar']) expect(screen.getByText(t)).toBeInTheDocument();
   });
 });

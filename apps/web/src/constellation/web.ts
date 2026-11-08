@@ -8,7 +8,7 @@ import { type Center, type Chord, type Motion, type Move, chordKey, neighbors, s
  */
 
 /** `resolvesTo`: where a substitute dominant was aimed when it was reached (Db7 as the subV of C). */
-export type StarNode = { key: string; chord: Chord; center: Center; x: number; y: number; resolvesTo?: Chord };
+export type StarNode = { key: string; chord: Chord; center: Center; x: number; y: number; resolvesTo?: Chord; via?: Move };
 export type Link = { from: string; to: string; move: Move };
 export type Web = { nodes: Record<string, StarNode>; links: Link[]; trail: string[]; focus: string; center: Center; opened: boolean };
 export type PreviewStar = { key: string; chord: Chord; center: Center; x: number; y: number; from: string; move: Move };
@@ -91,7 +91,8 @@ export const walk = (web: Web, move: Move): Web => {
   const at = web.nodes[key] ?? { key, ...freeSpot(Object.values(web.nodes), web.nodes[web.focus]!, 0) };
   // The type the student chose (G7(b9) instead of G7) is what the star now holds.
   const { resolvesTo: _old, ...rest } = at as StarNode;
-  const nodes = { ...web.nodes, [key]: { ...rest, key, chord: move.to, center: move.nextCenter, ...(move.resolvesTo ? { resolvesTo: move.resolvesTo } : {}) } };
+  // `via`: the step that reached this star, so the trail can show each star in the color of its action.
+  const nodes = { ...web.nodes, [key]: { ...rest, key, chord: move.to, center: move.nextCenter, via: move, ...(move.resolvesTo ? { resolvesTo: move.resolvesTo } : {}) } };
   return openFocus({ ...web, nodes, trail: [...web.trail, key], focus: key, center: move.nextCenter });
 };
 

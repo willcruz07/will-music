@@ -56,11 +56,11 @@ describe('harmony v2: relax, tension, resolution', () => {
     expect(m['G7']!.motion).toBe('tensiona');
   });
 
-  it('A7 → Dm7 resolves locally and Dm7 then prepares G7', () => {
+  it('A7 → Dm7 resolves and moves the center to Dm (the ii of C); Dm7 still prepares G7', () => {
     const toDm = at(neighbors({ root: 9, quality: '7' }, C))['Dm7']!;
     expect(toDm.motion).toBe('resolve');
-    expect(toDm.nextCenter).toEqual(C);
-    expect(toDm.why).toMatch(/prepara/);
+    expect(toDm.nextCenter).toEqual({ root: 2, minor: true });
+    expect(toDm.why).toContain('Dm (o ii de C)');
     expect(at(neighbors(toDm.to, toDm.nextCenter))['G7']!.motion).toBe('tensiona');
   });
 

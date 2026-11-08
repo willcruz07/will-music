@@ -297,7 +297,8 @@ const centerAfter = (to: Chord, center: Center, rule: { resolution?: boolean; ke
   if (rule.keep) return center;
   if (rule.resolution) {
     // A minor chord that is a degree of the key resolves locally (A7 → Dm7 stays in C); elsewhere it becomes the center.
-    if (g === 'min') return minorDegree(to.root, center) && !(d === 0 && !center.minor) ? center : { root: mod12(to.root), minor: true };
+    // Every resolution moves the center to the chord it lands on (A7 → Dm7: the center becomes Dm).
+    if (g === 'min') return d === 0 && center.minor ? center : { root: mod12(to.root), minor: true };
     if (g === 'maj') return d === 0 && !center.minor ? center : { root: mod12(to.root), minor: false };
     return center;
   }
@@ -315,6 +316,10 @@ const BALLOON: Record<Group, Quality[]> = {
   hdim: ['m7(b5)'],
   dim: ['°7'],
 };
+
+/** Names of the degrees of a key, to tell where a new center sits in the old one. */
+const MAJOR_DEGREES: Record<number, string> = { 2: 'ii', 4: 'iii', 5: 'IV', 7: 'V', 9: 'vi' };
+const MINOR_DEGREES: Record<number, string> = { 3: 'III', 5: 'iv', 7: 'V', 8: 'VI', 10: 'VII' };
 
 const sameCenter = (a: Center, b: Center) => a.root === b.root && a.minor === b.minor;
 
@@ -367,12 +372,11 @@ export const neighbors = (current: Chord, center: Center, resolvesTo?: Chord): M
     const motion = motionOf(level, to, rule);
     const nextCenter = centerAfter(to, center, rule);
     const name = chordName(to, nextCenter);
-    const local = rule.resolution && groupOf(to.quality) === 'min' && sameCenter(nextCenter, center) && levelOf(to, center) === 'afastamento';
-    const next = local
-      ? ` Resolução local: o ${name} já prepara o ${chordName({ root: mod12(root + 5), quality: '7' }, center)}.`
-      : sameCenter(nextCenter, center)
-        ? ''
-        : ` O centro tonal passa a ser ${chordName({ root, quality: nextCenter.minor ? 'm' : '', ...(flat ? { flat: true } : {}) }, nextCenter)}.`;
+    // When the new center is a degree of the old one, say so: "o centro tonal passa a ser Dm (o ii de C)".
+    const degreeName = (center.minor ? MINOR_DEGREES : MAJOR_DEGREES)[degree(root, center)];
+    const next = sameCenter(nextCenter, center)
+      ? ''
+      : ` O centro tonal passa a ser ${chordName({ root, quality: nextCenter.minor ? 'm' : '', ...(flat ? { flat: true } : {}) }, nextCenter)}${degreeName ? ` (o ${degreeName} de ${centerName(center)})` : ''}.`;
     const ctx: Ctx = {
       cur,
       res,

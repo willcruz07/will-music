@@ -7,10 +7,12 @@ export const ALTERED_COLOR = '#f472b6';
 /** Motion color, with altered tensions (b9, #5, °7) in pink so the spice of the reharmonization stands out. */
 export const colorOf = (m: Move): string => (m.motion === 'tensiona' && isAltered(m.to) ? ALTERED_COLOR : MOTION_COLOR[m.motion]);
 
-const SECTORS: { motion: Motion; label: string }[] = [
-  { motion: 'resolve', label: 'Resolver' },
-  { motion: 'tensiona', label: 'Tensionar' },
-  { motion: 'relaxa', label: 'Relaxar' },
+/** The legend always shows the four actions. */
+const LEGEND: { label: string; color: string }[] = [
+  { label: 'Resolver', color: MOTION_COLOR.resolve },
+  { label: 'Tensionar', color: MOTION_COLOR.tensiona },
+  { label: 'Tensão alterada', color: ALTERED_COLOR },
+  { label: 'Relaxar', color: MOTION_COLOR.relaxa },
 ];
 
 const TAP_SLOP = 8;
@@ -190,10 +192,19 @@ export const ConstellationView = ({
             ))}
           </g>
 
-          {/* The trail walked so far. */}
-          {web.trail.length > 1 && (
-            <polyline points={web.trail.map((k) => `${web.nodes[k]!.x},${web.nodes[k]!.y}`).join(' ')} fill="none" stroke="var(--primary)" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
-          )}
+          {/* The trail walked so far: each segment and each star in the color of the action that reached it. */}
+          <g data-testid="trail">
+            {web.trail.slice(1).map((k, i) => {
+              const a = web.nodes[web.trail[i]!]!;
+              const b = web.nodes[k]!;
+              return <line key={`seg-${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={b.via ? colorOf(b.via) : 'var(--primary)'} strokeWidth={4} strokeLinecap="round" />;
+            })}
+            {[...new Set(web.trail)].map((k) => {
+              const n = web.nodes[k]!;
+              const color = n.via ? colorOf(n.via) : 'var(--primary)';
+              return <circle key={`halo-${k}`} data-key={k} data-color={color} cx={n.x} cy={n.y} r={44} fill={color} fillOpacity={0.22} stroke={color} strokeWidth={3} />;
+            })}
+          </g>
 
           {Object.values(web.nodes).map((n) => {
             if (n.key === web.focus || orbitKeys.has(n.key)) return null;
@@ -239,7 +250,7 @@ export const ConstellationView = ({
 
           {web.opened ? (
             <g>
-              <circle cx={focus.x} cy={focus.y} r={46} fill="var(--primary)" />
+              <circle cx={focus.x} cy={focus.y} r={46} fill={focus.via ? colorOf(focus.via) : 'var(--primary)'} />
               <text x={focus.x} y={focus.y + 7} textAnchor="middle" fontSize={22} fontWeight={800} fill="var(--primary-foreground)">
                 {name(web.focus)}
               </text>
@@ -255,20 +266,14 @@ export const ConstellationView = ({
         </g>
       </svg>
       {/* Legend: the sectors present in the current orbit (Resolver only when the focus is a tension). */}
-      {links.length > 0 && (
+      {web.opened && (
         <ul aria-label="Movimentos" className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1 rounded-xl bg-background/70 px-2.5 py-2 text-xs backdrop-blur">
-          {SECTORS.filter((s) => links.some((l) => l.move.motion === s.motion)).map((s) => (
-            <li key={s.motion} className="flex items-center gap-1.5">
-              <span aria-hidden className="size-2.5 rounded-full" style={{ background: MOTION_COLOR[s.motion] }} />
+          {LEGEND.map((s) => (
+            <li key={s.label} className="flex items-center gap-1.5">
+              <span aria-hidden className="size-2.5 rounded-full" style={{ background: s.color }} />
               {s.label}
             </li>
           ))}
-          {links.some((l) => l.move.motion === 'tensiona' && isAltered(l.move.to)) && (
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="size-2.5 rounded-full" style={{ background: ALTERED_COLOR }} />
-              Tensão alterada
-            </li>
-          )}
         </ul>
       )}
     </div>

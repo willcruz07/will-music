@@ -218,7 +218,18 @@ export const ConstellationPage = () => {
           <div>
             <h2 className="text-sm font-semibold">Seu caminho</h2>
             <p data-testid="progression" className="mt-1 font-semibold text-chord">
-              {progression.join(' → ')}
+              {progression.map((name, i) => {
+                // Each chord in the color of the step that reached it (the starting chord keeps the chord color).
+                const step = i > 0 ? steps[i - 1] : undefined;
+                return (
+                  <span key={`${i}-${name}`}>
+                    {i > 0 && <span className="text-muted-foreground"> → </span>}
+                    <span data-testid="chord" data-motion={step?.motion} style={step ? { color: step.color } : undefined}>
+                      {name}
+                    </span>
+                  </span>
+                );
+              })}
             </p>
             {steps.length > 0 && (
               <p data-testid="pattern" className="mt-1 text-xs text-muted-foreground">
