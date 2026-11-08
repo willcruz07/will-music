@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AboutButton } from '../src/components/About.tsx';
+import { DialogHost } from '../src/ui/Dialog.tsx';
 
 describe('Sobre: bottom sheet about the author', () => {
   it('opens a sheet with the photo, contacts and Pix, and closes on Escape', async () => {
@@ -62,6 +63,19 @@ describe('Sobre: first visit', () => {
     render(<AboutButton autoOpenOnce />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Conheça o will-music/ })).toBeInTheDocument();
+  });
+
+  it('thanks the visitor when the first-visit presentation closes, but not when opened later', async () => {
+    localStorage.clear();
+    render(<><AboutButton autoOpenOnce /><DialogHost /></>);
+    await screen.findByRole('dialog', { name: /Will Cruz/ });
+    await userEvent.keyboard('{Escape}');
+    const thanks = await screen.findByRole('alertdialog', { name: /Obrigado/ });
+    await userEvent.click(within(thanks).getByRole('button', { name: 'OK' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Conheça o will-music/ }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
   it('does not open by itself without autoOpenOnce (Ajustes)', () => {

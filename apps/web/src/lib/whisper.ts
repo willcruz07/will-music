@@ -1,5 +1,6 @@
 import type { WhisperRequest, WhisperResponse } from '../worker/whisper.worker.ts';
 import { db } from './db.ts';
+import { notifyModelsChanged } from './modelsReminder.ts';
 import { findVoiceTracks, getStems } from './stems.ts';
 import { type WhisperChunk, isUsefulTranscript, leadingSilence, transcriptToLines, wordsToSegments } from './transcript.ts';
 import type { LyricLine } from './db.ts';
@@ -58,7 +59,10 @@ export const preloadWhisper = (onProgress: (loaded: number, total: number) => vo
       const msg = event.data;
       if (msg.type === 'progress') return onProgress(msg.loaded, msg.total);
       worker.terminate();
-      if (msg.type === 'ready') resolve();
+      if (msg.type === 'ready') {
+        notifyModelsChanged();
+        resolve();
+      }
       else reject(new Error(msg.type === 'error' ? msg.message : 'O modelo da letra não carregou.'));
     };
     worker.onerror = (e) => {

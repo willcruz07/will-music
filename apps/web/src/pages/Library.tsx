@@ -1,7 +1,6 @@
 import { FolderOpen, Music, Plus, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AboutButton } from '../components/About.tsx';
-import { ModelsSetup } from '../components/ModelsSetup.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { Link } from 'react-router';
 import { ImportButton } from '../components/PackageButtons.tsx';
@@ -137,7 +136,6 @@ export const Library = () => {
       {songs && songs.length > 0 && visible.length === 0 && <p className="mt-6 text-muted-foreground">Nenhuma música encontrada para “{query}”.</p>}
 
       <AboutButton autoOpenOnce />
-      <ModelsSetup />
     </section>
   );
 };
