@@ -79,6 +79,23 @@ describe('Constelação de acordes page', () => {
     expect(screen.getByTestId('pattern')).toHaveTextContent('relaxa → tensiona → resolve');
   });
 
+  it('each type in the balloon is in the color of its own move, and the altered one says so', async () => {
+    await startAtC();
+    await userEvent.pointer({ keys: '[TouchA]', target: star('G7') });
+    const balloon = screen.getByRole('dialog', { name: /G/ });
+    const label = (re: RegExp) => within(balloon).getByRole('radio', { name: re }).closest('label')!;
+    expect(label(/^G7,/).dataset.motion).toBe('tensiona');
+    expect(label(/^G7\(b9\)/).dataset.motion).toBe('tensão alterada');
+    // Not all green: the plain and the altered tension have different colors.
+    expect(label(/^G7\(b9\)/).style.borderColor).not.toBe(label(/^G7,/).style.borderColor);
+    await userEvent.click(within(balloon).getByRole('radio', { name: /^G7\(b9\)/ }));
+    expect(within(balloon).getByText('tensão alterada')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ir' }));
+    const diary = screen.getByRole('list', { name: 'Caminho' });
+    expect(within(diary).getByText('tensão alterada')).toBeInTheDocument();
+    expect(screen.getByTestId('pattern')).toHaveTextContent('tensão alterada');
+  });
+
   it('the balloon lists the types of the chosen root with a hint, and choosing one only selects', async () => {
     await startAtC();
     await userEvent.pointer({ keys: '[TouchA]', target: star('G7') });

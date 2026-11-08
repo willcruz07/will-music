@@ -10,6 +10,9 @@ export const ALTERED_COLOR = '#f472b6';
 export const colorOf = (m: Move): string => (m.motion === 'tensiona' && isAltered(m.to) ? ALTERED_COLOR : MOTION_COLOR[m.motion]);
 
 const MOTION_TEXT: Record<Motion, string> = { resolve: 'var(--motion-resolve-text)', tensiona: 'var(--motion-tension-text)', relaxa: 'var(--motion-relax-text)' };
+/** The move in words, telling an altered tension apart from a plain one (the four colors of the legend). */
+export const motionLabel = (m: Move): string => (m.motion === 'tensiona' && isAltered(m.to) ? 'tensão alterada' : m.motion);
+
 /** The same color for text (chord names): a darker tone on light themes, so it reads on white. */
 export const textColorOf = (m: Move): string => (m.motion === 'tensiona' && isAltered(m.to) ? 'var(--motion-altered-text)' : MOTION_TEXT[m.motion]);
 
@@ -176,6 +179,21 @@ export const ConstellationView = ({
     if (k) onSelect(k);
   };
 
+  /** Color of trail step i: the start in the main color, a jump back to an opened star as a relax, else its move. */
+  const stepColor = (i: number): string => {
+    if (i <= 0) return 'var(--primary)';
+    const move = web.steps[i];
+    return move ? colorOf(move) : MOTION_COLOR.relaxa;
+  };
+  /** Fill of a star already walked (its latest visit; the starting chord always keeps the start color), else undefined. */
+  const starColor = (key: string): string | undefined => {
+    if (!trailSet.has(key)) return undefined;
+    return web.trail[0] === key ? stepColor(0) : stepColor(web.trail.lastIndexOf(key));
+  };
+
+  // The chord in focus in the color of the step that reached it; the starting chord always keeps the start color.
+  const focusColor = web.focus === web.trail[0] ? stepColor(0) : stepColor(web.trail.length - 1);
+
   /** Each star is spelled in the center it lives in (the same spelling the diary and the balloon use). */
   const name = (key: string) => {
     const n = web.nodes[key]!;
@@ -222,28 +240,23 @@ export const ConstellationView = ({
             ))}
           </g>
 
-          {/* The trail walked so far: each segment and each star in the color of the action that reached it. */}
+          {/* The trail walked so far: each segment in the color of the step it was (a star visited twice keeps both). */}
           <g data-testid="trail">
             {web.trail.slice(1).map((k, i) => {
               const a = web.nodes[web.trail[i]!]!;
               const b = web.nodes[k]!;
-              return <line key={`seg-${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={b.via ? colorOf(b.via) : 'var(--primary)'} strokeWidth={4} strokeLinecap="round" />;
-            })}
-            {[...new Set(web.trail)].map((k) => {
-              const n = web.nodes[k]!;
-              const color = n.via ? colorOf(n.via) : 'var(--primary)';
-              return <circle key={`halo-${k}`} data-key={k} data-color={color} cx={n.x} cy={n.y} r={44} fill={color} fillOpacity={0.22} stroke={color} strokeWidth={3} />;
+              return <line key={`seg-${i}`} data-step={i + 1} data-color={stepColor(i + 1)} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={stepColor(i + 1)} strokeWidth={4} strokeLinecap="round" />;
             })}
           </g>
 
           {Object.values(web.nodes).map((n) => {
             if (n.key === web.focus || orbitKeys.has(n.key)) return null;
-            // On the trail, the inner ring takes the color of the step that reached the star, like its halo.
-            const ring = trailSet.has(n.key) ? (n.via ? colorOf(n.via) : 'var(--primary)') : 'var(--border)';
+            // A star already walked is filled with the color of the step that reached it, the chord in contrast.
+            const walked = starColor(n.key);
             return (
               <g key={n.key} role="button" aria-label={`${name(n.key)}, voltar a este acorde`} className="cursor-pointer" onClick={tap(() => onFocusStar(n.key))}>
-                <circle data-ring={n.key} cx={n.x} cy={n.y} r={22} fill="var(--surface)" stroke={ring} strokeWidth={trailSet.has(n.key) ? 2.5 : 1} opacity={trailSet.has(n.key) ? 0.9 : 0.5} />
-                <text x={n.x} y={n.y + 4} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)">
+                <circle data-key={n.key} data-color={walked} cx={n.x} cy={n.y} r={walked ? 26 : 22} fill={walked ?? 'var(--surface)'} stroke={walked ?? 'var(--border)'} strokeWidth={1} opacity={walked ? 1 : 0.5} />
+                <text x={n.x} y={n.y + 4} textAnchor="middle" fontSize={walked ? 12 : 11} fontWeight={walked ? 700 : 400} fill={walked ? 'var(--on-motion)' : 'var(--muted-foreground)'}>
                   {name(n.key)}
                 </text>
               </g>
@@ -255,6 +268,8 @@ export const ConstellationView = ({
             const label = chordName(l.move.to, l.move.nextCenter);
             const altered = l.move.motion === 'tensiona' && isAltered(l.move.to);
             const sel = selected === l.to;
+            // Already on the trail: filled with that step's color; the ring keeps the color of this move.
+            const walked = starColor(l.to);
             return (
               <g
                 key={l.to}
@@ -269,11 +284,11 @@ export const ConstellationView = ({
                 onPointerEnter={(e) => e.pointerType === 'mouse' && onSelect(l.to)}
                 onKeyDown={(e) => onOrbitKey(e, l.to)}
               >
-                <circle cx={n.x} cy={n.y} r={sel ? 38 : 32} fill="var(--surface)" stroke={colorOf(l.move)} strokeWidth={sel ? 4 : 2.5} />
-                <text x={n.x} y={n.y + 2} textAnchor="middle" fontSize={15} fontWeight={700} fill={textColorOf(l.move)} data-label={l.to}>
+                <circle data-key={walked ? l.to : undefined} data-color={walked} cx={n.x} cy={n.y} r={sel ? 38 : 32} fill={walked ?? 'var(--surface)'} stroke={colorOf(l.move)} strokeWidth={sel ? 4 : walked ? 3.5 : 2.5} />
+                <text x={n.x} y={n.y + 2} textAnchor="middle" fontSize={15} fontWeight={700} fill={walked ? 'var(--on-motion)' : textColorOf(l.move)} data-label={l.to}>
                   {label}
                 </text>
-                <text x={n.x} y={n.y + 17} textAnchor="middle" fontSize={9.5} fill="var(--muted-foreground)" aria-hidden>
+                <text x={n.x} y={n.y + 17} textAnchor="middle" fontSize={9.5} fill={walked ? 'var(--on-motion)' : 'var(--muted-foreground)'} aria-hidden>
                   {altered ? 'alterado' : l.move.motion}
                 </text>
               </g>
@@ -282,8 +297,8 @@ export const ConstellationView = ({
 
           {web.opened ? (
             <g>
-              <circle cx={focus.x} cy={focus.y} r={46} fill={focus.via ? colorOf(focus.via) : 'var(--primary)'} />
-              <text x={focus.x} y={focus.y + 7} textAnchor="middle" fontSize={22} fontWeight={800} fill="var(--primary-foreground)">
+              <circle data-focus={web.focus} data-color={focusColor} cx={focus.x} cy={focus.y} r={46} fill={focusColor} />
+              <text x={focus.x} y={focus.y + 7} textAnchor="middle" fontSize={22} fontWeight={800} fill="var(--on-motion)">
                 {name(web.focus)}
               </text>
             </g>
