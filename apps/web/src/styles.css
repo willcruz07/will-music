@@ -243,3 +243,8 @@ h1 {
     display: none;
   }
 }
+
+/* Screens without the bottom bar (inside a study): nothing keeps room for it. */
+:root[data-nav='none'] {
+  --nav-height: 0px;
+}
