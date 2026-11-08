@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Chord, type Move, chordKey, chordName, levelOf, neighbors, parseChord, startCenter } from '../src/constellation/harmony.ts';
+import { type Chord, type Move, chordKey, chordName, isAltered, levelOf, neighbors, parseChord, startCenter } from '../src/constellation/harmony.ts';
 import { chordNotes } from '../src/lib/chordNotation.ts';
 
 const C = { root: 0, minor: false };
@@ -222,5 +222,14 @@ describe('review 2 fixes: harmony', () => {
   it('never states that F7M shares three notes with Bm7(b5)', () => {
     const bm = parseChord('Bm7(b5)')!;
     for (const m of neighbors(bm, startCenter(bm))) expect(m.why).not.toMatch(/três notas/);
+  });
+});
+
+describe('altered chords', () => {
+  it('knows which tensions carry altered notes', () => {
+    expect(isAltered({ root: 7, quality: '7(b9)' })).toBe(true);
+    expect(isAltered({ root: 7, quality: '7(#5)' })).toBe(true);
+    expect(isAltered({ root: 1, quality: '°7' })).toBe(true);
+    for (const q of ['7', '7(9)', '7(13)', '7sus4', 'm7(b5)', '7M'] as const) expect(isAltered({ root: 7, quality: q }), q).toBe(false);
   });
 });

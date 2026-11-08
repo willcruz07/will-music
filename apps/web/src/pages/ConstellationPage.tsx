@@ -2,8 +2,8 @@ import { ArrowLeft, Guitar, Play, RotateCcw, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ChordHelp } from '../components/ChordHelp.tsx';
-import { ConstellationView, MOTION_COLOR } from '../constellation/ConstellationView.tsx';
-import { type Motion, type Move, type Quality, QUALITIES, centerName, chordKey, chordName, parseChord } from '../constellation/harmony.ts';
+import { ConstellationView, colorOf } from '../constellation/ConstellationView.tsx';
+import { type Motion, type Move, isAltered, type Quality, QUALITIES, centerName, chordKey, chordName, parseChord } from '../constellation/harmony.ts';
 import { type Web, focusOn, openFocus, orbit, resetWeb, startWeb, walk } from '../constellation/web.ts';
 import { chordEvents, useStudySynth } from '../study/widgets.tsx';
 import { Button } from '../ui/Button.tsx';
@@ -34,7 +34,7 @@ const QUALITY_NAMES: Record<Quality, string> = {
 const rootOptions = ROOTS.map((r) => ({ value: r, label: r }));
 const qualityOptions = QUALITIES.map((q) => ({ value: q, label: QUALITY_NAMES[q], hint: q ? `ex.: C${q}` : 'ex.: C' }));
 
-type Step = { name: string; motion: Motion; why: string };
+type Step = { name: string; motion: Motion; why: string; color: string };
 
 /**
  * The Constelação de acordes: pick a chord, open its orbit and walk through the harmony by relaxing,
@@ -111,7 +111,7 @@ export const ConstellationPage = () => {
   const go = (move: Move) => {
     const next = walk(web, move);
     const name = chordName(move.to, move.nextCenter);
-    setSteps((s) => [...s, { name, motion: move.motion, why: move.why }]);
+    setSteps((s) => [...s, { name, motion: move.motion, why: move.why, color: colorOf(move) }]);
     setWeb(next);
     setSelected(null);
     setChosen(null);
@@ -124,7 +124,7 @@ export const ConstellationPage = () => {
   const refocus = (key: string) => {
     const next = focusOn(web, key);
     const at = web.trail.indexOf(key);
-    setSteps((s) => (at >= 0 ? s.slice(0, at) : [...s, { name: nameOf(key), motion: 'relaxa', why: `Você voltou para ${nameOf(key)} e continua daqui.` }]));
+    setSteps((s) => (at >= 0 ? s.slice(0, at) : [...s, { name: nameOf(key), motion: 'relaxa', why: `Você voltou para ${nameOf(key)} e continua daqui.`, color: 'var(--glow)' }]));
     setWeb(next);
     setSelected(null);
     setChosen(null);
@@ -181,16 +181,16 @@ export const ConstellationPage = () => {
                     <label
                       key={o.to.quality || 'triad'}
                       className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary ${on ? 'border-transparent text-primary-foreground' : 'border-border text-chord hover:bg-muted'}`}
-                      style={on ? { background: MOTION_COLOR[o.motion] } : undefined}
+                      style={on ? { background: colorOf(o) } : undefined}
                     >
-                      <input type="radio" name="tipo" className="sr-only" checked={on} onChange={() => choose(o)} aria-label={`${name}, ${o.motion}`} />
+                      <input type="radio" name="tipo" className="sr-only" checked={on} onChange={() => choose(o)} aria-label={`${name}, ${o.motion}${o.motion === 'tensiona' && isAltered(o.to) ? ', alterado' : ''}`} />
                       {name}
                     </label>
                   );
                 })}
               </div>
               <p className="mt-3 text-sm">
-                <span className="mr-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold text-primary-foreground" style={{ background: MOTION_COLOR[chosen.motion] }}>
+                <span className="mr-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold text-primary-foreground" style={{ background: colorOf(chosen) }}>
                   {chosen.motion}
                 </span>
                 {chosen.why}
@@ -227,11 +227,11 @@ export const ConstellationPage = () => {
             )}
             <ol aria-label="Caminho" className="mt-3 space-y-2 text-sm">
               {steps.map((s, i) => (
-                <li key={`${i}-${s.name}`} className="border-l-2 pl-3" style={{ borderColor: MOTION_COLOR[s.motion] }}>
+                <li key={`${i}-${s.name}`} className="border-l-2 pl-3" style={{ borderColor: s.color }}>
                   <button type="button" aria-label={`Voltar para ${s.name}`} title={`Voltar para ${s.name}`} onClick={() => refocus(web.trail[i + 1]!)} className="rounded font-semibold text-chord underline-offset-4 hover:underline">
                     {s.name}
                   </button>{' '}
-                  <span className="text-xs font-semibold" style={{ color: MOTION_COLOR[s.motion] }}>
+                  <span className="text-xs font-semibold" style={{ color: s.color }}>
                     {s.motion}
                   </span>{' '}
                   <span className="text-muted-foreground">{s.why}</span>

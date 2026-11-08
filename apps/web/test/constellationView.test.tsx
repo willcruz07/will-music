@@ -80,7 +80,10 @@ describe('ConstellationView', () => {
     for (const first of orbit(start)) {
       const w = walk(start, first.move);
       const { unmount } = render(<ConstellationView web={w} selected={null} {...handlers()} />);
-      for (const l of orbit(w)) expect(screen.getByRole('button', { name: `${chordName(l.move.to, l.move.nextCenter)}, ${l.move.motion}` })).toBeInTheDocument();
+      for (const l of orbit(w)) {
+        const label = `${chordName(l.move.to, l.move.nextCenter)}, ${l.move.motion}`;
+        expect(screen.getByRole('button', { name: (n) => n === label || n === `${label}, alterado` })).toBeInTheDocument();
+      }
       unmount();
     }
   });
@@ -104,5 +107,14 @@ describe('ConstellationView: review fixes', () => {
   it('wheel zoom does not scroll the page', () => {
     render(<ConstellationView web={web()} selected={null} {...handlers()} />);
     expect(fireEvent.wheel(screen.getByRole('group', { name: /Constelação/ }), { deltaY: 100 })).toBe(false);
+  });
+});
+
+describe('altered tensions in pink', () => {
+  it('marks altered tensions with their own label and legend entry', () => {
+    render(<ConstellationView web={web()} selected={null} {...handlers()} />);
+    expect(screen.getByRole('button', { name: 'C#°7, tensiona, alterado' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'G7, tensiona' })).toBeInTheDocument();
+    expect(screen.getByText('Tensão alterada')).toBeInTheDocument();
   });
 });

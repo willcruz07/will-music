@@ -1,8 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { type Motion, chordName } from './harmony.ts';
+import { type Motion, type Move, chordName, isAltered } from './harmony.ts';
 import { type Web, orbit, previewStars } from './web.ts';
 
 export const MOTION_COLOR: Record<Motion, string> = { resolve: 'var(--primary)', tensiona: '#f59e0b', relaxa: 'var(--glow)' };
+export const ALTERED_COLOR = '#f472b6';
+/** Motion color, with altered tensions (b9, #5, °7) in pink so the spice of the reharmonization stands out. */
+export const colorOf = (m: Move): string => (m.motion === 'tensiona' && isAltered(m.to) ? ALTERED_COLOR : MOTION_COLOR[m.motion]);
+
 const SECTORS: { motion: Motion; label: string }[] = [
   { motion: 'resolve', label: 'Resolver' },
   { motion: 'tensiona', label: 'Tensionar' },
@@ -167,7 +171,7 @@ export const ConstellationView = ({
             const a = web.nodes[l.from]!;
             const b = web.nodes[l.to]!;
             const live = l.from === web.focus;
-            return <line key={`${l.from}-${l.to}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={live ? MOTION_COLOR[l.move.motion] : 'var(--border)'} strokeOpacity={live ? 0.55 : 0.5} strokeWidth={live ? 2 : 1} />;
+            return <line key={`${l.from}-${l.to}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={live ? colorOf(l.move) : 'var(--border)'} strokeOpacity={live ? 0.55 : 0.5} strokeWidth={live ? 2 : 1} />;
           })}
 
           <g data-testid="preview-ring" opacity={0.35}>
@@ -178,7 +182,7 @@ export const ConstellationView = ({
             {/* One bubble per chord, even when several neighbors lead to it. */}
             {[...new Map(ring.filter((s) => !web.nodes[s.key]).map((s) => [s.key, s])).values()].map((s) => (
               <g key={s.key} data-bubble={s.key}>
-                <circle cx={s.x} cy={s.y} r={20} fill="var(--surface)" stroke={MOTION_COLOR[s.move.motion]} strokeDasharray="3 3" />
+                <circle cx={s.x} cy={s.y} r={20} fill="var(--surface)" stroke={colorOf(s.move)} strokeDasharray="3 3" />
                 <text x={s.x} y={s.y + 4} textAnchor="middle" fontSize={10} fill="var(--muted-foreground)">
                   {chordName(s.chord, s.center)}
                 </text>
@@ -206,6 +210,7 @@ export const ConstellationView = ({
           {links.map((l, i) => {
             const n = web.nodes[l.to]!;
             const label = chordName(l.move.to, l.move.nextCenter);
+            const altered = l.move.motion === 'tensiona' && isAltered(l.move.to);
             const sel = selected === l.to;
             return (
               <g
@@ -214,19 +219,19 @@ export const ConstellationView = ({
                 tabIndex={i === 0 ? 0 : -1}
                 data-orbit=""
                 data-key={l.to}
-                aria-label={`${label}, ${l.move.motion}`}
+                aria-label={`${label}, ${l.move.motion}${altered ? ', alterado' : ''}`}
                 aria-pressed={sel}
                 className="cursor-pointer outline-none [&:focus-visible>circle]:stroke-[var(--foreground)]"
                 onClick={tap(() => (sel ? onWalk(l.to) : onSelect(l.to)))}
                 onPointerEnter={(e) => e.pointerType === 'mouse' && onSelect(l.to)}
                 onKeyDown={(e) => onOrbitKey(e, l.to)}
               >
-                <circle cx={n.x} cy={n.y} r={sel ? 38 : 32} fill="var(--surface)" stroke={MOTION_COLOR[l.move.motion]} strokeWidth={sel ? 4 : 2.5} />
+                <circle cx={n.x} cy={n.y} r={sel ? 38 : 32} fill="var(--surface)" stroke={colorOf(l.move)} strokeWidth={sel ? 4 : 2.5} />
                 <text x={n.x} y={n.y + 2} textAnchor="middle" fontSize={15} fontWeight={700} fill="var(--chord)">
                   {label}
                 </text>
                 <text x={n.x} y={n.y + 17} textAnchor="middle" fontSize={9.5} fill="var(--muted-foreground)" aria-hidden>
-                  {l.move.motion}
+                  {altered ? 'alterado' : l.move.motion}
                 </text>
               </g>
             );
@@ -258,6 +263,12 @@ export const ConstellationView = ({
               {s.label}
             </li>
           ))}
+          {links.some((l) => l.move.motion === 'tensiona' && isAltered(l.move.to)) && (
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden className="size-2.5 rounded-full" style={{ background: ALTERED_COLOR }} />
+              Tensão alterada
+            </li>
+          )}
         </ul>
       )}
     </div>

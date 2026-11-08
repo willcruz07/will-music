@@ -46,6 +46,8 @@ const MINOR_KEYS = ['Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'A
 
 export const groupOf = (q: Quality): Group =>
   q === 'm7(b5)' ? 'hdim' : q === '°7' ? 'dim' : q.startsWith('m') ? 'min' : q.startsWith('7') && !q.startsWith('7M') ? 'dom' : 'maj';
+/** Tensions with altered notes: b9, #5, and the diminished seventh (a 7(b9) without its root). */
+export const isAltered = (c: Chord): boolean => c.quality === '7(b9)' || c.quality === '7(#5)' || c.quality === '°7';
 const isDark = (q: Quality) => q === '7(b9)' || q === '7(#5)';
 const isClear = (q: Quality) => q === '7(9)' || q === '7(13)';
 
