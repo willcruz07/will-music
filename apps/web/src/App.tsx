@@ -2,7 +2,7 @@ import { Moon, Sun } from 'lucide-react';
 import { Suspense, lazy, useEffect } from 'react';
 import { Link, Route, Routes } from 'react-router';
 import { BottomNav, SettingsLink, TopNav } from './components/AppNav.tsx';
-import { InstallBanner, InstallButton, UpdateBanner } from './components/PwaPrompts.tsx';
+import { InstallBanner, UpdateBanner } from './components/PwaPrompts.tsx';
 import { useAutoHideBars } from './lib/scrollBars.ts';
 import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
 import { Library } from './pages/Library.tsx';
@@ -65,7 +65,6 @@ const Layout = () => {
         <div className="flex items-center gap-2">
           <TopNav />
           <SettingsLink />
-          <InstallButton />
           <ThemeToggle />
         </div>
       </div>
