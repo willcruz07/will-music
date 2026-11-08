@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { Link, useParams } from 'react-router';
 import { Player, type PlayerControls } from '../components/Player.tsx';
-import { ScoreView } from '../components/ScoreView.tsx';
+import { type ScoreCursor, ScoreView } from '../components/ScoreView.tsx';
+import { ScorePlayer, type ScorePlayerHandle } from '../components/ScorePlayer.tsx';
+import { skipTicksOf } from '@will-music/engine';
 import { PART_NAMES, VOICE_PARTS, type VoicePart, midiName, voiceType } from '@will-music/engine';
 import { LyricTicker } from '../components/LyricTicker.tsx';
 import { type Analysis, type Chart, type ScoreRecord, type Song, db } from '../lib/db.ts';
@@ -16,6 +18,7 @@ import {
   downloadText,
   hasScoreType,
   saveScore,
+  scoreGrid,
   transcribeChoir,
   transcribeDrums,
   transcribeKeys,
@@ -79,6 +82,8 @@ const SongScorePage = ({ id }: { id: string }) => {
   const lyricSink = useRef<((t: number) => void) | null>(null);
   const synth = useRef<ReturnType<typeof createScoreSynth> | null>(null);
   const player = useRef<PlayerControls | null>(null);
+  const cursor = useRef<ScoreCursor | null>(null);
+  const scorePlayer = useRef<ScorePlayerHandle | null>(null);
   const stems = useStems(id, audioUrl);
 
   useEffect(() => {
@@ -111,6 +116,10 @@ const SongScorePage = ({ id }: { id: string }) => {
   }, [chart, analysis]);
 
   const xml = useMemo(() => (song ? buildScoreXml(type, song, analysis, score, { lyrics }) : null), [type, song, analysis, score, lyrics]);
+  // The grid the score is written on and the leading bars it dropped: how song time maps onto the drawing.
+  const grid = useMemo(() => scoreGrid(type, analysis, score), [type, analysis, score]);
+  const skipTicks = useMemo(() => (xml ? skipTicksOf(xml) : 0), [xml]);
+  const scoreEvents = useMemo(() => eventsFor(type, score, guideVoices), [type, score, guideVoices]);
 
   // What the score synth plays: the notes of the part on screen, at their real times in the song.
   useEffect(() => {
@@ -322,7 +331,10 @@ const SongScorePage = ({ id }: { id: string }) => {
           )}
           <p className="mt-3 text-xs text-muted-foreground">É um rascunho feito de ouvido pelo app: confira tocando e ajuste no MuseScore se precisar.</p>
           {lyrics.some((l) => l.text.trim()) && <LyricTicker lines={lyrics} sink={lyricSink} />}
-          <ScoreView xml={xml} />
+          {grid && (
+            <ScorePlayer events={scoreEvents} grid={grid} skipTicks={skipTicks} cursorRef={cursor} songPlayer={player} handle={scorePlayer} onWithMusic={() => !synthOn && toggleSynth(true)} />
+          )}
+          <ScoreView xml={xml} cursorRef={cursor} />
         </>
       )}
 
@@ -330,13 +342,17 @@ const SongScorePage = ({ id }: { id: string }) => {
         <>
           <Player
             sources={sources}
-            onTime={(t) => lyricSink.current?.(t)}
+            onTime={(t) => {
+              lyricSink.current?.(t);
+              scorePlayer.current?.songTime(t);
+            }}
             title={song.title}
             songId={song.id}
             stems={stems}
             extra={synthSection}
             controls={player}
             onTransport={(t) => {
+              scorePlayer.current?.songTransport(t.playing);
               if (!synthOn) return;
               synth.current ??= createScoreSynth();
               synth.current.setVolume(synthVolume);

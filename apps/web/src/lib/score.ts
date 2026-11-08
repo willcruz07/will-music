@@ -1,6 +1,7 @@
 import {
   BASIC_PITCH,
   type ChordSegment,
+  type Grid,
   type KeyResult,
   type NoteEvent,
   buildChoirXml,
@@ -64,6 +65,21 @@ export const hasScoreType = (score: ScoreRecord | undefined, type: ScoreType): b
         ? !!score.choir && VOICE_PARTS.some((v) => score.choir!.voices[v].length > 0)
         : score.notes.length > 0);
 
+/** The tempo grid a score type is written on: the same one buildScoreXml uses, so song time maps onto the drawing. */
+export const scoreGrid = (type: ScoreType, analysis: AnalysisLike, score: ScoreRecord | undefined): Grid | null => {
+  if (!score || !hasScoreType(score, type)) return null;
+  const chordStarts = usableChords(analysis).map((c) => c.start);
+  const onsets =
+    type === 'choir'
+      ? VOICE_PARTS.flatMap((v) => score.choir!.voices[v]).map((n) => n.start)
+      : type === 'keys'
+        ? score.piano!.notes.map((n) => n.start)
+        : type === 'drums'
+          ? score.drums!.hits.map((h) => h.time)
+          : score.notes.map((n) => n.start);
+  return buildGrid(safeBpm(score.bpm, onsets.map((start) => ({ start }))), onsets, chordStarts);
+};
+
 /** MusicXML for one score type, or null when that part has not been transcribed yet. */
 export const buildScoreXml = (
   type: ScoreType,
@@ -74,12 +90,10 @@ export const buildScoreXml = (
 ): string | null => {
   if (!score || !hasScoreType(score, type)) return null;
   if (type === 'melody' || type === 'guitar') return buildSongScore(song, analysis, score, { tab: type === 'guitar' });
-  const chords = usableChords(analysis);
+  const grid = scoreGrid(type, analysis, score)!;
+  const bpm = grid.bpm;
   if (type === 'choir') {
     const voices = score.choir!.voices;
-    const all = VOICE_PARTS.flatMap((v) => voices[v]);
-    const bpm = safeBpm(score.bpm, all);
-    const grid = buildGrid(bpm, all.map((n) => n.start), chords.map((c) => c.start));
     return buildChoirXml({
       title: song.title,
       artist: song.artist,
@@ -92,13 +106,9 @@ export const buildScoreXml = (
   }
   if (type === 'keys') {
     const notes = score.piano!.notes;
-    const bpm = safeBpm(score.bpm, notes);
-    const grid = buildGrid(bpm, notes.map((n) => n.start), chords.map((c) => c.start));
     return buildPianoXml({ title: song.title, artist: song.artist, bpm, key: analysis?.key, notes: quantizePoly(notes, grid), harmonies: chordsToHarmony(analysis?.chords ?? [], grid) });
   }
   const hits = score.drums!.hits;
-  const bpm = safeBpm(score.bpm, hits.map((h) => ({ start: h.time })));
-  const grid = buildGrid(bpm, hits.map((h) => h.time), chords.map((c) => c.start));
   return buildDrumXml({ title: song.title, artist: song.artist, bpm, hits: hits.map((h) => ({ tick: tickAt(grid, h.time), kind: h.kind })) });
 };
 

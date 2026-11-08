@@ -77,3 +77,17 @@ export const chordsToHarmony = (segments: readonly { start: number; raw: string 
   }
   return out;
 };
+
+const SKIP_FIELD = 'will-music-skip-ticks';
+
+/**
+ * Scores drop their leading empty bars; this records how many ticks were dropped, inside `<identification>`, so a
+ * player can map song time to a spot on the score (other programs ignore the field).
+ */
+export const skipTicksXml = (skip: number): string => `<miscellaneous><miscellaneous-field name="${SKIP_FIELD}">${skip}</miscellaneous-field></miscellaneous>`;
+
+/** The ticks a score dropped at its start (0 when the field is missing). */
+export const skipTicksOf = (xml: string): number => {
+  const m = new RegExp(`name="${SKIP_FIELD}">([0-9]+)<`).exec(xml);
+  return m ? Number(m[1]) : 0;
+};
