@@ -48,3 +48,16 @@ describe('version label placement', () => {
     expect(label.parentElement!.className).toMatch(/flex-col/);
   });
 });
+
+describe('tablet layout (iPad portrait, 768–1023px)', () => {
+  it('keeps the bottom bar and leaves the top menu to wide screens (no overflowing header)', () => {
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+    const navs = screen.getAllByRole('navigation', { name: 'Principal' });
+    const top = navs.find((n) => n.tagName === 'NAV' && n.className.includes('hidden'))!;
+    const bottom = navs.find((n) => n.className.includes('fixed'))!;
+    expect(top.className).toMatch(/\blg:flex\b/);
+    expect(top.className).not.toMatch(/\bmd:flex\b/);
+    expect(bottom.className).toMatch(/\blg:hidden\b/);
+    expect(bottom.className).not.toMatch(/\bmd:hidden\b/);
+  });
+});

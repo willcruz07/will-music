@@ -14,13 +14,13 @@ const SETTINGS: Item = { to: '/ajustes', label: 'Ajustes', icon: Settings, end: 
 
 /** Settings live in the header on phones (the bottom bar keeps the four main places). */
 export const SettingsLink = () => (
-  <NavLink to="/ajustes" aria-label="Ajustes" title="Ajustes" className={({ isActive }) => `inline-flex size-10 items-center justify-center rounded-lg hover:bg-muted md:hidden ${isActive ? 'text-chord' : 'text-foreground'}`}>
+  <NavLink to="/ajustes" aria-label="Ajustes" title="Ajustes" className={({ isActive }) => `inline-flex size-10 items-center justify-center rounded-lg hover:bg-muted lg:hidden ${isActive ? 'text-chord' : 'text-foreground'}`}>
     <Settings className="size-5" />
   </NavLink>
 );
 
 export const TopNav = () => (
-  <nav className="hidden items-center gap-1 md:flex" aria-label="Principal">
+  <nav className="hidden items-center gap-1 lg:flex" aria-label="Principal">
     {[...ITEMS, MIC, SETTINGS].map(({ to, label, end }) => (
       <NavLink
         key={to}
@@ -62,7 +62,7 @@ const Tab = ({ item }: { item: Item }) => {
 export const BottomNav = () => (
   <nav
     aria-label="Principal"
-    className="glass-strong bar-slide fixed inset-x-3 z-30 flex h-[var(--nav-height)] items-center rounded-[1.75rem] border border-border px-2 shadow-[0_12px_40px_-16px_rgb(0_0_0/0.45)] md:hidden"
+    className="glass-strong bar-slide fixed inset-x-3 z-30 flex h-[var(--nav-height)] items-center rounded-[1.75rem] border border-border px-2 shadow-[0_12px_40px_-16px_rgb(0_0_0/0.45)] lg:hidden"
     style={{ bottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
   >
     <Tab item={ITEMS[0]!} />
