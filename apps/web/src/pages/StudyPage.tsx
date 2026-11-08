@@ -439,7 +439,7 @@ export const StudyPage = () => {
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link to="/estudo" className="inline-flex min-h-10 items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <Link to="/estudo" className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
             <ArrowLeft className="size-4" /> Trilhas de estudo
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">Ferramentas</h1>

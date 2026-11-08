@@ -1,11 +1,13 @@
 import { Mic } from 'lucide-react';
 import { useState } from 'react';
 import type { LyricsChoice } from '../lib/lyricsApply.ts';
+import { describeTranscription } from '../lib/transcript.ts';
 import { transcribeSong } from '../lib/whisper.ts';
 import { Button } from '../ui/Button.tsx';
+import { ProgressBar } from './AnalysisProgress.tsx';
 
 export const TranscribeLyrics = ({ songId, hasStems, onApply }: { songId: string; hasStems: boolean; onApply: (lyrics: LyricsChoice) => void }) => {
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ label: string; fraction?: number; detail?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const gpu = !!(navigator as Navigator & { gpu?: unknown }).gpu;
   return (
@@ -22,22 +24,24 @@ export const TranscribeLyrics = ({ songId, hasStems, onApply }: { songId: string
         disabled={busy}
         onClick={() => {
           setBusy(true);
-          setStatus('Preparando o áudio');
-          void transcribeSong(songId, (loaded, total) => setStatus(total && loaded < total ? `Baixando o Whisper (${Math.round(loaded / 1e6)} MB de ${Math.round(total / 1e6)} MB)` : 'Transcrevendo… pode levar alguns minutos.'))
+          setStatus({ label: 'Preparando o áudio' });
+          void transcribeSong(songId, (p) => setStatus(describeTranscription(p)))
             .then(({ lines }) => {
               setStatus(null);
               onApply({ source: 'manual', lines });
             })
-            .catch((e: unknown) => setStatus(e instanceof Error ? e.message : 'A transcrição falhou.'))
+            .catch((e: unknown) => setStatus({ label: e instanceof Error ? e.message : 'A transcrição falhou.' }))
             .finally(() => setBusy(false));
         }}
       >
         <Mic className="size-4" /> {busy ? 'Transcrevendo…' : 'Transcrever a letra'}
       </Button>
       {status && (
-        <p className="mt-2 text-sm" role="status">
-          {status}
-        </p>
+        <div className="mt-3" role="status" aria-live="polite">
+          <p className="text-sm">{status.label}</p>
+          {busy && <ProgressBar fraction={status.fraction} />}
+          {status.detail && <p className="mt-1 truncate text-xs italic text-muted-foreground">{status.detail}</p>}
+        </div>
       )}
     </div>
   );

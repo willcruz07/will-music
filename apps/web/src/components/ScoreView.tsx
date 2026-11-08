@@ -1,13 +1,72 @@
-import { useEffect, useRef, useState } from 'react';
+import { type MutableRefObject, useEffect, useRef, useState } from 'react';
 
-type Sheet = { load: (xml: string) => Promise<unknown>; render: () => void; clear: () => void };
+type OsmdCursor = {
+  show: () => void;
+  hide: () => void;
+  next: () => void;
+  reset: () => void;
+  cursorElement?: HTMLElement;
+  Iterator: { EndReached: boolean; currentTimeStamp: { RealValue: number } };
+};
+type Sheet = { load: (xml: string) => Promise<unknown>; render: () => void; clear: () => void; cursor?: OsmdCursor };
+
+/** The playback cursor of a drawn score: where each step starts (in whole notes) and a way to move onto one. */
+export type ScoreCursor = { steps: number[]; moveTo: (index: number) => void; hide: () => void };
+
+/** Walks the cursor once over the whole score to learn where every step starts. */
+const readSteps = (cursor: OsmdCursor): number[] => {
+  const steps: number[] = [];
+  cursor.reset();
+  while (!cursor.Iterator.EndReached) {
+    steps.push(cursor.Iterator.currentTimeStamp.RealValue);
+    cursor.next();
+  }
+  cursor.reset();
+  return steps;
+};
+
+const makeCursor = (cursor: OsmdCursor, host: HTMLElement): ScoreCursor => {
+  const steps = readSteps(cursor);
+  let at = 0;
+  let shown = false;
+  return {
+    steps,
+    moveTo(index) {
+      const target = Math.max(0, Math.min(index, steps.length - 1));
+      if (!shown) {
+        cursor.show();
+        shown = true;
+      }
+      if (target < at) {
+        cursor.reset();
+        at = 0;
+      }
+      while (at < target) {
+        cursor.next();
+        at++;
+      }
+      // Keep the cursor in view inside the scrolling page (and the sheet's own horizontal scroll).
+      const el = cursor.cursorElement;
+      if (!el) return;
+      const box = el.getBoundingClientRect();
+      const top = 140;
+      if (box.top < top || box.bottom > window.innerHeight - 160) window.scrollBy({ top: box.top - top - 40, behavior: 'smooth' });
+      const sheet = host.parentElement;
+      if (sheet && (box.left < sheet.getBoundingClientRect().left || box.right > sheet.getBoundingClientRect().right)) el.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+    },
+    hide() {
+      cursor.hide();
+      shown = false;
+    },
+  };
+};
 
 /**
  * Draws MusicXML with OpenSheetMusicDisplay (BSD-3), loaded on demand. The score sits on a light
  * "paper" sheet in both themes, since engraving is black on transparent. OSMD's own autoResize adds a
  * window listener it never removes, so resizing is driven here by a ResizeObserver owned by this effect.
  */
-export const ScoreView = ({ xml }: { xml: string }) => {
+export const ScoreView = ({ xml, cursorRef }: { xml: string; cursorRef?: MutableRefObject<ScoreCursor | null> }) => {
   const host = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +82,16 @@ export const ScoreView = ({ xml }: { xml: string }) => {
         const { OpenSheetMusicDisplay } = await import('opensheetmusicdisplay');
         if (cancelled || !host.current) return;
         host.current.innerHTML = '';
-        const view: Sheet = new OpenSheetMusicDisplay(host.current, { autoResize: false, backend: 'svg', drawTitle: true, drawComposer: true, drawPartNames: true });
+        const view: Sheet = new OpenSheetMusicDisplay(host.current, {
+          autoResize: false,
+          backend: 'svg',
+          drawTitle: true,
+          drawComposer: true,
+          drawPartNames: true,
+          disableCursor: false,
+          // The playback cursor: an emerald bar over the notes sounding now.
+          cursorsOptions: [{ type: 0, color: '#10b981', alpha: 0.45, follow: false }],
+        });
         sheet = view;
         await view.load(xml);
         if (cancelled) {
@@ -31,6 +99,10 @@ export const ScoreView = ({ xml }: { xml: string }) => {
           return;
         }
         view.render();
+        const attach = () => {
+          if (cursorRef && view.cursor && host.current) cursorRef.current = makeCursor(view.cursor, host.current);
+        };
+        attach();
         if (typeof ResizeObserver === 'function' && host.current) {
           let width = host.current.clientWidth;
           let frame = 0;
@@ -39,7 +111,11 @@ export const ScoreView = ({ xml }: { xml: string }) => {
             if (!next || Math.abs(next - width) < 8) return;
             width = next;
             cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(() => !cancelled && view.render());
+            frame = requestAnimationFrame(() => {
+              if (cancelled) return;
+              view.render();
+              attach(); // a new layout redraws the cursor; the player moves it back on its next tick
+            });
           });
           observer.observe(host.current);
         }
@@ -52,6 +128,7 @@ export const ScoreView = ({ xml }: { xml: string }) => {
     return () => {
       cancelled = true;
       observer?.disconnect();
+      if (cursorRef) cursorRef.current = null;
       sheet?.clear();
     };
   }, [xml]);

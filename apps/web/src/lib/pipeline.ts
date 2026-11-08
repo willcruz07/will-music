@@ -5,8 +5,13 @@ import { decodeForAnalysis } from './decode.ts';
 import { distributePlainLyrics, parseLrc, pickBestLyrics, searchLyrics } from './lrclib.ts';
 import { applyLyrics, lyricsToKeep } from './lyricsApply.ts';
 import { transcribeSong } from './whisper.ts';
+import { describeTranscription } from './transcript.ts';
 
-export type PipelineProgress = { label: string; fraction?: number };
+/**
+ * `lyricsPending`: the chart with the chords is saved and only the lyrics are still being transcribed, so the song
+ * page can show the chords already. `detail`: the latest words heard, so a slow transcription does not look stuck.
+ */
+export type PipelineProgress = { label: string; fraction?: number; detail?: string; lyricsPending?: boolean };
 
 const mb = (bytes: number) => (bytes / 1e6).toFixed(0);
 
@@ -69,15 +74,9 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
     // An audio never stays without lyrics: when the search finds nothing, Whisper listens and writes them.
     // The chart is already saved; if the transcription fails (an instrumental, say), the song keeps its chords.
     if (!lines.length) {
-      onProgress({ label: 'Transcrevendo a letra do áudio' });
+      onProgress({ label: 'Preparando a transcrição da letra', lyricsPending: true });
       try {
-        const { lines: heard } = await transcribeSong(songId, (loaded, total) =>
-          onProgress(
-            total && loaded < total
-              ? { label: `Transcrevendo a letra: baixando o modelo (${mb(loaded)} MB de ${mb(total)} MB)`, fraction: loaded / total }
-              : { label: 'Transcrevendo a letra: pode levar alguns minutos' },
-          ),
-        );
+        const { lines: heard } = await transcribeSong(songId, (p) => onProgress({ ...describeTranscription(p), lyricsPending: true }));
         await applyLyrics(songId, { source: 'manual', lines: heard });
       } catch (error) {
         console.warn('Transcrição automática da letra não deu certo', error);

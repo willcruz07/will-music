@@ -1,7 +1,7 @@
 import type { KeyResult } from '../key/key.ts';
 import { type Piece, escape, harmonyXml, keyFifths, pitchXml, timeline } from './musicxml.ts';
 import type { NoteEvent } from './notes.ts';
-import { type Harmony, type QNote, TICKS_PER_BAR } from './quantize.ts';
+import { type Harmony, type QNote, TICKS_PER_BAR, skipTicksXml } from './quantize.ts';
 
 export type VoicePart = 'S' | 'A' | 'T' | 'B';
 export const VOICE_PARTS: readonly VoicePart[] = ['S', 'A', 'T', 'B'];
@@ -150,7 +150,7 @@ export const buildChoirXml = (input: ChoirInput): string => {
     '<?xml version="1.0" encoding="UTF-8" standalone="no"?>',
     '<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">',
     `<score-partwise version="4.0"><work><work-title>${escape(input.title)}</work-title></work>`,
-    `<identification><creator type="composer">${escape(input.artist)}</creator><encoding><software>will-music</software></encoding></identification>`,
+    `<identification><creator type="composer">${escape(input.artist)}</creator><encoding><software>will-music</software></encoding>${skipTicksXml(skip)}</identification>`,
     `<part-list>${VOICE_PARTS.map((v, i) => `<score-part id="P${i + 1}"><part-name>${PART_NAMES[v]}</part-name></score-part>`).join('')}</part-list>`,
     ...VOICE_PARTS.map(part),
     '</score-partwise>',

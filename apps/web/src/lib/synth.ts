@@ -42,6 +42,7 @@ export const createScoreSynth = () => {
   let anchor = { song: 0, clock: 0, rate: 1 };
   let scheduledUntil = 0;
   let volume = 0.7;
+  let playing = false;
   const live = new Set<AudioScheduledSourceNode>();
 
   const ensure = () => {
@@ -160,16 +161,24 @@ export const createScoreSynth = () => {
       void ctx.resume();
       silence();
       anchor = { song: songTime, clock: ctx.currentTime + 0.03, rate };
+      playing = true;
       scheduledUntil = songTime;
       clearInterval(timer);
       timer = window.setInterval(pump, TICK_MS);
       pump();
     },
     stop() {
+      playing = false;
       clearInterval(timer);
       silence();
     },
+    /** Song time being heard now, or null when stopped. */
+    position(): number | null {
+      if (!playing || !context) return null;
+      return Math.max(anchor.song, anchor.song + (context.currentTime - anchor.clock) * anchor.rate);
+    },
     dispose() {
+      playing = false;
       clearInterval(timer);
       silence();
       void context?.close();

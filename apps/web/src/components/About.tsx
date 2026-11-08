@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BottomSheet } from "../ui/BottomSheet.tsx";
+import { alertDialog } from "../ui/Dialog.tsx";
 
 export const AUTHOR = {
   name: "Will Cruz",
@@ -64,14 +65,26 @@ export const AboutButton = ({
   autoOpenOnce?: boolean;
 }) => {
   const [open, setOpen] = useState(false);
+  const welcome = useRef(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const close = () => {
     setOpen(false);
     trigger.current?.focus();
+    // The first-visit presentation ends with a thank-you (opening "Sobre" later does not).
+    if (welcome.current) {
+      welcome.current = false;
+      void alertDialog(
+        "Valeu por chegar até aqui! Espero que o will-music te ajude muito na sua caminhada com a música. Bora tocar! 🎶",
+        { title: "Obrigado! 💚" },
+      );
+    }
   };
 
   useEffect(() => {
-    if (autoOpenOnce && firstVisit()) setOpen(true);
+    if (autoOpenOnce && firstVisit()) {
+      welcome.current = true;
+      setOpen(true);
+    }
   }, [autoOpenOnce]);
 
   return (

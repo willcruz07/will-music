@@ -2,6 +2,7 @@ import { Moon, Sun } from 'lucide-react';
 import { Suspense, lazy, useEffect } from 'react';
 import { Link, Route, Routes } from 'react-router';
 import { BottomNav, SettingsLink, TopNav } from './components/AppNav.tsx';
+import { ModelsSetup } from './components/ModelsSetup.tsx';
 import { InstallBanner, UpdateBanner } from './components/PwaPrompts.tsx';
 import { useAutoHideBars } from './lib/scrollBars.ts';
 import { applyThemePref, isDark, useThemePref } from './lib/theme.ts';
@@ -113,6 +114,7 @@ const Layout = () => {
     </main>
     <BottomNav />
     <UpdateBanner />
+    <ModelsSetup />
   </div>
   );
 };

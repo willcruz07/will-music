@@ -1,13 +1,15 @@
 /// <reference lib="webworker" />
-import { pipeline } from '@huggingface/transformers';
-import type { WhisperChunk } from '../lib/transcript.ts';
+import { WhisperTextStreamer, pipeline } from '@huggingface/transformers';
+import { type WhisperChunk, windowCount } from '../lib/transcript.ts';
 import { whisperModelFor } from '../lib/whisperModel.ts';
 
 /** `preload` only downloads and caches the model (first-run setup); `transcribe` runs it on audio. */
 export type WhisperRequest = { type: 'transcribe'; audio: Float32Array } | { type: 'preload' };
 export type WhisperResponse =
   | { type: 'progress'; loaded: number; total: number }
-  | { type: 'result'; chunks: WhisperChunk[]; device: 'webgpu' | 'wasm' }
+  /** While transcribing: 30 s windows done of the total, and the latest words heard (shows it is not stuck). */
+  | { type: 'transcribing'; done: number; total: number; heard: string }
+  | { type: 'result'; chunks: WhisperChunk[]; device: 'webgpu' | 'wasm'; words: boolean }
   | { type: 'ready' }
   | { type: 'error'; message: string };
 
@@ -45,14 +47,42 @@ self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
       asr = await load(device);
     }
     if (request.type === 'preload') return post({ type: 'ready' });
-    const output = (await asr(request.audio, {
-      language: 'portuguese',
-      task: 'transcribe',
-      return_timestamps: true,
-      chunk_length_s: 30,
-      stride_length_s: 5,
-    })) as { chunks?: WhisperChunk[] };
-    post({ type: 'result', chunks: output.chunks ?? [], device });
+    const total = windowCount(request.audio.length, 16000);
+    const run = (timestamps: true | 'word') => {
+      let done = 0;
+      let heard = '';
+      let last = 0;
+      const report = (force = false) => {
+        const now = Date.now();
+        if (!force && now - last < 400) return;
+        last = now;
+        post({ type: 'transcribing', done: Math.min(done, total), total, heard: heard.trim() });
+      };
+      report(true);
+      // One generate() per 30 s window: its end marks a window done; the words keep coming in between.
+      const streamer = new WhisperTextStreamer(asr.tokenizer as ConstructorParameters<typeof WhisperTextStreamer>[0], {
+        skip_prompt: true,
+        callback_function: (text: string) => {
+          heard = `${heard}${text}`.slice(-80);
+          report();
+        },
+        on_finalize: () => {
+          done++;
+          report(true);
+        },
+      });
+      return asr(request.audio, { language: 'portuguese', task: 'transcribe', return_timestamps: timestamps, chunk_length_s: 30, stride_length_s: 5, streamer }) as Promise<{ chunks?: WhisperChunk[] }>;
+    };
+    // Word timestamps put each line where its first word is sung; segment timestamps are the fallback.
+    let words = true;
+    let output: { chunks?: WhisperChunk[] };
+    try {
+      output = await run('word');
+    } catch {
+      words = false;
+      output = await run(true);
+    }
+    post({ type: 'result', chunks: output.chunks ?? [], device, words });
   } catch (error) {
     post({ type: 'error', message: error instanceof Error ? error.message : String(error) });
   }

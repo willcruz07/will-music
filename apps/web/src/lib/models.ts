@@ -1,4 +1,5 @@
 import { MODELS, type ModelId } from '@will-music/engine';
+import { notifyModelsChanged } from './modelsReminder.ts';
 import { createSha256 } from './sha256.ts';
 
 const CACHE_NAME = 'wm-models-v1';
@@ -126,11 +127,13 @@ export const listCachedModels = async (): Promise<{ id: ModelId; bytes: number }
 
 export const deleteCachedModels = async (): Promise<void> => {
   await caches.delete(CACHE_NAME);
+  notifyModelsChanged();
 };
 
 export const deleteCachedModel = async (id: ModelId): Promise<void> => {
   const cache = await caches.open(CACHE_NAME);
   await cache.delete(MODELS[id].url);
+  notifyModelsChanged();
 };
 
 /** The models the first actions need: chords and key, the basic voice/instrumental separation, the notes of a score. */
@@ -159,4 +162,5 @@ export const downloadModels = async (ids: ModelId[], onProgress: (done: number, 
     base += MODELS[id].bytes;
   }
   onProgress(total, total);
+  if (missing.length) notifyModelsChanged();
 };
