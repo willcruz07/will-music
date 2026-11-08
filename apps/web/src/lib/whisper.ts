@@ -3,6 +3,7 @@ import { db } from './db.ts';
 import { findVoiceTracks, getStems } from './stems.ts';
 import { type WhisperChunk, isUsefulTranscript, transcriptToLines } from './transcript.ts';
 import type { LyricLine } from './db.ts';
+import { type WhisperDevice, detectWhisperDevice, whisperModelFor } from './whisperModel.ts';
 
 const RATE = 16000;
 
@@ -35,14 +36,15 @@ const runWhisper = (audio: Float32Array, onProgress: (loaded: number, total: num
     worker.postMessage(request, [audio.buffer]);
   });
 
-const WHISPER_MODEL = 'whisper-small_timestamped';
+export { WHISPER_BYTES, detectWhisperDevice, whisperModelFor } from './whisperModel.ts';
 
-/** True when the Whisper model is already in the browser cache (transformers.js keeps it in "transformers-cache"). */
-export const whisperCached = async (): Promise<boolean> => {
+/** True when the Whisper model this device uses is already in the browser cache (transformers.js keeps it in "transformers-cache"). */
+export const whisperCached = async (device?: WhisperDevice): Promise<boolean> => {
   if (typeof caches === 'undefined') return false;
   try {
+    const name = whisperModelFor(device ?? (await detectWhisperDevice())).split('/')[1]!;
     const cache = await caches.open('transformers-cache');
-    return (await cache.keys()).some((r) => r.url.includes(WHISPER_MODEL));
+    return (await cache.keys()).some((r) => r.url.includes(name));
   } catch {
     return false;
   }
