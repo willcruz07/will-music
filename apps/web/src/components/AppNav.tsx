@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { GraduationCap, Library, ListMusic, Mic, Music4, Plus, Settings } from 'lucide-react';
-import { Link, NavLink } from 'react-router';
+import { Link, NavLink, useLocation } from 'react-router';
 
 type Item = { to: string; label: string; icon: typeof Library; end: boolean };
 
@@ -59,7 +60,28 @@ const Tab = ({ item }: { item: Item }) => {
 };
 
 /** Floating pill on phones and tablets, with the main action (add a song) raised in the middle. */
-export const BottomNav = () => (
+/** Inside a study (a lesson, a track, the tools, the constellation) the bottom bar gives the screen to the content. */
+export const bottomNavHidden = (pathname: string): boolean => pathname.startsWith('/estudo/');
+
+/**
+ * The floating bottom bar, except on screens inside a study. When it is hidden, `--nav-height` drops to zero
+ * (data-nav on <html>), so the player, notices and the page's bottom space move down with it.
+ */
+export const BottomNav = () => {
+  const { pathname } = useLocation();
+  const hidden = bottomNavHidden(pathname);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (hidden) root.dataset.nav = 'none';
+    else delete root.dataset.nav;
+    return () => {
+      delete root.dataset.nav;
+    };
+  }, [hidden]);
+  return hidden ? null : <BottomBar />;
+};
+
+const BottomBar = () => (
   <nav
     aria-label="Principal"
     className="glass-strong bar-slide fixed inset-x-3 z-30 flex h-[var(--nav-height)] items-center rounded-[1.75rem] border border-border px-2 shadow-[0_12px_40px_-16px_rgb(0_0_0/0.45)] lg:hidden"
