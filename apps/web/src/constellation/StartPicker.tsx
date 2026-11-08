@@ -9,8 +9,8 @@ const MAJOR = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 const MINOR = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'];
 const PT = ['Dó', 'Dó♯/Ré♭', 'Ré', 'Ré♯/Mi♭', 'Mi', 'Fá', 'Fá♯/Sol♭', 'Sol', 'Sol♯/Lá♭', 'Lá', 'Lá♯/Si♭', 'Si'];
 
-/** The starting chord of a choice: a major seventh chord or a minor seventh, the kinds the constellation starts from. */
-export const startChord = ({ pc, mode }: StartChoice): string => (mode === 'major' ? `${MAJOR[pc]}7M` : `${MINOR[pc]}m7`);
+/** The starting chord of a choice: just the major or the minor triad (Db, C#m); the types come later, in the balloons. */
+export const startChord = ({ pc, mode }: StartChoice): string => (mode === 'major' ? MAJOR[pc]! : `${MINOR[pc]}m`);
 
 /** How a pitch row is titled: one name, or both spellings when the modes spell it differently (Db · C#). */
 const rowName = (pc: number) => (MAJOR[pc] === MINOR[pc] ? MAJOR[pc]! : `${MAJOR[pc]} · ${MINOR[pc]}`);

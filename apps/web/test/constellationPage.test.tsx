@@ -18,11 +18,11 @@ const open = () =>
     </MemoryRouter>,
   );
 
-/** Starts at C7M and opens its orbit. */
+/** Starts at C (the plain triad) and opens its orbit. */
 const startAtC = async () => {
   open();
-  await userEvent.click(screen.getByRole('button', { name: 'Começar em C7M' }));
-  await userEvent.click(screen.getByRole('button', { name: /Abrir os caminhos de C7M/ }));
+  await userEvent.click(screen.getByRole('button', { name: 'Começar em C' }));
+  await userEvent.click(screen.getByRole('button', { name: /Abrir os caminhos de C$/ }));
 };
 const star = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name.replace(/[()]/g, '\\$&')}, `) });
 /** First tap selects (touch-like: no hover), then "Ir" walks with the suggested type. */
@@ -36,25 +36,25 @@ beforeEach(() => play.mockClear());
 describe('Constelação de acordes page', () => {
   it('starts from a chosen chord and opens its orbit on tap', async () => {
     open();
-    await userEvent.click(screen.getByRole('radio', { name: /^Dm7,/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Começar em Dm7' }));
+    await userEvent.click(screen.getByRole('radio', { name: /^Dm,/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Começar em Dm' }));
     expect(screen.queryByRole('button', { name: /^G7, / })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: /Abrir os caminhos de Dm7/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Abrir os caminhos de Dm$/ }));
     expect(within(screen.getByRole('group', { name: /Constelação/ })).getAllByRole('button').length).toBeGreaterThanOrEqual(6);
   });
 
   it('starts from Db', async () => {
     open();
-    await userEvent.click(screen.getByRole('radio', { name: /^Db7M,/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Começar em Db7M' }));
-    expect(screen.getByRole('button', { name: /Abrir os caminhos de Db7M/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: /^Db,/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Começar em Db' }));
+    expect(screen.getByRole('button', { name: /Abrir os caminhos de Db$/ })).toBeInTheDocument();
   });
 
-  it('the start lists the twelve notes, each only major or minor, spelled the way its key is written', () => {
+  it('the start lists the twelve notes, each only the major or minor triad, spelled the way its key is written', () => {
     open();
     expect(screen.getAllByRole('radio')).toHaveLength(24);
-    expect(screen.getByRole('radio', { name: /^C7M,/ })).toBeChecked();
-    for (const name of ['Db7M', 'C#m7', 'Ab7M', 'G#m7', 'Bbm7', 'F#7M']) expect(screen.getByRole('radio', { name: new RegExp(`^${name},`) })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /^C,/ })).toBeChecked();
+    for (const name of ['Db', 'C#m', 'Ab', 'G#m', 'Bbm', 'F#']) expect(screen.getByRole('radio', { name: new RegExp(`^${name},`) })).toBeInTheDocument();
     // No list of every chord type at the start any more.
     expect(screen.queryByLabelText('Tipo')).toBeNull();
   });
@@ -63,7 +63,7 @@ describe('Constelação de acordes page', () => {
     await startAtC();
     await goTo('Dm7');
     await goTo('G7');
-    expect(screen.getByTestId('progression')).toHaveTextContent('C7M → Dm7 → G7');
+    expect(screen.getByTestId('progression')).toHaveTextContent('C → Dm7 → G7');
     expect(within(screen.getByRole('list', { name: 'Caminho' })).getAllByRole('listitem')).toHaveLength(2);
   });
 
@@ -112,9 +112,9 @@ describe('Constelação de acordes page', () => {
     expect(within(balloon).getByRole('radio', { name: /^G7\(b9\)/ })).toBeChecked();
     expect(within(balloon).getByText(/tensão escura/)).toBeInTheDocument();
     expect(play).toHaveBeenLastCalledWith(expect.any(String), expect.any(Array));
-    expect(screen.getByTestId('progression')).toHaveTextContent(/^C7M$/);
+    expect(screen.getByTestId('progression')).toHaveTextContent(/^C$/);
     await userEvent.click(within(balloon).getByRole('button', { name: 'Ir' }));
-    expect(screen.getByTestId('progression')).toHaveTextContent('C7M → G7(b9)');
+    expect(screen.getByTestId('progression')).toHaveTextContent('C → G7(b9)');
     // The dark color asks for the minor resolution first.
     expect(screen.getByRole('button', { name: 'Cm7, resolve' })).toBeInTheDocument();
   });
@@ -134,7 +134,7 @@ describe('Constelação de acordes page', () => {
     await goTo('Dm7');
     await goTo('G7');
     await userEvent.click(screen.getByRole('button', { name: 'Voltar para Dm7' }));
-    expect(screen.getByTestId('progression')).toHaveTextContent('C7M → Dm7');
+    expect(screen.getByTestId('progression')).toHaveTextContent('C → Dm7');
     expect(screen.getByTestId('progression')).not.toHaveTextContent('G7');
   });
 
@@ -143,7 +143,7 @@ describe('Constelação de acordes page', () => {
     await goTo('Dm7');
     await goTo('G7');
     await userEvent.click(screen.getByRole('button', { name: 'Recomeçar' }));
-    expect(screen.getByTestId('progression')).toHaveTextContent(/^C7M$/);
+    expect(screen.getByTestId('progression')).toHaveTextContent(/^C$/);
   });
 
   it('has no target mode', async () => {
@@ -191,7 +191,7 @@ describe('the progression in the colors of its actions', () => {
     await goTo('Am7');
     await goTo('G7');
     const chords = within(screen.getByTestId('progression')).getAllByTestId('chord');
-    expect(chords.map((c) => c.textContent)).toEqual(['C7M', 'Am7', 'G7']);
+    expect(chords.map((c) => c.textContent)).toEqual(['C', 'Am7', 'G7']);
     expect(chords[1]!.getAttribute('data-motion')).toBe('relaxa');
     expect(chords[2]!.getAttribute('data-motion')).toBe('tensiona');
   });
