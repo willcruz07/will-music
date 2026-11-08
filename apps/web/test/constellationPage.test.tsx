@@ -112,3 +112,39 @@ describe('Constelação de acordes page', () => {
     expect(link).toHaveTextContent('Explore caminhos de rearmonização');
   });
 });
+
+describe('Constelação: review fixes', () => {
+  it('target mode explains every suggested step', async () => {
+    await startAtC();
+    await choose('Alvo: fundamental', 'Bb');
+    await choose('Alvo: tipo', 'Sétima maior');
+    const steps = within(screen.getByRole('list', { name: 'Passos sugeridos' })).getAllByRole('listitem');
+    expect(steps.length).toBeGreaterThanOrEqual(2);
+    for (const s of steps) expect(s.textContent!.length).toBeGreaterThan(15);
+  });
+
+  it('offers only target types the constellation can reach', async () => {
+    await startAtC();
+    await userEvent.click(screen.getByLabelText('Alvo: tipo'));
+    const options = screen.getAllByRole('option').map((o) => o.textContent);
+    expect(options.some((o) => o!.startsWith('Maior'))).toBe(false);
+    expect(options.some((o) => o!.startsWith('Sétima com quarta'))).toBe(false);
+    expect(options.some((o) => o!.startsWith('Sétima maior'))).toBe(true);
+  });
+
+  it('lets keyboard users go back to an earlier chord from the diary', async () => {
+    await startAtC();
+    await goTo('Dm7');
+    await goTo('G7');
+    await userEvent.click(screen.getByRole('button', { name: 'Voltar para Dm7' }));
+    expect(screen.getByTestId('progression')).toHaveTextContent('C7M → Dm7');
+    expect(screen.getByTestId('progression')).not.toHaveTextContent('G7');
+  });
+
+  it('starts from Db', async () => {
+    open();
+    await choose('Fundamental', 'Db');
+    await userEvent.click(screen.getByRole('button', { name: 'Começar' }));
+    expect(screen.getByRole('button', { name: /Abrir os caminhos de Db7M/ })).toBeInTheDocument();
+  });
+});

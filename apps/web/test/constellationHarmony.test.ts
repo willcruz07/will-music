@@ -18,7 +18,7 @@ describe('harmony engine: major center', () => {
     expect(byName['Fm6']!.kind).toBe('emprestimo');
     expect(byName['C7']!.kind).toBe('viraDominante');
     expect(moves.length).toBeGreaterThanOrEqual(6);
-    expect(moves.length).toBeLessThanOrEqual(10);
+    expect(moves.length).toBeLessThanOrEqual(12);
   });
 
   it('every move explains itself and carries a family', () => {
@@ -103,5 +103,41 @@ describe('harmony engine: centers', () => {
       const c = parseChord(n)!;
       expect(neighbors(c, startCenter(c)).length).toBeGreaterThanOrEqual(6);
     }
+  });
+});
+
+describe('review fixes: harmony', () => {
+  const names = (c: Chord, center = startCenter(c)) => neighbors(c, center).map((m) => ({ name: chordName(m.to, m.nextCenter), why: m.why }));
+
+  it('spells flat contexts with flats: Ab7, Db7 → Gb, C#°7 → Eb7', () => {
+    const ab7 = names(parseChord('Ab7')!);
+    expect(ab7.map((n) => n.name).some((n) => n.includes('#'))).toBe(false);
+    expect(ab7.map((n) => n.why).join(' ')).not.toMatch(/#/);
+    const db7 = neighbors(parseChord('Db7')!, { root: 0, minor: false }).find((m) => m.kind === 'cadencia')!;
+    expect(chordName(db7.to, db7.nextCenter)).toBe('Gb7M');
+    expect(db7.why).toMatch(/Gb7M/);
+    expect(names(parseChord('C#°7')!).map((n) => n.name)).toContain('Eb7');
+  });
+
+  it('the ii chain names the key the ii belongs to', () => {
+    const gm7 = neighbors({ root: 2, quality: 'm7' }, { root: 0, minor: false }).find((m) => m.kind === 'cadeia')!;
+    expect(gm7.why).toMatch(/ii de F\b/);
+  });
+
+  it('after a secondary dominant onto a minor chord, the ii–V is still there (I–VI7–ii–V)', () => {
+    const C = { root: 0, minor: false };
+    const toA7 = neighbors({ root: 0, quality: '7M' }, C).find((m) => chordName(m.to, C) === 'A7')!;
+    const toDm7 = neighbors(toA7.to, toA7.nextCenter).find((m) => m.kind === 'cadencia')!;
+    expect(chordName(toDm7.to, toDm7.nextCenter)).toBe('Dm7');
+    expect(neighbors(toDm7.to, toDm7.nextCenter).map((m) => chordName(m.to, m.nextCenter))).toContain('G7');
+  });
+
+  it('offers the borrowed chords from the minor key, with the right explanation', () => {
+    const C = { root: 0, minor: false };
+    const moves = neighbors({ root: 0, quality: '7M' }, C);
+    const bb7 = moves.find((m) => chordName(m.to, C) === 'Bb7')!;
+    expect(bb7.kind).toBe('emprestimo');
+    expect(bb7.why).not.toMatch(/mixolídio/);
+    expect(moves.map((m) => chordName(m.to, C))).toContain('Ab7M');
   });
 });

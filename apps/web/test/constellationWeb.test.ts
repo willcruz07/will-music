@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { chordName, parseChord } from '../src/constellation/harmony.ts';
-import { focusOn, openFocus, orbit, preview, resetWeb, startWeb, walk } from '../src/constellation/web.ts';
+import { focusOn, openFocus, orbit, preview, previewStars, resetWeb, startWeb, walk } from '../src/constellation/web.ts';
 
 describe('constellation state', () => {
   it('starts with a lone chord and opens its orbit on demand', () => {
@@ -58,5 +58,17 @@ describe('constellation state', () => {
     const pts = Object.values(w.nodes);
     for (let i = 0; i < pts.length; i++)
       for (let j = i + 1; j < pts.length; j++) expect(Math.hypot(pts[i]!.x - pts[j]!.x, pts[i]!.y - pts[j]!.y)).toBeGreaterThan(60);
+  });
+});
+
+describe('review fixes: preview ring', () => {
+  it('a chord in the preview ring is one bubble, even when several neighbors lead to it', () => {
+    const w = openFocus(startWeb(parseChord('C7M')!));
+    const at = new Map<string, string>();
+    for (const s of previewStars(w)) {
+      const p = `${s.x},${s.y}`;
+      if (at.has(s.key)) expect(p).toBe(at.get(s.key));
+      else at.set(s.key, p);
+    }
   });
 });

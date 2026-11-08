@@ -64,15 +64,18 @@ export const orbit = (web: Web): Link[] => (web.opened ? web.links.filter((l) =>
 export const previewStars = (web: Web): PreviewStar[] => {
   const focus = web.nodes[web.focus]!;
   const stars: PreviewStar[] = [];
+  // A chord several neighbors lead to is one bubble: every link to it reuses the first placement.
+  const placed = new Map<string, { x: number; y: number }>();
   for (const link of orbit(web)) {
     const from = web.nodes[link.to]!;
     const out = Math.atan2(from.y - focus.y, from.x - focus.x);
     const next = neighbors(from.chord, link.move.nextCenter).filter((m) => chordKey(m.to) !== focus.key);
     next.forEach((m, i) => {
       const key = chordKey(m.to);
-      const existing = web.nodes[key];
       const a = out + (i - (next.length - 1) / 2) * (Math.PI / 2 / Math.max(1, next.length - 1));
-      stars.push({ key, chord: m.to, center: m.nextCenter, from: link.to, move: m, x: existing?.x ?? Math.round(from.x + PREVIEW_RADIUS * Math.cos(a)), y: existing?.y ?? Math.round(from.y + PREVIEW_RADIUS * Math.sin(a)) });
+      const spot = web.nodes[key] ?? placed.get(key) ?? { x: Math.round(from.x + PREVIEW_RADIUS * Math.cos(a)), y: Math.round(from.y + PREVIEW_RADIUS * Math.sin(a)) };
+      placed.set(key, { x: spot.x, y: spot.y });
+      stars.push({ key, chord: m.to, center: m.nextCenter, from: link.to, move: m, x: spot.x, y: spot.y });
     });
   }
   return stars;

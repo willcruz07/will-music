@@ -66,3 +66,17 @@ describe('ConstellationView', () => {
     expect(h.onOpen).toHaveBeenCalled();
   });
 });
+
+describe('ConstellationView: review fixes', () => {
+  it('draws one preview bubble per chord', () => {
+    const w = web();
+    render(<ConstellationView web={w} selected={null} {...handlers()} />);
+    const keys = new Set(previewStars(w).filter((s) => !w.nodes[s.key]).map((s) => s.key));
+    expect(screen.getByTestId('preview-ring').querySelectorAll('[data-bubble]').length).toBe(keys.size);
+  });
+
+  it('wheel zoom does not scroll the page', () => {
+    render(<ConstellationView web={web()} selected={null} {...handlers()} />);
+    expect(fireEvent.wheel(screen.getByRole('group', { name: /Constelação/ }), { deltaY: 100 })).toBe(false);
+  });
+});

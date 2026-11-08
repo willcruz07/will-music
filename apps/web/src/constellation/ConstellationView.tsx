@@ -91,7 +91,25 @@ export const ConstellationView = ({
     if (pointers.current.size < 2) pinch.current = null;
     if (pointers.current.size === 0) setDragging(false);
   };
-  const onWheel = (e: React.WheelEvent) => setCamera((c) => ({ ...c, zoom: clamp(c.zoom * Math.exp(-e.deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM) }));
+  // Wheel zoom: a native, non-passive listener so the page behind does not scroll; no camera easing while wheeling.
+  const [wheeling, setWheeling] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let timer = 0;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setWheeling(true);
+      clearTimeout(timer);
+      timer = window.setTimeout(() => setWheeling(false), 200);
+      setCamera((c) => ({ ...c, zoom: clamp(c.zoom * Math.exp(-e.deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM) }));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, []);
 
   /** A tap, unless the pointer travelled: then it was a drag and does nothing. */
   const tap = (fn: () => void) => () => {
@@ -125,7 +143,7 @@ export const ConstellationView = ({
   const routeLine = [web.focus, ...route].map((k) => web.nodes[k]).filter(Boolean);
 
   return (
-    <div ref={box} className="relative h-full w-full touch-none select-none overflow-hidden" onWheel={onWheel}>
+    <div ref={box} className="relative h-full w-full touch-none select-none overflow-hidden">
       <svg
         className={`h-full w-full ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         viewBox={`0 0 ${size.w} ${size.h}`}
@@ -137,7 +155,7 @@ export const ConstellationView = ({
         aria-label={`Constelação a partir de ${name(web.focus)}`}
       >
         <g
-          className={dragging ? '' : 'transition-transform duration-[450ms] ease-out motion-reduce:transition-none'}
+          className={dragging || wheeling ? '' : 'transition-transform duration-[450ms] ease-out motion-reduce:transition-none'}
           style={{ transform: `translate(${size.w / 2}px, ${size.h / 2}px) scale(${camera.zoom}) translate(${-camera.x}px, ${-camera.y}px)` }}
         >
           {/* Links of every opened star, dim; the orbit's links brighter. */}
@@ -151,16 +169,17 @@ export const ConstellationView = ({
           <g data-testid="preview-ring" opacity={0.35}>
             {ring.map((s, i) => {
               const from = web.nodes[s.from]!;
-              return (
-                <g key={`${s.from}-${s.key}-${i}`} data-star={s.key}>
-                  <line x1={from.x} y1={from.y} x2={s.x} y2={s.y} stroke="var(--border)" strokeDasharray="3 4" />
-                  <circle cx={s.x} cy={s.y} r={20} fill="var(--surface)" stroke={FAMILY_COLOR[s.move.family]} strokeDasharray="3 3" />
-                  <text x={s.x} y={s.y + 4} textAnchor="middle" fontSize={10} fill="var(--muted-foreground)">
-                    {chordName(s.chord, s.center)}
-                  </text>
-                </g>
-              );
+              return <line key={`${s.from}-${s.key}-${i}`} data-star={s.key} x1={from.x} y1={from.y} x2={s.x} y2={s.y} stroke="var(--border)" strokeDasharray="3 4" />;
             })}
+            {/* One bubble per chord, even when several neighbors lead to it. */}
+            {[...new Map(ring.filter((s) => !web.nodes[s.key]).map((s) => [s.key, s])).values()].map((s) => (
+              <g key={s.key} data-bubble={s.key}>
+                <circle cx={s.x} cy={s.y} r={20} fill="var(--surface)" stroke={FAMILY_COLOR[s.move.family]} strokeDasharray="3 3" />
+                <text x={s.x} y={s.y + 4} textAnchor="middle" fontSize={10} fill="var(--muted-foreground)">
+                  {chordName(s.chord, s.center)}
+                </text>
+              </g>
+            ))}
           </g>
 
           {/* The trail walked so far, and the suggested route in target mode. */}

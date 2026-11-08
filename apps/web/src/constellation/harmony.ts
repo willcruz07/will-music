@@ -18,8 +18,9 @@ export const QUALITIES: readonly Quality[] = ['7M', '', '6', 'm7', 'm', 'm6', 'm
 
 const mod12 = (n: number) => ((n % 12) + 12) % 12;
 const NOTE_PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-const MAJOR_KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-const MINOR_KEYS = ['Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm'];
+// Key names as Brazilian charts write them; the flat keys (Db, Gb, Ebm) make every chord in them come out with flats.
+const MAJOR_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+const MINOR_KEYS = ['Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'G#m', 'Am', 'Bbm', 'Bm'];
 
 /** Identity of a chord by pitch, not by spelling: C#7 and Db7 are the same star. */
 export const chordKey = (c: Chord): string => `${mod12(c.root)}:${c.quality}`;
@@ -58,11 +59,13 @@ export const startCenter = (c: Chord): Center => {
 /** Degrees (from the center) that carry a minor chord: a dominant resolves to m7 there and to 7M everywhere else. */
 const minorDegree = (pc: number, center: Center) => (center.minor ? [0, 5] : [2, 4, 9]).includes(mod12(pc - center.root));
 
-/** cur: current chord · to: destination · target: a fourth above the destination · res: where the current chord resolves. */
-type Names = { cur: string; to: string; target: string; res: string; center: string };
-type Rule = { at: number; quality: Quality | 'resolve'; kind: MoveKind; family: Family; flat?: boolean; why: (n: Names) => string };
+/** cur: current chord · to: destination · target: a fourth above the destination · res: where the current chord resolves · iiOf: the key whose ii the destination is. */
+type Names = { cur: string; to: string; target: string; res: string; iiOf: string; center: string };
+/** `flat`: always spell with flats (tritone subs, borrowed chords); `inherit`: follow the current chord (a flat Db7 resolves to Gb, not F#). */
+type Spelling = boolean | 'inherit';
+type Rule = { at: number; quality: Quality | 'resolve'; kind: MoveKind; family: Family; flat: Spelling; why: (n: Names) => string };
 
-const R = (at: number, quality: Rule['quality'], kind: MoveKind, family: Family, why: Rule['why'], flat = false): Rule => ({ at, quality, kind, family, why, flat });
+const R = (at: number, quality: Rule['quality'], kind: MoveKind, family: Family, why: Rule['why'], flat: Spelling = false): Rule => ({ at, quality, kind, family, why, flat });
 
 const RULES: Record<Role, Rule[]> = {
   tonic: [
@@ -76,19 +79,20 @@ const RULES: Record<Role, Rule[]> = {
     R(5, 'm6', 'emprestimo', 'subdominante', (n) => `${n.to} vem do tom menor: o subdominante menor, aquele som de "amém".`, true),
     R(0, '7', 'viraDominante', 'alterado', (n) => `${n.to}: a tônica ganha sétima menor e vira dominante de ${n.target}.`),
     R(1, '°7', 'diminuto', 'alterado', (n) => `${n.to} é diminuto de passagem: sobe meio tom e liga ${n.cur} ao ii.`),
-    R(10, '7', 'emprestimo', 'subdominante', (n) => `${n.to} vem do modo mixolídio: o bVII7, som de gospel e rock.`, true),
+    R(10, '7', 'emprestimo', 'subdominante', (n) => `${n.to} vem do tom menor (bVII7): o dominante "pela porta dos fundos", resolve em ${n.cur} com cor de gospel.`, true),
+    R(8, '7M', 'emprestimo', 'subdominante', (n) => `${n.to} vem do tom menor (bVI): uma cor épica que volta bem para ${n.cur}.`, true),
   ],
   minor: [
     R(5, '7', 'iiV', 'dominante', (n) => `${n.cur} funciona como ii e ${n.to} como V: o ii–V que leva a ${n.target}.`),
     R(11, '7', 'subV', 'dominante', (n) => `${n.to} é o substituto de trítono do V: o baixo desce em semitons.`, true),
-    R(5, 'm7', 'cadeia', 'subdominante', (n) => `${n.to} é o ii de ${n.target}: a cadeia de ii andando pelo ciclo de quartas.`),
+    R(5, 'm7', 'cadeia', 'subdominante', (n) => `${n.to} é o ii de ${n.iiOf}: a cadeia de ii andando pelo ciclo de quartas.`),
     R(7, '7', 'secundario', 'alterado', (n) => `${n.to} é o dominante de ${n.cur}: reforça o acorde com uma nota de fora.`),
     R(3, '7M', 'relativo', 'tonica', (n) => `${n.to} é o relativo maior: as mesmas notas, com cor clara.`),
   ],
   dominant: [
-    R(5, 'resolve', 'cadencia', 'tonica', (n) => `${n.cur} resolve em ${n.to}: a tensão do trítono se desfaz.`),
-    R(2, 'm7', 'relativo', 'tonica', (n) => `${n.to}: cadência de engano, em vez de ${n.res} vai para o relativo menor.`),
-    R(5, '7', 'cadeia', 'dominante', (n) => `${n.to}: dominante que puxa outro dominante pelo ciclo de quartas.`),
+    R(5, 'resolve', 'cadencia', 'tonica', (n) => `${n.cur} resolve em ${n.to}: a tensão do trítono se desfaz.`, 'inherit'),
+    R(2, 'm7', 'relativo', 'tonica', (n) => `${n.to}: cadência de engano, em vez de ${n.res} vai para o relativo menor.`, 'inherit'),
+    R(5, '7', 'cadeia', 'dominante', (n) => `${n.to}: dominante que puxa outro dominante pelo ciclo de quartas.`, 'inherit'),
     R(6, '7', 'subV', 'dominante', (n) => `${n.to} tem o mesmo trítono de ${n.cur}: troca pelo substituto de trítono.`, true),
     R(4, 'm7(b5)', 'tritono', 'dominante', (n) => `${n.to} é ${n.cur} com nona e sem fundamental: mesmo trítono, outra cor.`),
   ],
@@ -101,7 +105,7 @@ const RULES: Record<Role, Rule[]> = {
   ],
   dim: [
     R(1, 'm7', 'diminuto', 'tonica', (n) => `${n.cur} sobe meio tom e chega em ${n.to}: diminuto de passagem.`),
-    ...[8, 11, 2, 5].map((at) => R(at, '7', 'tritono', 'dominante', (n) => `${n.cur} é ${n.to}(b9) sem a fundamental: pode virar esse dominante.`)),
+    ...[8, 11, 2, 5].map((at) => R(at, '7', 'tritono', 'dominante', (n) => `${n.cur} é ${n.to}(b9) sem a fundamental: pode virar esse dominante.`, at === 2)),
   ],
 };
 
@@ -109,6 +113,7 @@ const RULES: Record<Role, Rule[]> = {
 const MINOR_TONIC: Rule[] = [
   R(2, 'm7(b5)', 'iiV', 'subdominante', (n) => `${n.to} é o iiø do tom menor: abre o ii–V–i.`),
   R(7, '7', 'cadencia', 'dominante', (n) => `${n.to} é o V7 da menor harmônica: o dominante que pede ${n.cur}.`),
+  R(5, '7', 'iiV', 'dominante', (n) => `${n.cur} também funciona como ii: com ${n.to} forma o ii–V que leva a ${n.target}.`),
   R(8, '7M', 'relativo', 'subdominante', (n) => `${n.to} é o VI: subdominante com cor maior dentro do tom menor.`),
   R(10, '7', 'secundario', 'dominante', (n) => `${n.to} é o VII7: dominante do relativo maior.`),
   R(5, 'm7', 'iiV', 'subdominante', (n) => `${n.to} é o iv: o subdominante do tom menor.`),
@@ -125,29 +130,30 @@ const centerRules = (center: Center): Rule[] => [
 ];
 
 const MIN_ORBIT = 6;
-const MAX_ORBIT = 10;
+const MAX_ORBIT = 12;
 
 export const neighbors = (current: Chord, center: Center): Move[] => {
   const moves: Move[] = [];
   const seen = new Set([chordKey(current)]);
   const cur = chordName(current, center);
-  const res = chordName({ root: mod12(current.root + 5), quality: '' }, center);
+  const res = chordName({ root: mod12(current.root + 5), quality: '', ...(current.flat ? { flat: true } : {}) }, center);
   const add = (rule: Rule, base: number, limit: number) => {
     if (moves.length >= limit) return;
     const root = mod12(base + rule.at);
     const quality: Quality = rule.quality === 'resolve' ? (minorDegree(root, center) ? 'm7' : '7M') : rule.quality;
-    const to: Chord = { root, quality, ...(rule.flat ? { flat: true } : {}) };
+    const flat = rule.flat === 'inherit' ? !!current.flat : rule.flat;
+    const to: Chord = { root, quality, ...(flat ? { flat: true } : {}) };
     if (seen.has(chordKey(to))) return;
     seen.add(chordKey(to));
-    const name = chordName(to, center);
-    const target = chordName({ root: mod12(root + 5), quality: '' }, center);
-    let why = rule.why({ cur, to: name, target, res, center: centerName(center) });
-    let nextCenter = center;
     // Tonicization: a dominant that resolves somewhere other than home makes that chord the new center.
-    if (rule.quality === 'resolve' && root !== center.root) {
-      nextCenter = { root, minor: quality === 'm7' };
-      why += ` O centro tonal passa a ser ${centerName(nextCenter)}.`;
-    }
+    const tonicizes = rule.quality === 'resolve' && root !== center.root;
+    const nextCenter = tonicizes ? { root, minor: quality === 'm7' } : center;
+    // Each chord is spelled in the center it lives in (the resolution of Db7 is Gb7M, not F#7M).
+    const name = chordName(to, nextCenter);
+    const target = chordName({ root: mod12(root + 5), quality: '', ...(flat ? { flat: true } : {}) }, nextCenter);
+    const iiOf = chordName({ root: mod12(root + 10), quality: '' }, nextCenter);
+    let why = rule.why({ cur, to: name, target, res, iiOf, center: centerName(center) });
+    if (tonicizes) why += ` O centro tonal passa a ser ${centerName(nextCenter)}.`;
     moves.push({ to, kind: rule.kind, family: rule.family, why, nextCenter, variants: variantsOf(name, quality) });
   };
   const minorTonic = center.minor && current.root === center.root && roleOf(current.quality) === 'minor';

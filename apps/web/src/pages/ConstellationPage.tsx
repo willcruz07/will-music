@@ -10,7 +10,7 @@ import { chordEvents, useStudySynth } from '../study/widgets.tsx';
 import { Button } from '../ui/Button.tsx';
 import { SheetSelect } from '../ui/SheetSelect.tsx';
 
-const ROOTS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+const ROOTS = ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 const QUALITY_NAMES: Record<Quality, string> = {
   '7M': 'Sétima maior',
   '': 'Maior',
@@ -28,7 +28,11 @@ const FAMILY_LABEL: Record<Family, string> = { tonica: 'tônica', subdominante: 
 const MAX_STEPS = 8;
 
 const rootOptions = ROOTS.map((r) => ({ value: r, label: r }));
-const qualityOptions = QUALITIES.map((q) => ({ value: q, label: QUALITY_NAMES[q], hint: q ? `ex.: C${q}` : 'ex.: C' }));
+const toOption = (q: Quality) => ({ value: q, label: QUALITY_NAMES[q], hint: q ? `ex.: C${q}` : 'ex.: C' });
+const qualityOptions = QUALITIES.map(toOption);
+/** Only the chord types the constellation ever lands on: a target it can never reach would always fail. */
+const TARGET_QUALITIES: Quality[] = ['7M', 'm7', '7', 'm6', 'm7(b5)', '°7'];
+const targetOptions = TARGET_QUALITIES.map(toOption);
 
 type Step = { name: string; why: string };
 
@@ -52,11 +56,11 @@ export const ConstellationPage = () => {
     if (!web || !target) return null;
     const focus = web.nodes[web.focus]!;
     const targetName = chordName(target, web.center);
-    if (chordKey(focus.chord) === chordKey(target)) return { text: `Você já está em ${targetName}.`, keys: [] as string[] };
+    if (chordKey(focus.chord) === chordKey(target)) return { text: `Você já está em ${targetName}.`, keys: [] as string[], steps: [] as Move[] };
     const route = suggestRoute(focus.chord, web.center, target, MAX_STEPS);
-    if (!route) return { text: `Não encontrei um caminho até ${targetName} em ${MAX_STEPS} passos.`, keys: [] };
+    if (!route) return { text: `Não encontrei um caminho até ${targetName} em ${MAX_STEPS} passos.`, keys: [], steps: [] };
     const names = [nameOf(web, web.focus), ...route.map((m) => chordName(m.to, m.nextCenter))];
-    return { text: `Sugestão até ${targetName}: ${names.join(' → ')}`, keys: route.map((m) => chordKey(m.to)).filter((k) => web.nodes[k]) };
+    return { text: `Sugestão até ${targetName}: ${names.join(' → ')}`, keys: route.map((m) => chordKey(m.to)).filter((k) => web.nodes[k]), steps: route };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [web, targetRoot, targetQuality]);
 
@@ -184,7 +188,9 @@ export const ConstellationPage = () => {
             <ol aria-label="Caminho" className="mt-2 space-y-2 text-sm">
               {steps.map((s, i) => (
                 <li key={`${i}-${s.name}`} className="border-l-2 border-primary/50 pl-3">
-                  <span className="font-semibold text-chord">{s.name}</span> <span className="text-muted-foreground">{s.why}</span>
+                  <button type="button" aria-label={`Voltar para ${s.name}`} title={`Voltar para ${s.name}`} onClick={() => refocus(web.trail[i + 1]!)} className="rounded font-semibold text-chord underline-offset-4 hover:underline">
+                    {s.name}
+                  </button> <span className="text-muted-foreground">{s.why}</span>
                 </li>
               ))}
             </ol>
@@ -199,15 +205,24 @@ export const ConstellationPage = () => {
                 label="Alvo: tipo"
                 value={targetQuality ?? 'none'}
                 onChange={(q) => setTargetQuality(q as Quality)}
-                options={qualityOptions}
+                options={targetOptions}
                 className="min-w-0 flex-1"
                 renderValue={(o) => o?.label ?? 'Escolha'}
               />
             </div>
             {suggestion && (
-              <p data-testid="suggestion" className="mt-3 text-sm" aria-live="polite">
-                {suggestion.text}
-              </p>
+              <div className="mt-3 text-sm" aria-live="polite">
+                <p data-testid="suggestion">{suggestion.text}</p>
+                {suggestion.steps.length > 0 && (
+                  <ol aria-label="Passos sugeridos" className="mt-2 space-y-1.5">
+                    {suggestion.steps.map((m, i) => (
+                      <li key={`${i}-${chordKey(m.to)}`} className="border-l-2 border-[var(--chord)]/50 pl-3">
+                        <span className="font-semibold text-chord">{chordName(m.to, m.nextCenter)}</span> <span className="text-muted-foreground">{m.why}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
             )}
             {target && (
               <button
