@@ -1,143 +1,169 @@
 import { describe, expect, it } from 'vitest';
-import { type Chord, type Move, chordName, neighbors, parseChord, startCenter } from '../src/constellation/harmony.ts';
+import { type Chord, type Move, chordKey, chordName, levelOf, neighbors, parseChord, startCenter } from '../src/constellation/harmony.ts';
 import { chordNotes } from '../src/lib/chordNotation.ts';
 
 const C = { root: 0, minor: false };
-const names = (moves: Move[]) => moves.map((m) => chordName(m.to, C));
+const at = (moves: Move[]) => Object.fromEntries(moves.map((m) => [chordName(m.to, m.nextCenter), m]));
+const pcs = (name: string) => new Set(chordNotes(name)!);
 
-describe('harmony engine: major center', () => {
-  it('from C (center C) offers the core paths, each with its kind', () => {
-    const moves = neighbors({ root: 0, quality: '7M' }, C);
-    const byName = Object.fromEntries(moves.map((m) => [chordName(m.to, C), m]));
-    expect(byName['G7']!.kind).toBe('cadencia');
-    expect(byName['Bm7(b5)']!.kind).toBe('tritono');
-    expect(byName['Db7']!.kind).toBe('subV');
-    expect(byName['Dm7']!.kind).toBe('iiV');
-    expect(byName['Am7']!.kind).toBe('relativo');
-    expect(byName['A7']!.kind).toBe('secundario');
-    expect(byName['Fm6']!.kind).toBe('emprestimo');
-    expect(byName['C7']!.kind).toBe('viraDominante');
-    expect(moves.length).toBeGreaterThanOrEqual(6);
-    expect(moves.length).toBeLessThanOrEqual(12);
+describe('harmony v2: relax, tension, resolution', () => {
+  it('from G7 there is only resolution or more tension, never its own substitutes', () => {
+    const m = at(neighbors({ root: 7, quality: '7' }, C));
+    expect(m['C7M']!.motion).toBe('resolve');
+    for (const n of ['Am7', 'Em7', 'Ab7M']) expect(m[n]!.motion).toBe('resolve');
+    expect(m['C7']!.motion).toBe('tensiona');
+    expect(m['F#7']!.motion).toBe('tensiona');
+    for (const n of ['Bm7(b5)', 'Db7', 'Dm7']) expect(m[n]).toBeUndefined();
   });
 
-  it('every move explains itself and carries a family', () => {
-    for (const m of neighbors({ root: 0, quality: '7M' }, C)) {
-      expect(m.why.length).toBeGreaterThan(10);
-      expect(['tonica', 'subdominante', 'dominante', 'alterado']).toContain(m.family);
+  it('no dominant ever offers a chord with its own tritone as the next step', () => {
+    for (let r = 0; r < 12; r++) {
+      const tritone = [(r + 4) % 12, (r + 10) % 12];
+      for (const move of neighbors({ root: r, quality: '7' }, startCenter({ root: r, quality: '7' }))) {
+        if (move.motion !== 'tensiona') continue;
+        const notes = pcs(chordName(move.to, move.nextCenter));
+        expect(tritone.every((p) => notes.has(p)), chordName(move.to, move.nextCenter)).toBe(false);
+      }
     }
   });
 
-  it('Bm7(b5) and G7 share the tritone B–F (the reason for the substitution)', () => {
-    const pcs = (c: Chord) => new Set(chordNotes(chordName(c, C))!);
-    const g7 = pcs({ root: 7, quality: '7' });
-    const bm7b5 = pcs({ root: 11, quality: 'm7(b5)' });
-    expect(g7.has(11) && g7.has(5) && bm7b5.has(11) && bm7b5.has(5)).toBe(true);
-  });
-
-  it('groups the colors of a dominant into one neighbor', () => {
-    const g7 = neighbors({ root: 0, quality: '7M' }, C).find((m) => chordName(m.to, C) === 'G7')!;
-    expect(g7.variants).toEqual(['G7(9)', 'G7(13)', 'G7(b9)', 'G7(#5)']);
-    expect(names(neighbors({ root: 0, quality: '7M' }, C)).filter((n) => n.startsWith('G7')).length).toBe(1);
-  });
-
-  it('from Dm7 the ii–V chain continues: G7, and Gm7 as the ii of F', () => {
-    const moves = neighbors({ root: 2, quality: 'm7' }, C);
-    expect(names(moves)).toContain('G7');
-    expect(moves.find((m) => chordName(m.to, C) === 'Gm7')!.kind).toBe('cadeia');
-  });
-
-  it('spells with flats in flat centers', () => {
-    const F = { root: 5, minor: false };
-    const all = neighbors({ root: 5, quality: '7M' }, F).map((m) => chordName(m.to, F));
-    expect(all).toContain('Bbm6');
-    expect(all).toContain('Gb7');
-    expect(all.some((n) => n.includes('#'))).toBe(false);
-  });
-
-  it('never offers the current chord as its own neighbor', () => {
-    for (const n of ['C7M', 'Dm7', 'G7']) {
+  it('resolution only appears when the current chord is a tension', () => {
+    for (const n of ['C7M', 'Dm7', 'F7M', 'Am7', 'G']) {
       const c = parseChord(n)!;
-      expect(neighbors(c, C).some((m) => m.to.root === c.root && m.to.quality === c.quality)).toBe(false);
+      expect(neighbors(c, startCenter(c)).some((m) => m.motion === 'resolve'), n).toBe(false);
     }
   });
 
-  it('parses and names round-trip', () => {
-    for (const n of ['C7M', 'Dm7', 'G7', 'Bm7(b5)', 'C#°7', 'Fm6', 'Bb7M', 'Am']) expect(chordName(parseChord(n)!, startCenter(parseChord(n)!))).toBe(n);
-  });
-});
-
-describe('harmony engine: explanations', () => {
-  it('the deceptive cadence names the chord it avoids', () => {
-    const engano = neighbors({ root: 7, quality: '7' }, C).find((m) => chordName(m.to, C) === 'Am7')!;
-    expect(engano.why).toMatch(/em vez de C\b/);
-  });
-});
-
-describe('harmony engine: centers', () => {
-  it('resolving V→I moves the center (tonicization)', () => {
-    const toF = neighbors({ root: 0, quality: '7' }, C).find((m) => m.kind === 'cadencia')!;
-    expect(chordName(toF.to, C)).toBe('F7M');
-    expect(toF.nextCenter).toEqual({ root: 5, minor: false });
-    expect(toF.why).toMatch(/centro tonal/);
+  it('dark colors of the dominant ask for the minor resolution first', () => {
+    const dark = neighbors({ root: 7, quality: '7(b9)' }, C).filter((x) => x.motion === 'resolve');
+    expect(chordName(dark[0]!.to, dark[0]!.nextCenter)).toBe('Cm7');
+    const clear = neighbors({ root: 7, quality: '7(13)' }, C).filter((x) => x.motion === 'resolve');
+    expect(chordName(clear[0]!.to, clear[0]!.nextCenter)).toBe('C7M');
   });
 
-  it('resolving to the current tonic keeps the center', () => {
-    const toC = neighbors({ root: 7, quality: '7' }, C).find((m) => m.kind === 'cadencia')!;
-    expect(chordName(toC.to, C)).toBe('C7M');
-    expect(toC.nextCenter).toEqual(C);
+  it('substitutes appear where the tension is approached', () => {
+    for (const from of [{ root: 0, quality: '7M' as const }, { root: 2, quality: 'm7' as const }]) {
+      const m = at(neighbors(from, C));
+      for (const n of ['G7', 'Bm7(b5)', 'Db7']) expect(m[n]!.motion, n).toBe('tensiona');
+    }
   });
 
-  it('a minor center brings the minor relations', () => {
+  it('a pure major triad has an open intention', () => {
+    const G = parseChord('G')!;
+    const m = at(neighbors(G, startCenter(G)));
+    expect(m['D7M']!.motion).toBe('relaxa');
+    expect(m['C']!.motion).toBe('relaxa');
+    expect(m['G7']!.motion).toBe('tensiona');
+  });
+
+  it('A7 → Dm7 resolves locally and Dm7 then prepares G7', () => {
+    const toDm = at(neighbors({ root: 9, quality: '7' }, C))['Dm7']!;
+    expect(toDm.motion).toBe('resolve');
+    expect(toDm.nextCenter).toEqual(C);
+    expect(toDm.why).toMatch(/prepara/);
+    expect(at(neighbors(toDm.to, toDm.nextCenter))['G7']!.motion).toBe('tensiona');
+  });
+
+  it('C7M → Am7 relaxes; E7(b9) → Am7 in A minor is a full resolution', () => {
+    expect(at(neighbors({ root: 0, quality: '7M' }, C))['Am7']!.motion).toBe('relaxa');
     const Am = { root: 9, minor: true };
-    const all = neighbors({ root: 9, quality: 'm7' }, Am).map((m) => chordName(m.to, Am));
-    expect(all).toEqual(expect.arrayContaining(['Bm7(b5)', 'E7', 'F7M', 'G7']));
+    const full = at(neighbors({ root: 4, quality: '7(b9)' }, Am))['Am7']!;
+    expect(full.motion).toBe('resolve');
+    expect(full.nextCenter).toEqual(Am);
   });
 
-  it('starts from tricky chords with a coherent center and a valid orbit', () => {
+  it('walks the pattern relaxa, relaxa, relaxa, tensiona, resolve', () => {
+    const motions: string[] = [];
+    let cur: Chord = { root: 0, quality: '7M' };
+    let center = C;
+    for (const n of ['Am7', 'Em7', 'F7M', 'G7', 'C7M']) {
+      const m = at(neighbors(cur, center))[n];
+      expect(m, `${n} from ${chordName(cur, center)}`).toBeDefined();
+      motions.push(m!.motion);
+      cur = m!.to;
+      center = m!.nextCenter;
+    }
+    expect(motions).toEqual(['relaxa', 'relaxa', 'relaxa', 'tensiona', 'resolve']);
+  });
+
+  it('walks the pattern tensiona, tensiona, resolve, tensiona, resolve (ii–V chain)', () => {
+    const motions: string[] = [];
+    let cur: Chord = { root: 0, quality: '7M' };
+    let center = C;
+    for (const n of ['E7', 'A7', 'Dm7', 'G7', 'C7M']) {
+      const m = at(neighbors(cur, center))[n];
+      expect(m, `${n} from ${chordName(cur, center)}`).toBeDefined();
+      motions.push(m!.motion);
+      cur = m!.to;
+      center = m!.nextCenter;
+    }
+    expect(motions).toEqual(['tensiona', 'tensiona', 'resolve', 'tensiona', 'resolve']);
+  });
+
+  it('the balloon offers the types of the root, each with its own intention', () => {
+    const g = at(neighbors({ root: 0, quality: '7M' }, C))['G7']!;
+    const o = Object.fromEntries(g.options.map((x) => [chordName(x.to, x.nextCenter), x]));
+    expect(Object.keys(o)).toEqual(expect.arrayContaining(['G', 'G7M', 'G7', 'G7(9)', 'G7(13)', 'G7(b9)', 'G7(#5)', 'G7sus4']));
+    expect(o['G']!.motion).toBe('relaxa');
+    expect(o['G7(b9)']!.motion).toBe('tensiona');
+    expect(o['G7M']!.nextCenter).toEqual({ root: 7, minor: false });
+    for (const x of g.options) expect(x.why.length).toBeGreaterThan(10);
+  });
+
+  it('G7 and G7(b9) are the same star', () => {
+    expect(chordKey({ root: 7, quality: '7' })).toBe(chordKey({ root: 7, quality: '7(b9)' }));
+    expect(chordKey({ root: 7, quality: '7' })).not.toBe(chordKey({ root: 7, quality: '7M' }));
+  });
+
+  it('every move explains itself and the orbit stays within 6 to 14 chords', () => {
+    for (const n of ['C7M', 'Dm7', 'G7', 'G', 'F7M', 'Am7', 'Bm7(b5)', 'C#°7', 'E7(b9)']) {
+      const c = parseChord(n)!;
+      const moves = neighbors(c, startCenter(c));
+      expect(moves.length, n).toBeGreaterThanOrEqual(6);
+      expect(moves.length, n).toBeLessThanOrEqual(14);
+      for (const m of moves) expect(m.why.length).toBeGreaterThan(10);
+    }
+  });
+
+  it('knows the level of a chord in its center', () => {
+    expect(levelOf({ root: 0, quality: '7M' }, C)).toBe('repouso');
+    expect(levelOf({ root: 9, quality: 'm7' }, C)).toBe('repouso');
+    expect(levelOf({ root: 2, quality: 'm7' }, C)).toBe('afastamento');
+    expect(levelOf({ root: 5, quality: '7M' }, C)).toBe('afastamento');
+    expect(levelOf({ root: 7, quality: '7' }, C)).toBe('tensao');
+    expect(levelOf({ root: 11, quality: 'm7(b5)' }, C)).toBe('tensao');
+  });
+});
+
+describe('harmony v2: spelling and starting chords', () => {
+  it('spells flat contexts with flats: Ab7, Db7 → Gb, C#°7 → Eb7(b9)', () => {
+    const ab = parseChord('Ab7')!;
+    const ab7 = neighbors(ab, startCenter(ab));
+    expect(ab7.map((m) => chordName(m.to, m.nextCenter)).some((n) => n.includes('#'))).toBe(false);
+    expect(ab7.map((m) => m.why).join(' ')).not.toMatch(/#/);
+    const db7 = at(neighbors(parseChord('Db7')!, C))['Gb7M']!;
+    expect(db7.motion).toBe('resolve');
+    expect(db7.why).toMatch(/Gb7M/);
+    const dim = parseChord('C#°7')!;
+    expect(neighbors(dim, startCenter(dim)).map((m) => chordName(m.to, m.nextCenter))).toContain('Eb7(b9)');
+  });
+
+  it('the ii chain names the key the ii belongs to', () => {
+    const gm7 = at(neighbors({ root: 2, quality: 'm7' }, C))['Gm7']!;
+    expect(gm7.why).toMatch(/ii de F\b/);
+  });
+
+  it('starts from tricky chords with a coherent center', () => {
     expect(startCenter(parseChord('Bm7(b5)')!)).toEqual({ root: 9, minor: true });
     expect(startCenter(parseChord('C#°7')!)).toEqual({ root: 2, minor: false });
     expect(startCenter(parseChord('G7')!)).toEqual({ root: 0, minor: false });
     expect(startCenter(parseChord('Dm7')!)).toEqual({ root: 2, minor: true });
-    for (const n of ['Bm7(b5)', 'C#°7', 'G7', 'Dm7', 'F7M']) {
-      const c = parseChord(n)!;
-      expect(neighbors(c, startCenter(c)).length).toBeGreaterThanOrEqual(6);
+    expect(startCenter(parseChord('G')!)).toEqual({ root: 7, minor: false });
+  });
+
+  it('parses and names round-trip', () => {
+    for (const n of ['C7M', 'Dm7', 'G7', 'Bm7(b5)', 'C#°7', 'Fm6', 'Bb7M', 'Am', 'G7(b9)', 'G7(13)', 'C6(9)', 'Dm7(9)', 'G7sus4']) {
+      expect(chordName(parseChord(n)!, startCenter(parseChord(n)!))).toBe(n);
     }
-  });
-});
-
-describe('review fixes: harmony', () => {
-  const names = (c: Chord, center = startCenter(c)) => neighbors(c, center).map((m) => ({ name: chordName(m.to, m.nextCenter), why: m.why }));
-
-  it('spells flat contexts with flats: Ab7, Db7 → Gb, C#°7 → Eb7', () => {
-    const ab7 = names(parseChord('Ab7')!);
-    expect(ab7.map((n) => n.name).some((n) => n.includes('#'))).toBe(false);
-    expect(ab7.map((n) => n.why).join(' ')).not.toMatch(/#/);
-    const db7 = neighbors(parseChord('Db7')!, { root: 0, minor: false }).find((m) => m.kind === 'cadencia')!;
-    expect(chordName(db7.to, db7.nextCenter)).toBe('Gb7M');
-    expect(db7.why).toMatch(/Gb7M/);
-    expect(names(parseChord('C#°7')!).map((n) => n.name)).toContain('Eb7');
-  });
-
-  it('the ii chain names the key the ii belongs to', () => {
-    const gm7 = neighbors({ root: 2, quality: 'm7' }, { root: 0, minor: false }).find((m) => m.kind === 'cadeia')!;
-    expect(gm7.why).toMatch(/ii de F\b/);
-  });
-
-  it('after a secondary dominant onto a minor chord, the ii–V is still there (I–VI7–ii–V)', () => {
-    const C = { root: 0, minor: false };
-    const toA7 = neighbors({ root: 0, quality: '7M' }, C).find((m) => chordName(m.to, C) === 'A7')!;
-    const toDm7 = neighbors(toA7.to, toA7.nextCenter).find((m) => m.kind === 'cadencia')!;
-    expect(chordName(toDm7.to, toDm7.nextCenter)).toBe('Dm7');
-    expect(neighbors(toDm7.to, toDm7.nextCenter).map((m) => chordName(m.to, m.nextCenter))).toContain('G7');
-  });
-
-  it('offers the borrowed chords from the minor key, with the right explanation', () => {
-    const C = { root: 0, minor: false };
-    const moves = neighbors({ root: 0, quality: '7M' }, C);
-    const bb7 = moves.find((m) => chordName(m.to, C) === 'Bb7')!;
-    expect(bb7.kind).toBe('emprestimo');
-    expect(bb7.why).not.toMatch(/mixolídio/);
-    expect(moves.map((m) => chordName(m.to, C))).toContain('Ab7M');
   });
 });
