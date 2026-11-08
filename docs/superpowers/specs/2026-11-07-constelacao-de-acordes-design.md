@@ -23,7 +23,7 @@ O módulo transforma essa apostila numa **teia viva e navegável de acordes**, c
 6. Arrastar, dar zoom e passear por tudo o que já foi aberto; tocar em qualquer acorde aberto o traz de volta ao foco.
 7. Explicar cada passo em uma linha curta ("Bm7(b5): tem o mesmo trítono do G7, resolve no C com outra cor").
 8. Ouvir cada acorde ao chegar nele e ouvir o rastro inteiro como progressão.
-9. Modo alvo (opcional): o aluno escolhe um acorde de destino (ex.: de C para Bb7M) e o app sugere um caminho que tensiona e resolve até lá, passando por acordes maiores, menores e por ciclos diferentes, com a explicação de cada passo.
+9. ~~Modo alvo~~ (removido na revisão 2, §9): o aluno escolhia um acorde de destino (ex.: de C para Bb7M) e o app sugere um caminho que tensiona e resolve até lá, passando por acordes maiores, menores e por ciclos diferentes, com a explicação de cada passo.
 
 ### Não objetivos (versões seguintes)
 - Partir de uma música da biblioteca para rearmonizá-la (decisão do autor: primeira versão só parte de um acorde).
@@ -61,7 +61,7 @@ Abaixo (ou ao lado, no computador) fica o diário do caminho: a progressão perc
 
 Antes de andar, tocar (ou passar o mouse) num vizinho mostra a explicação daquela ligação.
 
-### Modo alvo (decisão do autor)
+### Modo alvo (removido na revisão 2, §9)
 Opcional, separado do modo padrão "explorar". O aluno escolhe um acorde alvo; o app sugere um caminho até ele, mostrado no diário e destacado na teia. Se o aluno desviar, a sugestão se recalcula a partir de onde ele está. No modo explorar não há caminho sugerido, só o rastro (o autor não quer marcação de rota fora do modo alvo).
 
 O caminho sugerido deve ser musical: tensionar e resolver, preferindo cadeias de ii–V e resoluções pelo ciclo de quartas, e não simplesmente o menor número de passos. Exemplo de C para Bb7M: C7M → Am7 → D7 → Gm7 → C7 → Cm7 → F7 → Bb7M (ou outro igualmente bom).
@@ -77,6 +77,8 @@ Cada acorde em foco tem acesso ao diagrama (violão, teclado, cavaquinho) pela a
 Um módulo próprio do Estudo, com entrada de destaque na tela inicial do Estudo (não é mais uma aba de Ferramentas). Abre em tela cheia ou quase, porque a navegação precisa de espaço. Funciona no celular (toque, pinça para zoom) e no computador (arrastar, roda do mouse).
 
 ## 5. O motor de harmonia
+
+> A revisão 2 (§9) substitui o modelo de relações desta seção. O que segue vale só onde a §9 não fala.
 
 O coração do módulo: dado o acorde em foco e o **centro tonal atual**, quais são os vizinhos, com que função e com qual explicação.
 
@@ -134,3 +136,45 @@ Usar e, onde preciso, estender os tipos que o app já conhece (`CHORD_TYPES` em 
 - O texto exato das explicações, no tom do app (frases curtas, voz ativa).
 - Layout no celular versus computador.
 - Testes do motor de harmonia (as ligações precisam de testes que conferem a teoria, ex.: Bm7(b5) e G7 compartilham B e F).
+
+## 9. Revisão 2, depois do primeiro uso (07/11/2026, decisões do autor)
+
+O autor testou a primeira versão e achou as ligações confusas. Exemplo: de C ele foi para G7, e a órbita do G7 oferecia Bm7(b5) e Db7. Esses acordes são **substitutos do G7** (mesmo trítono), não um próximo passo depois dele: quem já está na tensão não ganha nada trocando de roupa. O anel de prévia herdou o erro. Esta revisão substitui o modelo de relações da §5.
+
+### 9.1 Princípio: relaxar, tensionar, resolver
+A harmonia anda por **tensão e resolução**. Cada acorde, no seu contexto, tem um nível: **repouso** (tônica e relativos), **afastamento** (preparação: ii, IV, iv, iiø) ou **tensão** (dominantes, diminutos, alterados). Cada ligação da órbita recebe um **movimento**:
+- **Relaxar:** de um acorde estável para outro estável, sem criar tensão (C7M → Am7 → Em7 → F7M).
+- **Tensionar:** para um acorde que pede resolução. Tensão em cima de tensão vale (cadeia de dominantes: E7 → A7).
+- **Resolver:** de uma tensão para um acorde estável, maior ou menor. Só aparece quando o acorde atual é uma tensão.
+
+O aluno escolhe o próprio padrão de caminho (ex.: relaxa, relaxa, relaxa, tensiona, resolve; ou tensiona, tensiona, resolve, tensiona, resolve). O diário mostra o padrão percorrido junto com a explicação de cada passo.
+
+### 9.2 Quem vai para onde (por função)
+| Acorde atual | Opções |
+|---|---|
+| **Repouso** (7M, 6, tônica) | relaxar para afastamento (ii, IV) e relativos (vi, iii) · tensionar para o V7 **e seus substitutos** (viiø, subV7) · tensionar para dominantes secundários (V7/ii, V7/vi…) · empréstimos (iv6, bVII7, bVI7M) |
+| **Afastamento** (ii m7, IV 7M, iv m6, iiø) | tensionar para o V7 da tonalidade **e seus substitutos** · relaxar de volta ao repouso (plagal: IV → I, iv → I) · cadeia de ii (Dm7 → Gm7) |
+| **Tensão** (7 e cores) | **resolver** na tônica (maior ou menor, conforme a cor) · engano (vi, iii, bVI) · tensionar de novo: próximo dominante pelo ciclo de quartas (G7 → C7) ou **aproximação cromática** meio tom abaixo (G7 → F#7 → B) · **nunca** os próprios substitutos |
+| **Diminuto** | resolver meio tom acima · agir como dominante com b9 (tensionar) |
+| **Tríade maior pura** (G) | intenção aberta: repouso em G · IV de D (G → D7M, plagal) · V suave de C (G → C) · ganhar tensão (G → G7) · relativos |
+
+**Acorde menor (quem resolve e quem não resolve):**
+- Chegar a um menor **pelo seu próprio dominante** (A7 → Dm7, E7 → Am7) é **resolver**, com a explicação de resolução local; se o menor é afastamento no centro (Dm7 em Dó), a explicação diz que ele já prepara o próximo V7. *(Decisão do Claude; o autor tinha chamado esse passo de "relaxa" num exemplo.)*
+- Chegar a um menor **como relativo** (C7M → Am7) é **relaxar**.
+- Chegar à **tônica de um centro menor** (E7(b9) → Am7 em Lá menor) é **resolução completa**.
+
+### 9.3 O balão: escolher o tipo do acorde
+Tocar numa estrela abre o balão com os **tipos e cores** daquela fundamental, cada um com uma dica curta do que faz naquele contexto. Ex.: vindo de C, na estrela G:
+- **G:** relaxa (V sem sétima, suave);
+- **G7:** tensiona (pede C);
+- **G7(9), G7(13):** tensão clara (pede C maior);
+- **G7(b9), G7(#5):** tensão escura (pede Cm ou engano);
+- **G7sus4:** tensão suspensa (pede G7 ou C);
+- **G7M:** relaxa e muda o centro para Sol.
+
+O aluno ouve, escolhe e anda. **A escolha define o movimento, a explicação e a próxima órbita** (ex.: depois de G7(b9), a resolução em Cm7 vem primeiro). Em acordes estáveis, a cor (Dm7(9), C7M(9), C6(9)) muda o som, não a função. Uma estrela é identificada pela fundamental e pela função; a cor escolhida fica registrada no passo.
+
+### 9.4 Tela
+- A órbita se organiza em **três setores**, cada um com cor e rótulo: Relaxar, Tensionar, Resolver (este só quando há tensão).
+- O **modo alvo sai** (decisão do autor): sem seletor de destino nem rota sugerida.
+- O anel de prévia segue as mesmas regras.
