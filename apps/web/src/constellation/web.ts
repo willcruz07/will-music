@@ -8,9 +8,13 @@ import { type Center, type Chord, type Motion, type Move, chordKey, neighbors, s
  */
 
 /** `resolvesTo`: where a substitute dominant was aimed when it was reached (Db7 as the subV of C). */
-export type StarNode = { key: string; chord: Chord; center: Center; x: number; y: number; resolvesTo?: Chord; via?: Move };
+export type StarNode = { key: string; chord: Chord; center: Center; x: number; y: number; resolvesTo?: Chord };
 export type Link = { from: string; to: string; move: Move };
-export type Web = { nodes: Record<string, StarNode>; links: Link[]; trail: string[]; focus: string; center: Center; opened: boolean };
+/**
+ * `steps[i]`: the move that reached `trail[i]` (null for the starting chord and for a jump back to an opened star).
+ * Kept per step, not per star: a star visited twice keeps the color of each visit, and the start never changes.
+ */
+export type Web = { nodes: Record<string, StarNode>; links: Link[]; trail: string[]; steps: (Move | null)[]; focus: string; center: Center; opened: boolean };
 export type PreviewStar = { key: string; chord: Chord; center: Center; x: number; y: number; from: string; move: Move };
 
 const ORBIT_RADIUS = 220;
@@ -22,7 +26,7 @@ const SECTOR = (Math.PI * 2) / 3;
 export const startWeb = (chord: Chord): Web => {
   const key = chordKey(chord);
   const center = startCenter(chord);
-  return { nodes: { [key]: { key, chord, center, x: 0, y: 0 } }, links: [], trail: [key], focus: key, center, opened: false };
+  return { nodes: { [key]: { key, chord, center, x: 0, y: 0 } }, links: [], trail: [key], steps: [null], focus: key, center, opened: false };
 };
 
 const far = (nodes: Iterable<{ x: number; y: number }>, x: number, y: number) => [...nodes].every((n) => Math.hypot(n.x - x, n.y - y) > MIN_GAP);
@@ -91,9 +95,8 @@ export const walk = (web: Web, move: Move): Web => {
   const at = web.nodes[key] ?? { key, ...freeSpot(Object.values(web.nodes), web.nodes[web.focus]!, 0) };
   // The type the student chose (G7(b9) instead of G7) is what the star now holds.
   const { resolvesTo: _old, ...rest } = at as StarNode;
-  // `via`: the step that reached this star, so the trail can show each star in the color of its action.
-  const nodes = { ...web.nodes, [key]: { ...rest, key, chord: move.to, center: move.nextCenter, via: move, ...(move.resolvesTo ? { resolvesTo: move.resolvesTo } : {}) } };
-  return openFocus({ ...web, nodes, trail: [...web.trail, key], focus: key, center: move.nextCenter });
+  const nodes = { ...web.nodes, [key]: { ...rest, key, chord: move.to, center: move.nextCenter, ...(move.resolvesTo ? { resolvesTo: move.resolvesTo } : {}) } };
+  return openFocus({ ...web, nodes, trail: [...web.trail, key], steps: [...web.steps, move], focus: key, center: move.nextCenter });
 };
 
 /** Brings an opened star back to focus; the path continues from there (the trail is cut back if it was on it). */
@@ -102,7 +105,15 @@ export const focusOn = (web: Web, key: string): Web => {
   if (!node) return web;
   const at = web.trail.indexOf(key);
   const trail = at >= 0 ? web.trail.slice(0, at + 1) : [...web.trail, key];
-  return openFocus({ ...web, trail, focus: key, center: node.center });
+  const steps = at >= 0 ? web.steps.slice(0, at + 1) : [...web.steps, null];
+  return openFocus({ ...web, trail, steps, focus: key, center: node.center });
+};
+
+/** The move that last reached a star on the trail (its first visit wins for the starting chord: it stays the start). */
+export const arrivalOf = (web: Web, key: string): Move | null | undefined => {
+  const first = web.trail.indexOf(key);
+  if (first < 0) return undefined;
+  return first === 0 ? null : web.steps[web.trail.lastIndexOf(key)] ?? null;
 };
 
 export const resetWeb = (web: Web): Web => openFocus(startWeb(web.nodes[web.trail[0]!]!.chord));

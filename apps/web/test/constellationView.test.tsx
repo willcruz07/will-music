@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ConstellationView, colorOf, textColorOf } from '../src/constellation/ConstellationView.tsx';
+import { ALTERED_COLOR, ConstellationView, MOTION_COLOR, colorOf, textColorOf } from '../src/constellation/ConstellationView.tsx';
 import { chordName, parseChord } from '../src/constellation/harmony.ts';
-import { openFocus, orbit, previewStars, startWeb, walk } from '../src/constellation/web.ts';
+import { type Web, openFocus, orbit, previewStars, startWeb, walk } from '../src/constellation/web.ts';
 
 const web = () => openFocus(startWeb(parseChord('C7M')!));
 const handlers = () => ({ onSelect: vi.fn(), onWalk: vi.fn(), onFocusStar: vi.fn(), onOpen: vi.fn() });
@@ -117,7 +117,12 @@ describe('altered tensions in pink', () => {
 });
 
 describe('the trail in the colors of its actions', () => {
-  it('colors each walked star with the action that reached it', () => {
+  const go = (w: Web, key: string, quality?: string) => {
+    const link = orbit(w).find((l) => l.to === key)!;
+    return walk(w, quality ? link.move.options.find((o) => o.to.quality === quality)! : link.move);
+  };
+
+  it('colors each step of the trail with the move it was', () => {
     let w = openFocus(startWeb(parseChord('C7M')!));
     const toG7 = orbit(w).find((l) => l.to === '7:dom')!.move;
     w = walk(w, toG7);
@@ -125,29 +130,45 @@ describe('the trail in the colors of its actions', () => {
     w = walk(w, toC);
     render(<ConstellationView web={w} selected={null} {...handlers()} />);
     const trail = screen.getByTestId('trail');
-    expect(trail.querySelector('[data-key="7:dom"]')!.getAttribute('data-color')).toBe(colorOf(toG7));
-    expect(trail.querySelector('[data-key="0:maj"]')!.getAttribute('data-color')).toBe(colorOf(toC));
+    expect(trail.querySelector('[data-step="1"]')!.getAttribute('data-color')).toBe(colorOf(toG7));
+    expect(trail.querySelector('[data-step="2"]')!.getAttribute('data-color')).toBe(colorOf(toC));
+    // G7, walked by a tension, is filled with that color even while it sits in the orbit again.
+    expect(document.querySelector('circle[data-key="7:dom"]')!.getAttribute('fill')).toBe(colorOf(toG7));
   });
 
-  it('the inner ring of a walked star keeps the color of the step that reached it (not always green)', () => {
+  it('a star walked twice keeps the color of each visit on its segments; the star shows the latest', () => {
     let w = openFocus(startWeb(parseChord('C7M')!));
-    // C7M → G7 → F#7 → F#m7 → B7 → E7M: G7 (reached by a tension) ends up off the orbit, as a trail star.
-    for (const target of ['7:dom', '6:dom', '6:min', '11:dom', '4:maj']) {
-      const link = orbit(w).find((l) => l.to === target)!;
-      w = walk(w, link.move);
-    }
+    w = go(w, '7:dom'); // G7: tension
+    w = go(w, '0:maj'); // back to C7M
+    w = go(w, '7:dom', '7(b9)'); // G7(b9): altered tension
     render(<ConstellationView web={w} selected={null} {...handlers()} />);
-    const rings = [...document.querySelectorAll('[data-ring]')].filter((el) => w.trail.includes(el.getAttribute('data-ring')!));
-    expect(rings.length).toBeGreaterThan(0);
-    for (const el of rings) {
-      const node = w.nodes[el.getAttribute('data-ring')!]!;
-      expect(el.getAttribute('stroke'), node.key).toBe(node.via ? colorOf(node.via) : 'var(--primary)');
-    }
-    // G7 was reached by a tension: its ring is not green.
-    const g7 = rings.find((el) => el.getAttribute('data-ring') === '7:dom');
-    expect(g7).toBeDefined();
-    expect(g7!.getAttribute('stroke')).toBe(colorOf(w.nodes['7:dom']!.via!));
-    expect(g7!.getAttribute('stroke')).not.toBe('var(--primary)');
+    const trail = screen.getByTestId('trail');
+    expect(trail.querySelector('[data-step="1"]')!.getAttribute('data-color')).toBe(MOTION_COLOR.tensiona);
+    expect(trail.querySelector('[data-step="3"]')!.getAttribute('data-color')).toBe(ALTERED_COLOR);
+    expect(document.querySelector('[data-focus="7:dom"]')!.getAttribute('fill')).toBe(ALTERED_COLOR);
+  });
+
+  it('the starting chord keeps the start color, even when a later step comes back to it', () => {
+    let w = openFocus(startWeb(parseChord('C7M')!));
+    const relax = orbit(w).find((l) => l.to === '9:min')!; // Am7, then back to C7M relaxing
+    w = walk(w, relax.move);
+    const back = orbit(w).find((l) => l.to === '0:maj')!;
+    w = walk(w, back.move);
+    render(<ConstellationView web={w} selected={null} {...handlers()} />);
+    expect(document.querySelector('[data-focus="0:maj"]')!.getAttribute('fill')).toBe('var(--primary)');
+    expect(back.move.motion).toBe('relaxa');
+    expect(screen.getByTestId('trail').querySelector('[data-step="2"]')!.getAttribute('data-color')).toBe(colorOf(back.move));
+  });
+
+  it('a walked star off the orbit is filled with its color and its chord drawn in contrast', () => {
+    let w = openFocus(startWeb(parseChord('C7M')!));
+    // C7M → G7 → F#7 → F#m7 → B7 → E7M: G7 ends up off the orbit, as a trail star.
+    for (const key of ['7:dom', '6:dom', '6:min', '11:dom', '4:maj']) w = go(w, key);
+    render(<ConstellationView web={w} selected={null} {...handlers()} />);
+    const g7 = document.querySelector('circle[data-key="7:dom"]')!;
+    expect(g7.getAttribute('fill')).toBe(colorOf(w.steps[1]!));
+    expect(g7.getAttribute('fill')).not.toBe('var(--primary)');
+    expect(g7.parentElement!.querySelector('text')!.getAttribute('fill')).toBe('var(--on-motion)');
   });
 
   it('the chord name inside each orbit star is in the color of its move (a tension is not green)', () => {

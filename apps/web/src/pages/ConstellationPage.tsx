@@ -2,7 +2,7 @@ import { ArrowLeft, Guitar, Play, RotateCcw, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ChordHelp } from '../components/ChordHelp.tsx';
-import { ConstellationView, colorOf, textColorOf } from '../constellation/ConstellationView.tsx';
+import { ConstellationView, colorOf, motionLabel, textColorOf } from '../constellation/ConstellationView.tsx';
 import { type Motion, type Move, isAltered, type Quality, QUALITIES, centerName, chordKey, chordName, parseChord } from '../constellation/harmony.ts';
 import { type Web, focusOn, openFocus, orbit, resetWeb, startWeb, walk } from '../constellation/web.ts';
 import { SilentModeHint, chordEvents, useStudySynth } from '../study/widgets.tsx';
@@ -35,7 +35,7 @@ const rootOptions = ROOTS.map((r) => ({ value: r, label: r }));
 const qualityOptions = QUALITIES.map((q) => ({ value: q, label: QUALITY_NAMES[q], hint: q ? `ex.: C${q}` : 'ex.: C' }));
 
 /** `color`: the line and ring color of the step; `text`: the same color for words (darker on light themes). */
-type Step = { name: string; motion: Motion; why: string; color: string; text: string };
+type Step = { name: string; motion: Motion; label: string; why: string; color: string; text: string };
 
 /**
  * The Constelação de acordes: pick a chord, open its orbit and walk through the harmony by relaxing,
@@ -112,7 +112,7 @@ export const ConstellationPage = () => {
   const go = (move: Move) => {
     const next = walk(web, move);
     const name = chordName(move.to, move.nextCenter);
-    setSteps((s) => [...s, { name, motion: move.motion, why: move.why, color: colorOf(move), text: textColorOf(move) }]);
+    setSteps((s) => [...s, { name, motion: move.motion, label: motionLabel(move), why: move.why, color: colorOf(move), text: textColorOf(move) }]);
     setWeb(next);
     setSelected(null);
     setChosen(null);
@@ -125,7 +125,7 @@ export const ConstellationPage = () => {
   const refocus = (key: string) => {
     const next = focusOn(web, key);
     const at = web.trail.indexOf(key);
-    setSteps((s) => (at >= 0 ? s.slice(0, at) : [...s, { name: nameOf(key), motion: 'relaxa', why: `Você voltou para ${nameOf(key)} e continua daqui.`, color: 'var(--glow)', text: 'var(--motion-relax-text)' }]));
+    setSteps((s) => (at >= 0 ? s.slice(0, at) : [...s, { name: nameOf(key), motion: 'relaxa', label: 'relaxa', why: `Você voltou para ${nameOf(key)} e continua daqui.`, color: 'var(--glow)', text: 'var(--motion-relax-text)' }]));
     setWeb(next);
     setSelected(null);
     setChosen(null);
@@ -181,8 +181,10 @@ export const ConstellationPage = () => {
                   return (
                     <label
                       key={o.to.quality || 'triad'}
-                      className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary ${on ? 'border-transparent text-primary-foreground' : 'border-border text-chord hover:bg-muted'}`}
-                      style={on ? { background: colorOf(o) } : undefined}
+                      // Each type in the color of its own move: filled when chosen, outlined otherwise.
+                      className="flex cursor-pointer items-center gap-1.5 rounded-lg border-2 px-2.5 py-1.5 text-sm font-semibold hover:bg-muted has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary"
+                      style={on ? { background: colorOf(o), borderColor: colorOf(o), color: 'var(--on-motion)' } : { borderColor: colorOf(o), color: textColorOf(o) }}
+                      data-motion={motionLabel(o)}
                     >
                       <input type="radio" name="tipo" className="sr-only" checked={on} onChange={() => choose(o)} aria-label={`${name}, ${o.motion}${o.motion === 'tensiona' && isAltered(o.to) ? ', alterado' : ''}`} />
                       {name}
@@ -191,8 +193,8 @@ export const ConstellationPage = () => {
                 })}
               </div>
               <p className="mt-3 text-sm">
-                <span className="mr-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold text-primary-foreground" style={{ background: colorOf(chosen) }}>
-                  {chosen.motion}
+                <span className="mr-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: colorOf(chosen), color: 'var(--on-motion)' }}>
+                  {motionLabel(chosen)}
                 </span>
                 {chosen.why}
               </p>
@@ -235,7 +237,7 @@ export const ConstellationPage = () => {
             </p>
             {steps.length > 0 && (
               <p data-testid="pattern" className="mt-1 text-xs text-muted-foreground">
-                {steps.map((s) => s.motion).join(' → ')}
+                {steps.map((s) => s.label).join(' → ')}
               </p>
             )}
             <ol aria-label="Caminho" className="mt-3 space-y-2 text-sm">
@@ -245,7 +247,7 @@ export const ConstellationPage = () => {
                     {s.name}
                   </button>{' '}
                   <span className="text-xs font-semibold" style={{ color: s.text }}>
-                    {s.motion}
+                    {s.label}
                   </span>{' '}
                   <span className="text-muted-foreground">{s.why}</span>
                 </li>
