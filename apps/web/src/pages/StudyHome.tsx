@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, BookOpen, Check, CircleDot, Ear, Guitar, Library, ListMusic, Mic, Music2, Piano } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, CircleDot, Ear, Guitar, Library, ListMusic, Mic, Music2, Piano, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
@@ -91,6 +91,15 @@ export const StudyHome = () => {
           </section>
         );
       })}
+
+      <Link to="/estudo/constelacao" className="mt-8 flex items-center gap-4 rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 to-transparent p-4 hover:border-primary">
+        <Sparkles className="size-8 shrink-0 text-primary" />
+        <span className="min-w-0 flex-1">
+          <span className="block font-[family-name:var(--font-display)] text-lg font-semibold">Constelação</span>
+          <span className="block text-sm text-muted-foreground">Explore caminhos de rearmonização</span>
+        </span>
+        <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
+      </Link>
 
       <section aria-labelledby="ferramentas" className="mt-8">
         <h2 id="ferramentas" className="text-xl font-semibold">

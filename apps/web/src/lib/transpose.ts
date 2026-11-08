@@ -21,7 +21,7 @@ const parseKey = (key: string): { pc: number; minor: boolean } | null => {
 export const prefersFlats = (key: string): boolean => FLAT_KEYS.has(key.trim());
 
 /** Spelling (sharp or flat) of a pitch class inside a key; a boolean forces flats/sharps. */
-const spell = (pc: number, key: string | boolean): string => {
+export const spellPitch = (pc: number, key: string | boolean): string => {
   if (typeof key === 'boolean') return (key ? FLATS : SHARPS)[pc]!;
   const parsed = parseKey(key);
   if (!parsed) return SHARPS[pc]!;
@@ -39,7 +39,7 @@ export const transposeChord = (chord: string, semitones: number, key: string | b
   const [, root, suffix, bass] = match;
   const move = (note: string) => {
     const pc = PC[note];
-    return pc === undefined ? note : spell(mod12(pc + semitones), key);
+    return pc === undefined ? note : spellPitch(mod12(pc + semitones), key);
   };
   const out = `${move(root!)}${suffix}`;
   return bass ? `${out}/${move(bass)}` : out;
