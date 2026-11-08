@@ -28,3 +28,13 @@ describe('screen stays on while the app is open', () => {
     Reflect.deleteProperty(navigator, 'wakeLock');
   });
 });
+
+describe('app version', () => {
+  it('shows the version from package.json in the header', async () => {
+    const { version } = await import('../package.json');
+    const [major, minor] = version.split('.');
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+    expect(screen.getByText(`v${major}.${minor}`)).toBeInTheDocument();
+    expect(version).toBe('3.0.0');
+  });
+});

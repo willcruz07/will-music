@@ -2,12 +2,17 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
+// The app version shown in the header comes from this package.json: change "version" there to release a new one.
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
 
 export default defineConfig({
   // Fixed root, so the app also starts when Vite is launched from the repository root (see ../../vite.config.ts).
   root: fileURLToPath(new URL('.', import.meta.url)),
+  define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     react(),
     tailwindcss(),
