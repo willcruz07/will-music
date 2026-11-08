@@ -72,9 +72,12 @@ const Layout = () => {
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
         <Link to="/" className="inline-flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight">
           <img src={`${import.meta.env.BASE_URL}icons/mark-96.png`} alt="" width={32} height={32} className="size-8 rounded-lg" />
-          will-music
-          <span className="rounded-md border border-border px-1.5 py-0.5 font-sans text-[10px] font-semibold leading-none tracking-normal text-muted-foreground" title={`Versão ${APP_VERSION}`}>
-            {versionLabel()}
+          {/* The name with the version right under it, in one block. */}
+          <span className="flex flex-col leading-none">
+            <span>will-music</span>
+            <span className="mt-1 font-sans text-[10px] font-semibold tracking-normal text-muted-foreground" title={`Versão ${APP_VERSION}`}>
+              {versionLabel()}
+            </span>
           </span>
         </Link>
         <div className="flex items-center gap-2">

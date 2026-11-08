@@ -38,3 +38,13 @@ describe('app version', () => {
     expect(version).toBe('3.0.0');
   });
 });
+
+describe('version label placement', () => {
+  it('sits under the app name, in the same block', () => {
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+    const label = screen.getByText(/^v\d+\.\d+$/);
+    const name = screen.getByText('will-music');
+    expect(label.parentElement).toBe(name.parentElement);
+    expect(label.parentElement!.className).toMatch(/flex-col/);
+  });
+});
