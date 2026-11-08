@@ -18,7 +18,7 @@ const TOOLS: { tab: string; label: string; about: string; icon: typeof Guitar }[
   { tab: 'acordes', label: 'Dicionário de acordes', about: 'Violão, teclado e cavaquinho', icon: Guitar },
   { tab: 'formacao', label: 'Formação', about: 'Intervalos, tríades e tétrades', icon: BookOpen },
   { tab: 'escalas', label: 'Campo harmônico', about: 'Escalas e acordes de cada tom', icon: Music2 },
-  { tab: 'ciclo', label: 'Ciclo de quintas', about: 'Armaduras, relativos e vizinhos', icon: CircleDot },
+  { tab: 'ciclo', label: 'Ciclo de quintas e quartas', about: 'Armaduras, relativos e vizinhos', icon: CircleDot },
   { tab: 'progressoes', label: 'Progressões', about: 'Em qualquer tom, para ouvir e tocar', icon: ListMusic },
   { tab: 'braco', label: 'Escalas no braço', about: 'Desenho, teclado e tablatura', icon: Piano },
   { tab: 'intervalos', label: 'Treino de ouvido', about: 'Reconheça intervalos', icon: Ear },
