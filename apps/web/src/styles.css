@@ -86,6 +86,7 @@ label,
 
 body {
   margin: 0;
+  overflow-x: clip;
   min-height: 100dvh;
   overscroll-behavior-y: none;
 }
@@ -141,7 +142,7 @@ h1 {
   --bar-shift: calc(var(--nav-height) + env(safe-area-inset-bottom) + 3rem);
   --player-shift: calc(var(--nav-height) + 0.5rem);
 }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   :root[data-bars='hidden'] {
     --bar-shift: 0px;
     --player-shift: 0px;
@@ -179,7 +180,8 @@ h1 {
   padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 1.5rem);
 }
 
-@media (min-width: 768px) {
+/* From 1024px the bottom bar gives way to the menu in the header (tablets in portrait keep the bar). */
+@media (min-width: 1024px) {
   .pb-nav {
     padding-bottom: 2.5rem;
   }

@@ -274,8 +274,8 @@ export const Player = (props: Props) => {
     {/* While the controls are open the page behind dims and blurs, like the other sheets; a tap on it closes them. */}
     {open && <div data-testid="player-backdrop" aria-hidden onClick={() => setOpen(false)} className="sheet-backdrop fixed inset-0 z-[29] bg-black/55 backdrop-blur-sm" />}
     {/* Phones: the chart fades out behind the floating player and the bottom bar instead of showing in the gap. */}
-    <div aria-hidden className="player-slide pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(var(--nav-height)+env(safe-area-inset-bottom)+7.5rem)] bg-gradient-to-t from-background via-background/95 to-transparent md:hidden" />
-    <div className="glass-strong player-slide fixed inset-x-3 z-30 overflow-hidden rounded-2xl border border-border shadow-[0_12px_40px_-16px_rgb(0_0_0/0.45)] bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+1.25rem)] md:inset-x-0 md:bottom-0 md:rounded-none md:border-x-0 md:border-b-0 md:pb-[env(safe-area-inset-bottom)]">
+    <div aria-hidden className="player-slide pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(var(--nav-height)+env(safe-area-inset-bottom)+7.5rem)] bg-gradient-to-t from-background via-background/95 to-transparent lg:hidden" />
+    <div className="glass-strong player-slide fixed inset-x-3 z-30 overflow-hidden rounded-2xl border border-border shadow-[0_12px_40px_-16px_rgb(0_0_0/0.45)] bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+1.25rem)] lg:inset-x-0 lg:bottom-0 lg:rounded-none lg:border-x-0 lg:border-b-0 lg:pb-[env(safe-area-inset-bottom)]">
       <audio
         ref={audioRef}
         src={tracks[0]?.src}

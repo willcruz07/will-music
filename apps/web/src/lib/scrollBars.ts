@@ -15,7 +15,7 @@ export const nextBarsHidden = (hidden: boolean, lastY: number, y: number, maxY: 
   return hidden;
 };
 
-const PHONE = '(max-width: 767px)';
+const PHONE = '(max-width: 1023px)';
 
 const setHidden = (hidden: boolean) => {
   if (hidden) document.documentElement.dataset.bars = 'hidden';
