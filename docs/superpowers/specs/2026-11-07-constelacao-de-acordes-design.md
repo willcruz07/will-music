@@ -1,4 +1,4 @@
-# Teia de acordes — design
+# Constelação de acordes — design
 
 Data: 07/11/2026 · Módulo novo do Estudo do will-music. Desenho feito em conversa com o autor; os esboços estão em `.superpowers/brainstorm/` (fora do repositório).
 
@@ -118,7 +118,7 @@ Usar e, onde preciso, estender os tipos que o app já conhece (`CHORD_TYPES` em 
 - A ferramenta "Ciclo de quintas" passou a se chamar "Ciclo de quintas e quartas" (já feito; separado deste módulo).
 
 ## 7. Decisões minhas (Claude), para o autor conferir
-- Nome provisório do módulo: **Teia de acordes**.
+- Nome do módulo (escolhido com o autor): **Constelação de acordes**; na entrada do Estudo pode aparecer só "Constelação", com a descrição "Explore caminhos de rearmonização".
 - Centro tonal acompanhado automaticamente (§5).
 - Órbita com 6 a 10 vizinhos, variações de cor agrupadas (§5).
 - Visual em 2D (sem 3D), leve para celular.
