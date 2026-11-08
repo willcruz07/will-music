@@ -3,7 +3,8 @@ import { buildChart, keyToChord } from './chart.ts';
 import { type Analysis, type Chart, type LyricLine, db, now, updateSong } from './db.ts';
 import { decodeForAnalysis } from './decode.ts';
 import { distributePlainLyrics, parseLrc, pickBestLyrics, searchLyrics } from './lrclib.ts';
-import { lyricsToKeep } from './lyricsApply.ts';
+import { applyLyrics, lyricsToKeep } from './lyricsApply.ts';
+import { transcribeSong } from './whisper.ts';
 
 export type PipelineProgress = { label: string; fraction?: number };
 
@@ -64,6 +65,24 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       }
       await updateSong(songId, { key: keyToChord(result.key), durationSec: song.durationSec || durationSec, analysisStatus: 'done' });
     });
+
+    // An audio never stays without lyrics: when the search finds nothing, Whisper listens and writes them.
+    // The chart is already saved; if the transcription fails (an instrumental, say), the song keeps its chords.
+    if (!lines.length) {
+      onProgress({ label: 'Transcrevendo a letra do áudio' });
+      try {
+        const { lines: heard } = await transcribeSong(songId, (loaded, total) =>
+          onProgress(
+            total && loaded < total
+              ? { label: `Transcrevendo a letra: baixando o modelo (${mb(loaded)} MB de ${mb(total)} MB)`, fraction: loaded / total }
+              : { label: 'Transcrevendo a letra: pode levar alguns minutos' },
+          ),
+        );
+        await applyLyrics(songId, { source: 'manual', lines: heard });
+      } catch (error) {
+        console.warn('Transcrição automática da letra não deu certo', error);
+      }
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await updateSong(songId, { analysisStatus: 'error', analysisError: message });

@@ -8,7 +8,7 @@ import { BottomSheet } from '../ui/BottomSheet.tsx';
 import { Button } from '../ui/Button.tsx';
 
 const ASKED_KEY = 'wm-models-asked';
-const WHISPER_BYTES = 150 * 1024 * 1024;
+const WHISPER_BYTES = 300 * 1024 * 1024;
 const mb = (bytes: number) => formatBytes(bytes);
 
 const ITEMS = [
