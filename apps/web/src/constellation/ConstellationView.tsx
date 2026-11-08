@@ -1,4 +1,6 @@
+import { LocateFixed, ZoomIn, ZoomOut } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type Camera, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, clamp, sliderToZoom, zoomAround, zoomToSlider } from './camera.ts';
 import { type Motion, type Move, chordName, isAltered } from './harmony.ts';
 import { type Web, orbit, previewStars } from './web.ts';
 
@@ -16,15 +18,11 @@ const LEGEND: { label: string; color: string }[] = [
 ];
 
 const TAP_SLOP = 8;
-const MIN_ZOOM = 0.35;
-const MAX_ZOOM = 2.5;
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-
-type Camera = { x: number; y: number; zoom: number };
 
 /**
  * The constellation on screen: the star in focus in the middle, its orbit (walkable), a dim preview ring
- * one step further, the trail walked, and every other opened star. Drag to pan, wheel or pinch to zoom;
+ * one step further, the trail walked, and every other opened star. Drag to pan; wheel, pinch or the zoom bar
+ * (−, slider, +, center) to zoom;
  * the camera flies to the focus when it changes. A tap that moved more than a few pixels is a drag.
  */
 export const ConstellationView = ({
@@ -49,7 +47,8 @@ export const ConstellationView = ({
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const start = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false);
-  const pinch = useRef<number | null>(null);
+  // Distance and midpoint of the two fingers at the last move of a pinch.
+  const pinch = useRef<{ d: number; mx: number; my: number } | null>(null);
 
   useLayoutEffect(() => {
     const el = box.current;
@@ -65,13 +64,23 @@ export const ConstellationView = ({
   const orbitKeys = new Set(links.map((l) => l.to));
   const trailSet = new Set(web.trail);
 
-  // Fly to the focus and zoom out enough to keep the trail and the orbit in view.
-  useEffect(() => {
+  // Fly to the focus and zoom out enough to keep the trail and the orbit in view (also the "center" button).
+  const fit = () => {
     const pts = [...web.trail.map((k) => web.nodes[k]!), ...links.map((l) => web.nodes[l.to]!)];
     const span = Math.max(1, ...pts.map((p) => Math.max(Math.abs(p.x - focus.x), Math.abs(p.y - focus.y)))) + 90;
     setCamera({ x: focus.x, y: focus.y, zoom: clamp(Math.min(size.w, size.h) / 2 / span, MIN_ZOOM, MAX_ZOOM) });
+  };
+  useEffect(() => {
+    fit();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [web.focus, web.opened, size.w, size.h]);
+
+  /** Screen point of a pointer, relative to the view's top-left. */
+  const local = (x: number, y: number) => {
+    const r = box.current?.getBoundingClientRect();
+    return { x: x - (r?.left ?? 0), y: y - (r?.top ?? 0) };
+  };
+  const zoomBy = (factor: number) => setCamera((c) => zoomAround(c, factor, { x: size.w / 2, y: size.h / 2 }, size));
 
   const onPointerDown = (e: React.PointerEvent) => {
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -88,16 +97,29 @@ export const ConstellationView = ({
     if (pointers.current.size >= 2) {
       const [a, b] = [...pointers.current.values()];
       const d = Math.hypot(a!.x - b!.x, a!.y - b!.y);
-      if (pinch.current) setCamera((c) => ({ ...c, zoom: clamp((c.zoom * d) / pinch.current!, MIN_ZOOM, MAX_ZOOM) }));
-      pinch.current = d;
+      const mid = local((a!.x + b!.x) / 2, (a!.y + b!.y) / 2);
+      const last = pinch.current;
+      pinch.current = { d, mx: mid.x, my: mid.y };
+      // Read before updating: the camera update runs later, when pinch.current already holds this move.
+      if (!last || last.d < 1) return;
+      const factor = d / last.d;
+      const panX = mid.x - last.mx;
+      const panY = mid.y - last.my;
+      setCamera((c) => {
+        const z = zoomAround(c, factor, mid, size);
+        return { ...z, x: z.x - panX / z.zoom, y: z.y - panY / z.zoom };
+      });
       return;
     }
+    if (pinch.current) return; // one finger lifted after a pinch: wait for it to end, no jump
     setCamera((c) => ({ ...c, x: c.x - (e.clientX - prev.x) / c.zoom, y: c.y - (e.clientY - prev.y) / c.zoom }));
   };
   const onPointerUp = (e: React.PointerEvent) => {
     pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) pinch.current = null;
-    if (pointers.current.size === 0) setDragging(false);
+    if (pointers.current.size === 0) {
+      pinch.current = null;
+      setDragging(false);
+    }
   };
   // Wheel zoom: a native, non-passive listener so the page behind does not scroll; no camera easing while wheeling.
   const [wheeling, setWheeling] = useState(false);
@@ -112,10 +134,14 @@ export const ConstellationView = ({
       timer = window.setTimeout(() => setWheeling(false), 200);
       setCamera((c) => ({ ...c, zoom: clamp(c.zoom * Math.exp(-e.deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM) }));
     };
+    // iPhone/iPad: Safari's own pinch gestures would zoom the whole page instead of the constellation.
+    const noPageZoom = (e: Event) => e.preventDefault();
     el.addEventListener('wheel', onWheel, { passive: false });
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) el.addEventListener(type, noPageZoom, { passive: false });
     return () => {
       clearTimeout(timer);
       el.removeEventListener('wheel', onWheel);
+      for (const type of ['gesturestart', 'gesturechange', 'gestureend']) el.removeEventListener(type, noPageZoom);
     };
   }, []);
 
@@ -265,6 +291,36 @@ export const ConstellationView = ({
           )}
         </g>
       </svg>
+      {/* Zoom bar: for phones where pinching is awkward, and as a visible way to zoom anywhere. */}
+      <div
+        role="toolbar"
+        aria-label="Zoom da constelação"
+        className="absolute right-2 top-2 flex items-center gap-0.5 rounded-xl border border-border bg-background/80 p-1 shadow-sm backdrop-blur"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <button type="button" aria-label="Diminuir o zoom" disabled={camera.zoom <= MIN_ZOOM + 1e-3} onClick={() => zoomBy(1 / ZOOM_STEP)} className="inline-flex size-9 items-center justify-center rounded-lg hover:bg-muted disabled:opacity-40">
+          <ZoomOut className="size-4" />
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={zoomToSlider(camera.zoom)}
+          aria-label="Zoom"
+          aria-valuetext={`${Math.round(camera.zoom * 100)}%`}
+          onChange={(e) => {
+            const zoom = sliderToZoom(Number(e.target.value));
+            setCamera((c) => zoomAround(c, zoom / c.zoom, { x: size.w / 2, y: size.h / 2 }, size));
+          }}
+          className="w-20 accent-[var(--primary)] sm:w-28"
+        />
+        <button type="button" aria-label="Aumentar o zoom" disabled={camera.zoom >= MAX_ZOOM - 1e-3} onClick={() => zoomBy(ZOOM_STEP)} className="inline-flex size-9 items-center justify-center rounded-lg hover:bg-muted disabled:opacity-40">
+          <ZoomIn className="size-4" />
+        </button>
+        <button type="button" aria-label="Centralizar no acorde" onClick={fit} className="inline-flex size-9 items-center justify-center rounded-lg hover:bg-muted">
+          <LocateFixed className="size-4" />
+        </button>
+      </div>
       {/* Legend: the sectors present in the current orbit (Resolver only when the focus is a tension). */}
       {web.opened && (
         <ul aria-label="Movimentos" className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1 rounded-xl bg-background/70 px-2.5 py-2 text-xs backdrop-blur">
