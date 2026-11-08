@@ -55,8 +55,8 @@ export const startCenter = (c: Chord): Center => {
   }
 };
 
-/** Degrees (from the center) that carry a major chord: where a dominant resolves to 7M instead of m7. */
-const majorDegree = (pc: number, center: Center) => (center.minor ? [3, 8, 10] : [0, 5, 7]).includes(mod12(pc - center.root));
+/** Degrees (from the center) that carry a minor chord: a dominant resolves to m7 there and to 7M everywhere else. */
+const minorDegree = (pc: number, center: Center) => (center.minor ? [0, 5] : [2, 4, 9]).includes(mod12(pc - center.root));
 
 /** cur: current chord · to: destination · target: a fourth above the destination · res: where the current chord resolves. */
 type Names = { cur: string; to: string; target: string; res: string; center: string };
@@ -135,7 +135,7 @@ export const neighbors = (current: Chord, center: Center): Move[] => {
   const add = (rule: Rule, base: number, limit: number) => {
     if (moves.length >= limit) return;
     const root = mod12(base + rule.at);
-    const quality: Quality = rule.quality === 'resolve' ? (majorDegree(root, center) ? '7M' : 'm7') : rule.quality;
+    const quality: Quality = rule.quality === 'resolve' ? (minorDegree(root, center) ? 'm7' : '7M') : rule.quality;
     const to: Chord = { root, quality, ...(rule.flat ? { flat: true } : {}) };
     if (seen.has(chordKey(to))) return;
     seen.add(chordKey(to));
