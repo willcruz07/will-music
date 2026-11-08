@@ -123,7 +123,7 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
   if (entries === null) return null;
   if (!entry) {
     return (
-      <main className="min-h-dvh bg-background p-6 text-foreground">
+      <main className="min-h-dvh bg-background p-6 pt-[calc(env(safe-area-inset-top)+1.5rem)] text-foreground">
         <p className="text-xl">Nenhuma música para tocar.</p>
         <Link to={exitTo} className="mt-4 inline-block text-chord underline">
           Voltar
@@ -148,7 +148,7 @@ export const Stage = ({ mode = 'list' }: { mode?: 'list' | 'song' }) => {
         touchX.current = null;
       }}
     >
-      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
+      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-background/95 px-4 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur">
         <Link to={exitTo} aria-label="Sair do palco" className="inline-flex size-10 items-center justify-center rounded-lg hover:bg-muted">
           <X className="size-5" />
         </Link>

@@ -320,7 +320,7 @@ export const Song = () => {
       )}
 
       {syncing && (
-        <div className="sticky top-14 z-10 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-primary bg-surface p-3" role="status">
+        <div className="sticky top-[calc(env(safe-area-inset-top)+3.5rem)] z-10 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-primary bg-surface p-3" role="status">
           <p className="mr-auto text-sm">
             <span className="font-semibold">Sincronizando.</span> Toque na letra ou aperte espaço quando cada linha começar. Seta para a esquerda desfaz a última marca.
           </p>

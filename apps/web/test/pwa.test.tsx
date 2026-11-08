@@ -108,3 +108,16 @@ describe('install banner', () => {
     expect(screen.queryByRole('button', { name: /Instalar app/ })).toBeNull();
   });
 });
+
+describe('iOS status bar', () => {
+  it('goes translucent in the dark theme (the header shows behind it) and stays default in the light one', () => {
+    const meta = document.createElement('meta');
+    meta.name = 'apple-mobile-web-app-status-bar-style';
+    document.head.append(meta);
+    setThemePref('dark');
+    expect(meta.content).toBe('black-translucent');
+    setThemePref('light');
+    expect(meta.content).toBe('default');
+    meta.remove();
+  });
+});

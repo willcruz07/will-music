@@ -18,6 +18,8 @@
           if (dark) {
             document.documentElement.classList.add("dark");
             document.querySelector('meta[name="theme-color"]').content = "#101829";
+            // iPhone: translucent status bar, so the header shows behind it (see lib/theme.ts).
+            document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]').content = "black-translucent";
           }
         } catch (e) {}
       })();

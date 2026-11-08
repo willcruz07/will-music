@@ -19,7 +19,7 @@ export const AUTHOR = {
 };
 
 const PHOTO = `${import.meta.env.BASE_URL}will.jpeg`;
-const LOGO = `${import.meta.env.BASE_URL}logo.png`;
+const LOGO = `${import.meta.env.BASE_URL}logo.webp`;
 
 /** Instagram has no icon in lucide (no brand marks), so a plain camera-style glyph stands in. */
 const InstagramGlyph = ({ className = "" }: { className?: string }) => (
