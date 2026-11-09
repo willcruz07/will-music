@@ -5,7 +5,8 @@ import { AboutButton } from '../components/About.tsx';
 import { InstallApp } from '../components/PwaPrompts.tsx';
 import { db } from '../lib/db.ts';
 import { deleteCachedModel, deleteCachedModels, downloadAllModels, listCachedModels } from '../lib/models.ts';
-import { formatBytes, requestPersistence, storageStatus } from '../lib/storage.ts';
+import { formatBytes, storageStatus } from '../lib/storage.ts';
+import { StorageProtection } from '../components/StorageProtection.tsx';
 import { useThemePref } from '../lib/theme.ts';
 import { Button } from '../ui/Button.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
@@ -106,17 +107,10 @@ export const Settings = () => {
       <Section title="Armazenamento">
         {storage?.usage !== undefined && storage.quota !== undefined && (
           <p>
-            Usando {formatBytes(storage.usage)} de {formatBytes(storage.quota)}.
+            Usando {formatBytes(storage.usage)} de uma cota estimada de {formatBytes(storage.quota)}.
           </p>
         )}
-        <p className="mt-1 text-sm text-muted-foreground">
-          {storage?.persisted ? 'Seus dados estão protegidos contra limpeza automática do navegador.' : 'O navegador pode apagar os dados se o aparelho ficar sem espaço.'}
-        </p>
-        {!storage?.persisted && (
-          <Button variant="outline" className="mt-3" onClick={() => void requestPersistence().then(refresh)}>
-            Proteger meus dados
-          </Button>
-        )}
+        <StorageProtection />
       </Section>
 
       <Section title="Seus dados">

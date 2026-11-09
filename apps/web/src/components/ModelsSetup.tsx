@@ -8,6 +8,7 @@ import { WHISPER_BYTES, detectWhisperDevice, preloadWhisper, whisperCached } fro
 import { BottomSheet } from '../ui/BottomSheet.tsx';
 import { Button } from '../ui/Button.tsx';
 import { confirmDialog } from '../ui/Dialog.tsx';
+import { StorageProtection } from './StorageProtection.tsx';
 
 const ASKED_KEY = 'wm-models-asked';
 const mb = (bytes: number) => formatBytes(bytes);
@@ -263,6 +264,7 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
                   );
                 })}
               </ul>
+              <StorageProtection />
               {phase.kind === 'installing' && (
                 <div className="mt-4" role="status">
                   <p className="text-sm">{phase.label}</p>

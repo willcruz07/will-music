@@ -4,6 +4,8 @@ import type { PlayerSource } from '../components/Player.tsx';
 import type { StemsRecord } from './db.ts';
 import { exportMixMp3 } from './exportMix.ts';
 import { isRunning, subscribeAnalysis } from './jobs.ts';
+import { isIOS } from './ios.ts';
+import { confirmDialog } from '../ui/Dialog.tsx';
 import { type MixTrack, mixVolumes } from './mixer.ts';
 import { type SeparationProgress, deleteStemSet, hasUsableWebGpu, listStemSets, selectStemSet, separateSong } from './stems.ts';
 
@@ -52,6 +54,15 @@ export const useStems = (songId: string, originalUrl?: string) => {
       abort.current = controller;
       setProgress({ stage: 'models', done: 0, total: 1, mode });
       try {
+        if (isIOS() && mode !== 'vocals') {
+          const proceed = await confirmDialog({
+            title: 'Separar faixas neste aparelho?',
+            message: 'A separação usa bastante memória. No iPhone ou iPad, o navegador pode interromper o processamento ou recarregar a página. Proteger o armazenamento não evita esse limite. Para maior estabilidade, separe no computador. Se continuar, mantenha o app aberto em primeiro plano.',
+            confirmLabel: 'Continuar neste aparelho',
+            cancelLabel: 'Agora não',
+          });
+          if (!proceed || controller.signal.aborted) return;
+        }
         await separateSong(songId, (p) => setProgress({ ...p, mode }), { mode, signal: controller.signal });
         await load();
       } catch (e) {
@@ -81,6 +92,8 @@ export const useStems = (songId: string, originalUrl?: string) => {
           await load();
           return;
         }
+        // On iOS, separation starts only from the explicit action in the player, after the memory notice.
+        if (isIOS()) return;
         const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
         // Unsupported devices retain manual access and the original audio without starting a failing job.
         if (!(await hasUsableWebGpu(gpu)) || cancelled) return;

@@ -1,7 +1,8 @@
 import type { StemMode } from '@will-music/engine';
 import { Download, Layers, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { formatBytes, requestPersistence, storageStatus } from '../../lib/storage.ts';
+import { formatBytes, storageStatus } from '../../lib/storage.ts';
+import { StorageProtection } from '../StorageProtection.tsx';
 import { downloadBlob } from '../../lib/download.ts';
 import { MODE_INFO, availableModes, heavyOnThisDevice } from '../../lib/stems.ts';
 import type { StemsState } from '../../lib/useStems.ts';
@@ -22,17 +23,11 @@ const StorageNote = () => {
     <div className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
       {free !== undefined && (
         <p>
-          Espaço livre para o app: <span className="font-semibold text-foreground">{formatBytes(free)}</span> (usando {formatBytes(status.usage!)}).
+          Margem estimada da cota: <span className="font-semibold text-foreground">{formatBytes(Math.max(0, free))}</span> (usando {formatBytes(status.usage!)}). Não representa espaço livre garantido no aparelho.
           {free < 600e6 && ' Pouco espaço: numa janela anônima o limite é bem menor; use uma janela normal.'}
         </p>
       )}
-      {status.persisted ? (
-        <p className="mt-0.5">Seus dados estão protegidos: o navegador não apaga as músicas, faixas e modelos sozinho.</p>
-      ) : (
-        <button type="button" className="mt-1 font-semibold text-chord underline underline-offset-2" onClick={() => void requestPersistence().then(refresh)}>
-          Proteger meus dados (pedir ao navegador para não apagar)
-        </button>
-      )}
+      <StorageProtection />
     </div>
   );
 };
