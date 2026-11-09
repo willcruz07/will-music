@@ -49,6 +49,46 @@ export const smoothArgmax = (
   return indices;
 };
 
+/**
+ * Keep short, stable changes without trusting every frame-level fluctuation. The short-window decision
+ * must agree with the unsmoothed model for at least three consecutive frames (~0.28 s at ChordMini's
+ * hop). Elsewhere retain the original wider smoothing. Runs never borrow evidence across model windows.
+ */
+export const adaptiveChordIndices = (
+  logits: Float32Array,
+  frameCount: number,
+  seqLen = 108,
+  chordCount = 170,
+  stableRadius = 4,
+): Int32Array => {
+  const stable = smoothArgmax(logits, frameCount, seqLen, chordCount, stableRadius);
+  const sensitive = smoothArgmax(logits, frameCount, seqLen, chordCount, 1);
+  const raw = smoothArgmax(logits, frameCount, seqLen, chordCount, 0);
+  const minimumFrames = 3;
+
+  for (let windowStart = 0; windowStart < frameCount; windowStart += seqLen) {
+    const windowEnd = Math.min(frameCount, windowStart + seqLen);
+    let start = windowStart;
+    while (start < windowEnd) {
+      const chord = sensitive[start]!;
+      let end = start + 1;
+      while (end < windowEnd && sensitive[end] === chord) end++;
+      let consecutive = 0;
+      let supported = false;
+      for (let frame = start; frame < end; frame++) {
+        consecutive = raw[frame] === chord ? consecutive + 1 : 0;
+        if (consecutive >= minimumFrames) {
+          supported = true;
+          break;
+        }
+      }
+      if (supported) stable.fill(chord, start, end);
+      start = end;
+    }
+  }
+  return stable;
+};
+
 const round3 = (value: number): number => Math.round(value * 1000) / 1000;
 
 export const buildChordSegments = (indices: Int32Array, frameDuration: number): ChordSegment[] => {

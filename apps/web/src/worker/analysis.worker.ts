@@ -32,7 +32,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         key = estimateKeyFromChords(chords);
         keyModel = 'estimado-pelos-acordes';
       }
-      post({ type: 'result', key, chords, models: { chords: modelVersion('chordnet'), cqtPlan: modelVersion('cqtPlan'), key: keyModel } });
+      post({ type: 'result', key, chords, models: { chords: modelVersion('chordnet'), cqtPlan: modelVersion('cqtPlan'), key: keyModel, chordDecoder: 'adaptive-3-frame-v1' } });
     } finally {
       await chordRunner.release();
       await keyRunner.release();

@@ -1,5 +1,5 @@
 import { peakNormalize } from './audio/prepare.ts';
-import { type ChordSegment, buildChordSegments, smoothArgmax, windowFeatures } from './chords/decode.ts';
+import { type ChordSegment, adaptiveChordIndices, buildChordSegments, windowFeatures } from './chords/decode.ts';
 import { computeLogCqt } from './cqt/cpuCqt.ts';
 import type { CqtPlan } from './cqt/plan.ts';
 import type { TensorRunner } from './inference/runner.ts';
@@ -37,7 +37,7 @@ export const analyzeChords = async (
     logits.set(values, r * runFrames * g.chordCount);
     onProgress?.(r + 1, runs.length);
   }
-  const indices = smoothArgmax(logits, cqt.frameCount, g.seqLen, g.chordCount, g.smoothingRadius);
+  const indices = adaptiveChordIndices(logits, cqt.frameCount, g.seqLen, g.chordCount, g.smoothingRadius);
   return buildChordSegments(indices, g.frameDuration);
 };
 

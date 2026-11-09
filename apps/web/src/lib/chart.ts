@@ -1,7 +1,8 @@
 import { type ChordSegment, type KeyResult, toDisplayLabel } from '@will-music/engine';
 import type { LyricLine } from './db.ts';
 
-const MIN_CHORD_SEC = 0.75;
+// Preserve passing chords lasting at least ~3 model frames; the decoder handles unstable predictions.
+const MIN_CHORD_SEC = 0.25;
 const MAX_LINE_SEC = 8;
 const CHORDS_PER_ROW = 4;
 
