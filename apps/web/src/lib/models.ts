@@ -136,8 +136,8 @@ export const deleteCachedModel = async (id: ModelId): Promise<void> => {
   notifyModelsChanged();
 };
 
-/** The models the first actions need: chords and key, the basic voice/instrumental separation, the notes of a score. */
-export const BASIC_MODELS: ModelId[] = ['chordnet', 'cqtPlan', 'skey', 'kara2Core', 'kara2Data', 'basicPitch'];
+/** The models the first actions need: chords and key, six-track separation, the notes of a score. */
+export const BASIC_MODELS: ModelId[] = ['chordnet', 'cqtPlan', 'skey', 'demucs6s', 'basicPitch'];
 
 /** Which of `ids` are not on the device yet. */
 export const missingModels = async (ids: ModelId[] = BASIC_MODELS): Promise<ModelId[]> => {

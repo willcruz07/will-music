@@ -1,7 +1,6 @@
 import { AlertTriangle, Check, Download, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MODELS, type ModelId } from '@will-music/engine';
-import { isIOS } from '../lib/ios.ts';
 import { downloadModels, missingModels } from '../lib/models.ts';
 import { MODELS_CHANGED, neverRemind, reminderDue, reminderWait, snoozeReminder } from '../lib/modelsReminder.ts';
 import { formatBytes } from '../lib/storage.ts';
@@ -14,18 +13,17 @@ const ASKED_KEY = 'wm-models-asked';
 const mb = (bytes: number) => formatBytes(bytes);
 const sum = (ids: ModelId[]) => ids.reduce((n, id) => n + MODELS[id].bytes, 0);
 
-type ItemId = 'chords' | 'split' | 'lyrics' | 'notes' | 'four';
-type Item = { id: ItemId; label: string; about: string; models: ModelId[] | 'whisper'; optional?: boolean };
+type ItemId = 'chords' | 'split' | 'lyrics' | 'notes';
+type Item = { id: ItemId; label: string; about: string; models: ModelId[] | 'whisper' };
 
 // The lyrics model depends on the device (lighter where there is no WebGPU); its size shows the larger one until known.
 const ITEMS: Item[] = [
   { id: 'chords', label: 'Acordes e tom', about: 'para montar a cifra de cada música', models: ['chordnet', 'cqtPlan', 'skey'] },
-  { id: 'split', label: 'Separar voz e instrumental', about: 'para ouvir e treinar cada parte', models: ['kara2Core', 'kara2Data'] },
+  { id: 'split', label: 'Separar faixas', about: '6 faixas: voz, bateria, baixo, guitarra, piano e outros', models: ['demucs6s'] },
   { id: 'lyrics', label: 'Transcrição da letra', about: 'quando a letra não é encontrada na internet', models: 'whisper' },
   { id: 'notes', label: 'Notas da partitura', about: 'para gerar partituras e tablaturas', models: ['basicPitch'] },
-  { id: 'four', label: 'Separar em 4 faixas', about: 'voz, bateria, baixo e outros (serve também para 6 faixas)', models: ['demucs6s'], optional: true },
 ];
-const BASIC = ITEMS.filter((i) => !i.optional);
+const BASIC = ITEMS;
 
 const itemReady = async (item: Item): Promise<boolean> =>
   item.models === 'whisper' ? whisperCached() : (await missingModels(item.models)).length === 0;
@@ -64,7 +62,7 @@ const whenNoModal = (fn: () => void): (() => void) => {
 
 /**
  * The analysis models: on the first run, a sheet asks to install them (with sizes, a check on each one as it
- * lands, and the optional 4-track separation). Afterwards, while the basic ones are missing, a red notice floats
+ * lands, including the default 6-track separation). Afterwards, while the basic ones are missing, a red notice floats
  * at the top; closing it offers "Me lembre mais tarde" (it comes back in a day) or "Não me exiba mais".
  */
 export const ModelsSetup = () => {
@@ -161,8 +159,6 @@ type Phase = { kind: 'ask' } | { kind: 'installing'; item: ItemId; label: string
 const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<ItemId>; onReady: (r: Set<ItemId>) => void; onClose: () => void }) => {
   const [phase, setPhase] = useState<Phase>({ kind: 'ask' });
   const [ready, setReadyState] = useState(initialReady);
-  // The 285 MB model can close the page on iPhone and iPad while separating, so it starts unchecked there.
-  const [withFour, setWithFour] = useState(!isIOS());
   const [whisperBytes, setWhisperBytes] = useState(WHISPER_BYTES.webgpu);
   const confirming = useRef(false);
 
@@ -173,8 +169,7 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
   }, []);
 
   const bytesOf = (item: Item) => (item.models === 'whisper' ? whisperBytes : sum(item.models));
-  const chosen = ITEMS.filter((i) => !i.optional || withFour);
-  const pending = chosen.filter((i) => !ready.has(i.id));
+  const pending = ITEMS.filter((i) => !ready.has(i.id));
   const total = pending.reduce((n, i) => n + bytesOf(i), 0);
   const installing = phase.kind === 'installing';
   const missingBasic = BASIC.some((i) => !ready.has(i.id));
@@ -252,27 +247,14 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
                 {ITEMS.map((item) => {
                   const done = ready.has(item.id);
                   const busy = phase.kind === 'installing' && phase.item === item.id;
-                  const skipped = item.optional && !withFour && !done;
                   return (
-                    <li key={item.id} className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${done ? 'border-primary/50 bg-primary/5' : 'border-border'} ${skipped ? 'opacity-60' : ''}`}>
-                      {item.optional && !done ? (
-                        <input
-                          type="checkbox"
-                          aria-label={`Incluir: ${item.label}`}
-                          className="size-5 shrink-0 accent-[var(--primary)]"
-                          checked={withFour}
-                          disabled={installing}
-                          onChange={(e) => setWithFour(e.target.checked)}
-                        />
-                      ) : (
+                    <li key={item.id} className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${done ? 'border-primary/50 bg-primary/5' : 'border-border'}`}>
                         <span className={`flex size-6 shrink-0 items-center justify-center rounded-full ${done ? 'bg-primary text-primary-foreground' : 'border border-border'}`} aria-hidden>
                           {done ? <Check className="size-4" /> : busy ? <Loader2 className="size-4 animate-spin text-primary" /> : null}
                         </span>
-                      )}
                       <span className="min-w-0 flex-1">
                         <span className="block font-semibold">
                           {item.label}
-                          {item.optional && <span className="ml-1.5 text-xs font-normal text-muted-foreground">opcional</span>}
                         </span>
                         <span className="block text-xs text-muted-foreground">{item.about}</span>
                       </span>

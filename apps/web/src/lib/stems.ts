@@ -3,7 +3,7 @@ import { MODELS, type ModelId, SEPARATION_GEOMETRY, STEM_MODES, type StemMode, m
 import type { SeparationResponse, SeparationTracks } from '../worker/separationProtocol.ts';
 import { type StemName, type StemsRecord, db, now } from './db.ts';
 import { listCachedModels } from './models.ts';
-import { type StorageApi, ensureRoom, isQuotaError, requestPersistence, storageStatus, explainQuota } from './storage.ts';
+import { type StorageApi, ensureRoom, formatBytes, isQuotaError, requestPersistence, storageStatus, explainQuota } from './storage.ts';
 
 export const NO_WEBGPU = 'A separação de faixas precisa de um navegador com WebGPU (Chrome ou Edge atualizados).';
 
@@ -25,7 +25,8 @@ export const MODE_INFO: Record<StemMode, { label: string; description: string; m
   };
 })();
 
-export const availableModes = (): StemMode[] => ['vocals', 'four', 'six', 'full'];
+// The study player uses six tracks. Vocal-specific modes remain available to the vocal division features.
+export const availableModes = (): StemMode[] => ['six'];
 
 export const decodeForSeparation = async (blob: Blob): Promise<{ planar: Float32Array; samples: number }> => {
   const context = new OfflineAudioContext(2, 1, SEPARATION_GEOMETRY.sampleRate);
@@ -93,7 +94,7 @@ type Deps = {
 
 /** Separates a song with the chosen mode and stores all its tracks together (MP3); on failure nothing is written. */
 export const separateSong = async (songId: string, onProgress: (p: SeparationProgress) => void, deps: Deps = {}): Promise<void> => {
-  const mode = deps.mode ?? 'vocals';
+  const mode = deps.mode ?? 'six';
   const gpu = 'gpu' in deps ? deps.gpu : (navigator as Navigator & { gpu?: GpuLike }).gpu;
   if (!(await hasUsableWebGpu(gpu))) throw new Error(NO_WEBGPU);
   const audio = await db.audio.get(songId);
@@ -119,7 +120,21 @@ export const separateSong = async (songId: string, onProgress: (p: SeparationPro
     createdAt: stamp,
     selectedAt: `${stamp}${await laterThanOthers(songId, stamp)}`,
   };
-  await step('guardar as faixas', () => db.stemSets.put(record));
+  const outputBytes = record.tracks.reduce((sum, track) => sum + track.blob.size, 0);
+  await ensureRoom(outputBytes * 1.1, deps.storage);
+  try {
+    await step(`guardar ${record.tracks.length} faixas (${formatBytes(outputBytes)})`, () => db.stemSets.put(record));
+  } catch (error) {
+    // Preserve the storage error and the actual write size for diagnosing browser-specific failures.
+    console.error('Falha ao guardar as faixas separadas no IndexedDB', {
+      songId,
+      mode,
+      totalBytes: outputBytes,
+      tracks: record.tracks.map((track) => ({ name: track.name, bytes: track.blob.size })),
+      error,
+    });
+    throw error;
+  }
 };
 
 export const listStemSets = (songId: string): Promise<StemsRecord[]> => db.stemSets.where('songId').equals(songId).toArray();

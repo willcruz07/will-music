@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PlayerSource } from '../components/Player.tsx';
 import type { StemsRecord } from './db.ts';
 import { exportMixMp3 } from './exportMix.ts';
+import { isRunning, subscribeAnalysis } from './jobs.ts';
 import { type MixTrack, mixVolumes } from './mixer.ts';
-import { type SeparationProgress, deleteStemSet, getStems, listStemSets, selectStemSet, separateSong } from './stems.ts';
+import { type SeparationProgress, deleteStemSet, hasUsableWebGpu, listStemSets, selectStemSet, separateSong } from './stems.ts';
 
 const DEFAULT_MIX = (names: string[]): MixTrack[] => names.map((name) => ({ name, volume: 1, muted: false, solo: false }));
 
@@ -20,7 +21,8 @@ export const useStems = (songId: string, originalUrl?: string) => {
   const abort = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
-    const [record, sets] = await Promise.all([getStems(songId), listStemSets(songId)]);
+    const sets = await listStemSets(songId);
+    const record = sets.find((set) => set.mode === 'six');
     setModes(sets.map((s) => s.mode));
     setActive(record ?? null);
     setUrls((previous) => {
@@ -43,7 +45,7 @@ export const useStems = (songId: string, originalUrl?: string) => {
   }, [load]);
 
   const separate = useCallback(
-    async (mode: StemMode = 'vocals') => {
+    async (mode: StemMode = 'six') => {
       if (abort.current) return; // one separation at a time
       setError(null);
       const controller = new AbortController();
@@ -63,6 +65,39 @@ export const useStems = (songId: string, originalUrl?: string) => {
     },
     [songId, load],
   );
+
+  // Wait for chord/lyric analysis before starting another heavy model. Existing six-track results are reused.
+  useEffect(() => {
+    if (!originalUrl) return;
+    let cancelled = false;
+    let started = false;
+    const prepare = async () => {
+      if (cancelled || started) return;
+      started = true;
+      try {
+        const sets = await listStemSets(songId);
+        if (cancelled) return;
+        if (sets.some((set) => set.mode === 'six')) {
+          await load();
+          return;
+        }
+        const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
+        // Unsupported devices retain manual access and the original audio without starting a failing job.
+        if (!(await hasUsableWebGpu(gpu)) || cancelled) return;
+        await separate('six');
+      } catch (error) {
+        if (!cancelled) setError(error instanceof Error ? error.message : 'Não foi possível preparar as faixas.');
+      }
+    };
+    const unsubscribe = isRunning(songId)
+      ? subscribeAnalysis(songId, (event) => { if (event === 'done') void prepare(); })
+      : (void prepare(), () => {});
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      abort.current?.abort();
+    };
+  }, [songId, originalUrl, separate, load]);
 
   const cancel = useCallback(() => abort.current?.abort(), []);
 

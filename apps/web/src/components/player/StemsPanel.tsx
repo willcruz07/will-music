@@ -106,7 +106,7 @@ export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; titl
       )}
       {!hasStems || choosing ? (
         <>
-          <p className="mb-2 text-sm text-muted-foreground">Escolha como separar. Cada tipo baixa o modelo uma vez e fica guardado no aparelho. Precisa de Chrome ou Edge com WebGPU.</p>
+          <p className="mb-2 text-sm text-muted-foreground">A música é separada em voz, bateria, baixo, guitarra, piano e outros. O modelo é baixado uma vez e reutilizado nas próximas músicas. A separação precisa de WebGPU.</p>
           {chooser}
           <StorageNote />
           {hasStems && (

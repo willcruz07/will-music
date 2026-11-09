@@ -32,9 +32,11 @@ export const isQuotaError = (error: unknown): boolean =>
 export const explainQuota = (estimate: { usage?: number; quota?: number }): string => {
   const numbers = estimate.usage !== undefined && estimate.quota ? ` (usando ${formatBytes(estimate.usage)} de ${formatBytes(estimate.quota)} permitidos)` : '';
   return (
-    `O navegador não deixou guardar mais dados do will-music${numbers}. ` +
-    'Se estiver numa janela anônima ou no perfil de visitante, abra o app numa janela normal: lá o limite é bem menor. ' +
-    'Se não, libere espaço apagando faixas de outras músicas ou modelos em Ajustes.'
+    `O navegador recusou a gravação dos dados do will-music${numbers}. ` +
+    'A cota informada é uma estimativa e não garante espaço disponível para esta gravação. ' +
+    'Verifique o espaço livre no dispositivo e se o navegador permite armazenar dados deste site. ' +
+    'Se estiver em janela anônima ou perfil de visitante, tente uma janela normal. ' +
+    'Se o armazenamento do site estiver próximo do limite, libere espaço em Ajustes.'
   );
 };
 

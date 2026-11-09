@@ -1,9 +1,10 @@
 import { FileAudio, Upload } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { createManualSong } from '../lib/chartEdit.ts';
 import { createSong } from '../lib/db.ts';
 import { readTags } from '../lib/metadata.ts';
+import { explainQuota, isQuotaError } from '../lib/storage.ts';
 import { Button } from '../ui/Button.tsx';
 
 const minutes = (sec: number) => (sec ? `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}` : '');
@@ -16,9 +17,12 @@ export const NewSong = () => {
   const [duration, setDuration] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const submitting = useRef(false);
 
   const choose = async (picked: File | undefined) => {
-    if (!picked) return;
+    if (!picked || submitting.current) return;
+    setSaveError(null);
     setFile(picked);
     const tags = await readTags(picked);
     setTitle(tags.title);
@@ -27,10 +31,25 @@ export const NewSong = () => {
   };
 
   const submit = async () => {
-    if (!file || !title.trim()) return;
+    if (!file || !title.trim() || submitting.current) return;
+    submitting.current = true;
+    setSaveError(null);
     setSaving(true);
-    const song = await createSong({ title: title.trim(), artist: artist.trim(), durationSec: duration }, file);
-    navigate(`/musica/${song.id}`);
+    try {
+      const song = await createSong({ title: title.trim(), artist: artist.trim(), durationSec: duration }, file);
+      navigate(`/musica/${song.id}`);
+    } catch (error) {
+      console.error('Não foi possível salvar a música e o áudio no armazenamento local.', error);
+      const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      setSaveError(
+        isQuotaError(error)
+          ? explainQuota({})
+          : `Não foi possível salvar a música no aparelho. Tente novamente. Detalhe: ${detail}`,
+      );
+    } finally {
+      submitting.current = false;
+      setSaving(false);
+    }
   };
 
   return (
@@ -54,7 +73,7 @@ export const NewSong = () => {
         {file ? <FileAudio className="size-8 text-primary" /> : <Upload className="size-8 text-primary" />}
         <span className="font-semibold">{file ? file.name : 'Escolha um arquivo de áudio ou arraste para cá'}</span>
         <span className="text-sm text-muted-foreground">{file ? minutes(duration) : 'MP3, WAV, M4A ou OGG'}</span>
-        <input type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg" className="sr-only" aria-label="Arquivo de áudio" onChange={(e) => void choose(e.target.files?.[0])} />
+        <input type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg" className="sr-only" aria-label="Arquivo de áudio" disabled={saving} onChange={(e) => void choose(e.target.files?.[0])} />
       </label>
 
       {!file && (
@@ -80,6 +99,7 @@ export const NewSong = () => {
             <span className="text-sm font-semibold">Artista</span>
             <input value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Ajuda a encontrar a letra" className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 outline-none placeholder:text-muted-foreground focus:border-primary" />
           </label>
+          {saveError && <p role="alert" className="text-sm text-danger">{saveError}</p>}
           <Button onClick={() => void submit()} disabled={saving || !title.trim()} className="w-full sm:w-auto">
             {saving ? 'Salvando…' : 'Analisar música'}
           </Button>
