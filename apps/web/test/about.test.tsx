@@ -13,6 +13,8 @@ describe('Sobre: bottom sheet about the author', () => {
     expect(within(sheet).getByRole('img', { name: /Will Cruz/ })).toHaveAttribute('src', expect.stringContaining('will.jpeg'));
     expect(within(sheet).getByRole('link', { name: /WhatsApp/ })).toHaveAttribute('href', 'https://wa.me/5521981314531');
     expect(within(sheet).getByRole('link', { name: /Instagram/ })).toHaveAttribute('href', 'https://www.instagram.com/willcruz_k07/');
+    expect(within(sheet).getByText(/Mais de 10 anos em tecnologia/)).toBeInTheDocument();
+    expect(within(sheet).getByRole('heading', { name: /Dois caminhos. Um propósito/ })).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();

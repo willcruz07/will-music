@@ -1,4 +1,5 @@
 import { type MutableRefObject, useEffect, useRef, useState } from 'react';
+import { ScoreSkeleton } from './StudioSkeletons.tsx';
 
 type OsmdCursor = {
   show: () => void;
@@ -135,7 +136,7 @@ export const ScoreView = ({ xml, cursorRef }: { xml: string; cursorRef?: Mutable
 
   return (
     <div className="mt-4 overflow-x-auto rounded-xl border border-border bg-white p-2 text-black shadow-sm">
-      {loading && <div className="m-6 h-1 w-24 animate-pulse rounded-full bg-emerald-500/40" aria-label="Desenhando a partitura" />}
+      {loading && <div aria-label="Desenhando a partitura" role="status"><ScoreSkeleton /></div>}
       {error && (
         <p className="m-4 text-sm text-red-700" role="alert">
           {error}

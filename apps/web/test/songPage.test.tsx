@@ -40,7 +40,7 @@ describe('song page without audio', () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByRole('link', { name: /Editar letra e acordes/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Editar letra e cifra/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Analisar de novo' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Sincronizar/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Tocar' })).toBeNull();
@@ -48,7 +48,7 @@ describe('song page without audio', () => {
 });
 
 describe('song page toolbar on mobile', () => {
-  it('is a sideways strip, so every tool can be reached on a narrow screen', async () => {
+  it('groups the reading controls and chart actions in wrapping rows', async () => {
     const song = await createManualSong('Hino', '');
     render(
       <MemoryRouter initialEntries={[`/musica/${song.id}`]}>
@@ -58,6 +58,12 @@ describe('song page toolbar on mobile', () => {
       </MemoryRouter>,
     );
     const toolbar = await screen.findByRole('toolbar', { name: 'Ferramentas da música' });
-    expect(toolbar.closest('[data-testid="scroll-strip"]')).not.toBeNull();
+    expect(toolbar).toContainElement(screen.getByRole('button', { name: 'Meio tom acima' }));
+    expect(toolbar).toContainElement(screen.getByRole('button', { name: 'Aumentar letra' }));
+    expect(toolbar).toContainElement(screen.getByRole('button', { name: 'Imprimir cifra' }));
+    expect(screen.queryByRole('link', { name: 'Palco' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Partitura' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Dados' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Excluir música' })).toBeNull();
   });
 });

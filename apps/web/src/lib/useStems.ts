@@ -13,7 +13,7 @@ import { type SeparationProgress, deleteStemSet, hasUsableWebGpu, listStemSets, 
 const DEFAULT_MIX = (names: string[]): MixTrack[] => names.map((name) => ({ name, volume: 1, muted: false, solo: false }));
 
 /** Stem tracks of a song: separation jobs per mode, the active set, mixer state and the player sources. */
-export const useStems = (songId: string, originalUrl?: string) => {
+export const useStems = (songId: string, originalUrl?: string, autoMix = false) => {
   const [active, setActive] = useState<StemsRecord | null>(null);
   const [modes, setModes] = useState<StemMode[]>([]);
   const [urls, setUrls] = useState<{ name: string; url: string }[] | null>(null);
@@ -23,6 +23,7 @@ export const useStems = (songId: string, originalUrl?: string) => {
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const urlHandles = useRef<{ name: string; url: string }[] | null>(null);
+  const urlRecord = useRef<StemsRecord | undefined>(undefined);
   const generation = useRef(0);
   const [temporaryTracks, setTemporaryTracks] = useState(false);
 
@@ -35,15 +36,19 @@ export const useStems = (songId: string, originalUrl?: string) => {
     setTemporaryTracks(!!temporary);
     setModes([...new Set([...sets.map((s) => s.mode), ...(temporary ? [temporary.mode] : [])])]);
     setActive(record ?? null);
-    urlHandles.current?.forEach((u) => URL.revokeObjectURL(u.url));
-    urlHandles.current = record ? record.tracks.map((t) => ({ name: t.name, url: URL.createObjectURL(t.blob) })) : null;
-    setUrls(urlHandles.current);
+    if (autoMix) setUseMix(!!record);
+    if (urlRecord.current !== record) {
+      urlRecord.current = record;
+      urlHandles.current?.forEach((u) => URL.revokeObjectURL(u.url));
+      urlHandles.current = record ? record.tracks.map((t) => ({ name: t.name, url: URL.createObjectURL(t.blob) })) : null;
+      setUrls(urlHandles.current);
+    }
     // A new set of tracks starts with every track at full volume.
     setMix((current) => {
       const names = record?.tracks.map((t) => t.name) ?? [];
       return current.length === names.length && current.every((t, i) => t.name === names[i]) ? current : DEFAULT_MIX(names);
     });
-  }, [songId]);
+  }, [songId, autoMix]);
 
   useEffect(() => {
     setUseMix(false);
@@ -55,6 +60,7 @@ export const useStems = (songId: string, originalUrl?: string) => {
       release();
       urlHandles.current?.forEach((u) => URL.revokeObjectURL(u.url));
       urlHandles.current = null;
+      urlRecord.current = undefined;
     };
   }, [load]);
 
@@ -141,7 +147,7 @@ export const useStems = (songId: string, originalUrl?: string) => {
   const sources: PlayerSource[] | undefined =
     urls && useMix ? urls.map((u) => ({ name: u.name, src: u.url, volume: volumes[u.name] ?? 1 })) : originalUrl ? [{ name: 'mix', src: originalUrl, volume: 1 }] : undefined;
 
-  return { hasStems: !!urls, activeMode: active?.mode ?? null, modes, mix, setMix, useMix, setUseMix, progress, error, temporaryTracks, separate, cancel, select, remove, exportMix, sources };
+  return { hasStems: !!urls, tracks: active?.tracks, activeMode: active?.mode ?? null, modes, mix, setMix, useMix, setUseMix, progress, error, temporaryTracks, separate, cancel, select, remove, exportMix, sources };
 };
 
 export type StemsState = ReturnType<typeof useStems>;

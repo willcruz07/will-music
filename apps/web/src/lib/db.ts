@@ -1,4 +1,4 @@
-import type { ChordSegment, DrumHit, KeyResult, NoteEvent, StemMode, VoicePart } from '@will-music/engine';
+import type { ChordSegment, DrumHit, Grid, KeyResult, NoteEvent, StemMode, VoicePart } from '@will-music/engine';
 import Dexie, { type EntityTable, type Table } from 'dexie';
 import { isQuotaError, requestPersistence } from './storage.ts';
 import { clearPendingAnalysis } from './pendingAnalysis.ts';
@@ -47,6 +47,9 @@ export type Chart = {
   fontSize: number;
   origin: 'generated' | 'edited' | 'manual';
   generatedFromAnalysisId?: string;
+  /** Selected diagrams by original chord name (before transpose), saved with the chart. */
+  chordShapes?: Record<string, { instrument: 'violao' | 'teclado' | 'cavaquinho'; variant: number }>;
+  chordInstrument?: 'violao' | 'teclado' | 'cavaquinho';
   /** Start time of each lyric line, in chart order (spec §5.5). null = interpolate. */
   lineTimes?: (number | null)[];
   createdAt: string;
@@ -65,6 +68,12 @@ export type PeaksRecord = { songId: string; peaks: Float32Array; duration: numbe
 
 /** Transcribed melody (raw note times); the MusicXML is rebuilt from it on demand. */
 export type ScoreRecord = {
+  /** Self-contained saved documents, independent from source audio and analysis. */
+  documents?: Partial<Record<'melody' | 'guitar' | 'keys' | 'drums' | 'choir', string>>;
+  savedType?: 'melody' | 'guitar' | 'keys' | 'drums' | 'choir';
+  documentGrid?: Grid;
+  documentGrids?: Partial<Record<'melody' | 'guitar' | 'keys' | 'drums' | 'choir', Grid>>;
+  guitar?: { notes: NoteEvent[]; source: string };
   songId: string;
   notes: NoteEvent[];
   bpm: number;

@@ -54,7 +54,7 @@ describe('song score', () => {
 });
 
 describe('score pages', () => {
-  it('lists songs with and without a score', async () => {
+  it('lists only songs with a saved score', async () => {
     const a = await createManualSong('Com partitura', '');
     await createManualSong('Sem partitura', '');
     await saveScore(record(a.id));
@@ -64,7 +64,7 @@ describe('score pages', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText('Com partitura')).toBeInTheDocument();
-    expect(screen.getByText('Sem partitura')).toBeInTheDocument();
+    expect(screen.queryByText('Sem partitura')).not.toBeInTheDocument();
     expect(screen.getByText('Pronta')).toBeInTheDocument();
   });
 

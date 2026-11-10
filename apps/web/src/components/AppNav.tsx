@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { GraduationCap, Library, ListMusic, Mic, Music4, Plus, Settings } from 'lucide-react';
+import { GraduationCap, Library, ListMusic, Mic, Plus, Settings } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router';
 
 type Item = { to: string; label: string; icon: typeof Library; end: boolean };
@@ -7,10 +7,9 @@ type Item = { to: string; label: string; icon: typeof Library; end: boolean };
 const ITEMS: Item[] = [
   { to: '/', label: 'Biblioteca', icon: Library, end: true },
   { to: '/listas', label: 'Listas', icon: ListMusic, end: false },
-  { to: '/partituras', label: 'Partituras', icon: Music4, end: false },
+  { to: '/microfone', label: 'Microfone', icon: Mic, end: false },
   { to: '/estudo', label: 'Estudo', icon: GraduationCap, end: false },
 ];
-const MIC: Item = { to: '/microfone', label: 'Microfone', icon: Mic, end: false };
 const SETTINGS: Item = { to: '/ajustes', label: 'Ajustes', icon: Settings, end: false };
 
 /** Settings live in the header on phones (the bottom bar keeps the four main places). */
@@ -22,7 +21,7 @@ export const SettingsLink = () => (
 
 export const TopNav = () => (
   <nav className="hidden items-center gap-1 lg:flex" aria-label="Principal">
-    {[...ITEMS, MIC, SETTINGS].map(({ to, label, end }) => (
+    {[...ITEMS, SETTINGS].map(({ to, label, end }) => (
       <NavLink
         key={to}
         to={to}

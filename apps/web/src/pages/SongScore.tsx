@@ -28,6 +28,7 @@ import { createScoreSynth, toSynthEvents } from '../lib/synth.ts';
 import { useStems } from '../lib/useStems.ts';
 import { Button } from '../ui/Button.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
+import { PrintScoreButton } from '../components/PrintScoreButton.tsx';
 
 const progressLabel = (p: ScoreProgress) =>
   p.stage === 'decode' ? 'Preparando o áudio' : p.stage === 'models' ? 'Baixando o modelo de notas' : `Escutando as notas (${p.done} de ${p.total})`;
@@ -50,7 +51,7 @@ const eventsFor = (type: ScoreType, score: ScoreRecord | undefined, voices: Read
       ? toSynthEvents({ hits: score?.drums?.hits })
       : type === 'choir'
         ? toSynthEvents({ notes: VOICE_PARTS.filter((v) => voices.has(v)).flatMap((v) => score?.choir?.voices[v] ?? []) })
-        : toSynthEvents({ notes: score?.notes });
+        : toSynthEvents({ notes: type === 'guitar' ? score?.guitar?.notes ?? score?.notes : score?.notes });
 
 const EMPTY_TEXT: Record<ScoreType, string> = {
   melody: 'O app escuta a voz principal (ou a música inteira, se as faixas não foram separadas) e escreve a melodia com a cifra por cima.',
@@ -95,6 +96,7 @@ const SongScorePage = ({ id }: { id: string }) => {
       setChart(c);
       setAnalysis(a);
       setScore(sc);
+      if (sc?.savedType) setType(sc.savedType);
       if (audio) {
         url = URL.createObjectURL(audio.blob);
         setAudioUrl(url);
@@ -246,10 +248,11 @@ const SongScorePage = ({ id }: { id: string }) => {
 
   return (
     <section>
-      <Link to={`/musica/${song.id}`} className="-ml-1 inline-flex items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
-        <ArrowLeft className="size-4" /> {song.title}
+      <Link to="/?aba=partituras" className="-ml-1 inline-flex items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
+        <ArrowLeft className="size-4" /> Biblioteca
       </Link>
       <h1 className="mt-2 text-3xl font-bold tracking-tight">Partitura</h1>
+      <p className="mt-1 text-lg text-muted-foreground">{song.title}</p>
 
       <ScrollStrip className="mt-4" role="radiogroup" label="Tipo de partitura" selected={`${type}:${song ? 1 : 0}`} onKeyDown={rovingKeys} innerClassName="rounded-xl border border-border bg-surface p-1">
           {SCORE_TYPES.map((t) => (
@@ -258,6 +261,7 @@ const SongScorePage = ({ id }: { id: string }) => {
               type="button"
               role="radio"
               aria-checked={type === t.type}
+              disabled={!audioUrl && !!score?.savedType && !hasScoreType(score, t.type)}
               onClick={() => chooseType(t.type)}
               className={`min-h-10 scroll-mx-4 whitespace-nowrap rounded-lg px-4 text-sm transition-colors ${type === t.type ? 'bg-primary font-semibold text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
@@ -298,14 +302,16 @@ const SongScorePage = ({ id }: { id: string }) => {
               defaultValue={score.bpm}
               key={score.bpm}
               aria-label="Andamento (BPM)"
+              readOnly={!!score.documents?.[type]}
               className="w-16 bg-transparent text-right font-semibold tabular-nums outline-none"
-              onBlur={(e) => setBpm(e.currentTarget)}
+              onBlur={(e) => { if (!score.documents?.[type]) setBpm(e.currentTarget); }}
               onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
             />
           </label>
           <Button variant="outline" onClick={() => xml && downloadText(xml, `${song.title || 'partitura'} (${info.label.toLowerCase()}).musicxml`, 'application/vnd.recordare.musicxml+xml')}>
             <Download className="size-4" /> Baixar MusicXML
           </Button>
+          {xml && <PrintScoreButton xml={xml} title={`${song.title} — ${info.label}`} />}
           <Button variant="ghost" onClick={generate} disabled={!!progress || !audioUrl}>
             <RefreshCw className="size-4" /> Gerar de novo
           </Button>
@@ -332,7 +338,7 @@ const SongScorePage = ({ id }: { id: string }) => {
           <p className="mt-3 text-xs text-muted-foreground">É um rascunho feito de ouvido pelo app: confira tocando e ajuste no MuseScore se precisar.</p>
           {lyrics.some((l) => l.text.trim()) && <LyricTicker lines={lyrics} sink={lyricSink} />}
           {grid && (
-            <ScorePlayer events={scoreEvents} grid={grid} skipTicks={skipTicks} cursorRef={cursor} songPlayer={player} handle={scorePlayer} onWithMusic={() => !synthOn && toggleSynth(true)} />
+            <ScorePlayer scoreOnly events={scoreEvents} grid={grid} skipTicks={skipTicks} cursorRef={cursor} songPlayer={player} handle={scorePlayer} onWithMusic={() => !synthOn && toggleSynth(true)} />
           )}
           <ScoreView xml={xml} cursorRef={cursor} />
         </>

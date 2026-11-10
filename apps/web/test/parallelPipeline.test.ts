@@ -3,6 +3,7 @@ import { createSong, db } from '../src/lib/db.ts';
 import { runPipeline, type PipelineProgress } from '../src/lib/pipeline.ts';
 import { analyzeInWorker } from '../src/worker/client.ts';
 import { transcribeSong } from '../src/lib/whisper.ts';
+import { getPendingAnalysis, retainSessionAnalysis } from '../src/lib/pendingAnalysis.ts';
 
 vi.mock('../src/worker/client.ts', () => ({ analyzeInWorker: vi.fn() }));
 vi.mock('../src/lib/whisper.ts', () => ({ transcribeSong: vi.fn() }));
@@ -22,6 +23,20 @@ beforeEach(async () => {
 const song = () => createSong({ title: 'Paralela', artist: '', durationSec: 8 }, new Blob(['audio']));
 
 describe('parallel song processing', () => {
+  it('keeps studio results in memory without writing analysis or charts and releases them on exit', async () => {
+    vi.mocked(analyzeInWorker).mockResolvedValue(harmony);
+    vi.mocked(transcribeSong).mockResolvedValue(transcript);
+    const entry = await song();
+    const releasePage = retainSessionAnalysis(entry.id);
+    try {
+      await runPipeline(entry.id, () => {}, { execution: 'parallel', persist: false });
+      expect(getPendingAnalysis(entry.id)).toMatchObject({ sessionOnly: true });
+      expect(getPendingAnalysis(entry.id)!.chart.chordPro).toContain('Uma letra reconhecida');
+      expect(await db.analyses.where('songId').equals(entry.id).count()).toBe(0);
+      expect(await db.charts.where('songId').equals(entry.id).count()).toBe(0);
+    } finally { releasePage(); }
+    expect(getPendingAnalysis(entry.id)).toBeUndefined();
+  });
   it('starts both tasks before either finishes and publishes chords while lyrics are still pending', async () => {
     const chords = deferred<typeof harmony>();
     const lyrics = deferred<typeof transcript>();

@@ -6,22 +6,24 @@ import { retainSessionStems } from './sessionStems.ts';
 import { lyricsToKeep } from './lyricsApply.ts';
 import { transcribeSong } from './whisper.ts';
 import { describeTranscription } from './transcript.ts';
-import { getPendingAnalysis, setPendingAnalysis } from './pendingAnalysis.ts';
+import { getPendingAnalysis, setPendingAnalysis, retainSessionAnalysis } from './pendingAnalysis.ts';
 import { savePendingAnalysis } from './saveAnalysis.ts';
 import { isQuotaError } from './storage.ts';
+import { estimateAudioBpm } from './audioTempo.ts';
 
 import { resolveAnalysisExecution, isResourceFailure, type ExecutionPreference } from './analysisExecution.ts';
 export type AnalysisTaskProgress = { id: 'chords' | 'lyrics'; label: string; detail?: string; fraction?: number; status: 'waiting' | 'running' | 'done' | 'error' | 'skipped' };
 /** Two independent task snapshots, plus the already-published chord chart while lyrics finish. */
-export type PipelineProgress = { label: string; fraction?: number; detail?: string; lyricsPending?: boolean; tasks?: AnalysisTaskProgress[] };
+export type PipelineProgress = { label: string; fraction?: number; detail?: string; lyricsPending?: boolean; tasks?: AnalysisTaskProgress[]; tempo?: number };
 const mb = (bytes: number) => (bytes / 1e6).toFixed(0);
 
-export const runPipeline = async (songId: string, onProgress: (p: PipelineProgress) => void, options: { execution?: ExecutionPreference } = {}): Promise<void> => {
+export const runPipeline = async (songId: string, onProgress: (p: PipelineProgress) => void, options: { execution?: ExecutionPreference; persist?: boolean } = {}): Promise<void> => {
   const song = await db.songs.get(songId);
   const audio = await db.audio.get(songId);
   if (!song || !audio) throw new Error('Música não encontrada.');
-  await updateSong(songId, { analysisStatus: 'running', analysisError: undefined });
+  if (options.persist !== false) await updateSong(songId, { analysisStatus: 'running', analysisError: undefined });
   const release = retainSessionStems(songId);
+  const releaseAnalysis = retainSessionAnalysis(songId);
   const controller = new AbortController();
   let stopped = false;
   let assembling = false;
@@ -35,6 +37,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
     const warnings: string[] = [];
     const previous = await db.analyses.where('songId').equals(songId).first();
     let lyrics = lyricsToKeep(previous?.lyrics);
+    let tempo = song.tempo;
     const chordsTask: AnalysisTaskProgress = { id: 'chords', label: 'Preparando o áudio dos acordes', status: 'running' };
     const lyricsTask: AnalysisTaskProgress = { id: 'lyrics', label: lyrics?.lines.length ? 'Letra preservada' : 'Aguardando a transcrição', status: lyrics?.lines.length ? 'skipped' : 'waiting' };
     const snapshot = () => [{ ...chordsTask }, { ...lyricsTask }];
@@ -42,11 +45,13 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       if (stopped || controller.signal.aborted || assembling) return;
       const active = chordsTask.status === 'running' ? chordsTask : lyricsTask;
       const both = chordsTask.status === 'running' && lyricsTask.status === 'running';
-      onProgress({ label: both ? 'Analisando acordes e transcrevendo a letra…' : active.label, detail: active.detail, fraction: active.fraction, lyricsPending: chartPublished && lyricsTask.status === 'running', tasks: snapshot() });
+      onProgress({ label: both ? 'Analisando acordes e transcrevendo a letra…' : active.label, detail: active.detail, fraction: active.fraction, lyricsPending: chartPublished && lyricsTask.status === 'running', tasks: snapshot(), tempo });
     };
     publish();
     // Decode the chord input first; do not overlap two full native audio decoders on long files.
     const { channels, durationSec } = await decodeForAnalysis(audio.blob, { mono: true });
+    tempo = song.tempo ?? (channels[0] ? estimateAudioBpm(channels[0], 22050) : undefined);
+    publish();
     let lyricsFailure: unknown;
     let lyricsPromise: Promise<void> | undefined;
     const launchLyrics = () => {
@@ -102,8 +107,8 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       chordPro, lineTimes: lines.map((line) => line.start), origin: 'generated', generatedFromAnalysisId: analysis.id,
       createdAt: existing?.createdAt ?? stamp, updatedAt: stamp,
     };
-    setPendingAnalysis({ analysis, chart, song: { ...song, key: keyToChord(result.key), durationSec: song.durationSec || durationSec, analysisStatus: 'done', analysisError: undefined, updatedAt: stamp } });
-    try { await savePendingAnalysis(songId); }
+    setPendingAnalysis({ analysis, chart, sessionOnly: options.persist === false, song: { ...song, tempo, key: keyToChord(result.key), durationSec: song.durationSec || durationSec, analysisStatus: 'done', analysisError: undefined, updatedAt: stamp } });
+    try { if (options.persist !== false) await savePendingAnalysis(songId); }
     catch (error) {
       if (!isQuotaError(error)) throw error;
       console.warn('Análise concluída, mas a gravação foi recusada. Resultado preservado na sessão.', { songId, error });
@@ -133,12 +138,13 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
   } catch (error) {
     controller.abort();
     const message = error instanceof Error ? error.message : String(error);
-    try { await updateSong(songId, { analysisStatus: 'error', analysisError: message }); }
+    try { if (options.persist !== false) await updateSong(songId, { analysisStatus: 'error', analysisError: message }); }
     catch (statusError) { console.warn('Não foi possível registrar o estado de erro da análise.', { songId, error, statusError }); }
     throw error;
   } finally {
     stopped = true;
     controller.abort();
     release();
+    releaseAnalysis();
   }
 };

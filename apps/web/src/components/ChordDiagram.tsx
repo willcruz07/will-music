@@ -3,6 +3,7 @@ import { SVGuitarChord } from 'svguitar';
 import { chordNotes } from '../lib/chordNotation.ts';
 import { type GuitarShape, guitarShapes, toSvguitar } from '../lib/chordShapes.ts';
 import { CAVAQUINHO, findVoicings } from '../lib/frettedShapes.ts';
+import { ChordShapeSkeleton } from './StudioSkeletons.tsx';
 
 export type Instrument = 'violao' | 'teclado' | 'cavaquinho';
 export const INSTRUMENT_NAMES: Record<Instrument, string> = { violao: 'Violão', teclado: 'Teclado', cavaquinho: 'Cavaquinho' };
@@ -35,11 +36,13 @@ const frettedShapes = async (chord: string, instrument: 'violao' | 'cavaquinho',
 const Fretted = ({ chord, instrument, variant, onVariants, strict }: { chord: string; instrument: 'violao' | 'cavaquinho'; variant: number; onVariants?: (n: number) => void; strict: boolean }) => {
   const box = useRef<HTMLDivElement>(null);
   const [missing, setMissing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const report = useRef(onVariants);
   report.current = onVariants;
   useEffect(() => {
     let cancelled = false;
     setMissing(false);
+    setLoading(true);
     void frettedShapes(chord, instrument, strict).then((shapes) => {
       const el = box.current;
       if (cancelled || !el) return;
@@ -67,7 +70,8 @@ const Fretted = ({ chord, instrument, variant, onVariants, strict }: { chord: st
       } catch {
         // Rendering needs real SVG layout (not available in every environment); leave the box empty.
       }
-    });
+    }).catch(() => { if (!cancelled) { setMissing(true); report.current?.(0); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => {
       cancelled = true;
     };
@@ -75,6 +79,7 @@ const Fretted = ({ chord, instrument, variant, onVariants, strict }: { chord: st
   // The box stays mounted (hidden when there is no shape) so the next chord can draw into it.
   return (
     <>
+      {loading && <ChordShapeSkeleton />}
       {missing && <p className="text-sm text-muted-foreground">Sem diagrama para {chord}</p>}
       <div ref={box} hidden={missing} className="w-full" aria-label={`Diagrama de ${INSTRUMENT_NAMES[instrument].toLowerCase()} de ${chord}`} role="img" />
     </>

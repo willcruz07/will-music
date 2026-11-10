@@ -71,7 +71,9 @@ export const Waveform = ({ peaks, duration, time, loop, onSeek, onSelect }: Prop
   useEffect(() => {
     const onResize = () => draw();
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(onResize) : null;
+    if (canvas.current) observer?.observe(canvas.current);
+    return () => { window.removeEventListener('resize', onResize); observer?.disconnect(); };
   });
 
   const timeAt = (clientX: number) => {

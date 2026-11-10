@@ -8,6 +8,18 @@ export const createSetlist = async (name: string): Promise<Setlist> => {
   return setlist;
 };
 
+/** Create and link in one write, so a failed add cannot leave an empty list behind. */
+export const createSetlistWithSong = async (name: string, songId: string): Promise<Setlist> => {
+  if (!name.trim()) throw new Error('Informe um nome para a lista.');
+  const stamp = now();
+  const list: Setlist = { id: crypto.randomUUID(), name: name.trim(), items: [{ songId }], createdAt: stamp, updatedAt: stamp };
+  await db.transaction('rw', db.songs, db.setlists, async () => {
+    if (!(await db.songs.get(songId))) throw new Error('Esta cifra foi removida da biblioteca.');
+    await db.setlists.add(list);
+  });
+  return list;
+};
+
 export const updateSetlist = async (id: string, patch: Partial<Omit<Setlist, 'id' | 'createdAt'>>): Promise<void> => {
   await db.setlists.update(id, { ...patch, updatedAt: now() });
 };
@@ -17,9 +29,11 @@ export const deleteSetlist = (id: string): Promise<void> => db.setlists.delete(i
 export const listSetlists = (): Promise<Setlist[]> => db.setlists.orderBy('updatedAt').reverse().toArray();
 
 export const addToSetlist = async (id: string, songId: string): Promise<void> => {
-  const setlist = await db.setlists.get(id);
-  if (!setlist) return;
-  await updateSetlist(id, { items: [...setlist.items, { songId }] });
+  await db.transaction('rw', db.setlists, async () => {
+    const setlist = await db.setlists.get(id);
+    if (!setlist) throw new Error('Esta lista foi removida. Abra a seleção novamente.');
+    await updateSetlist(id, { items: [...setlist.items, { songId }] });
+  });
 };
 
 export const moveItem = (items: readonly SetlistItem[], from: number, to: number): SetlistItem[] => {

@@ -1,6 +1,6 @@
 import { Moon, Sun } from 'lucide-react';
 import { Suspense, lazy, useEffect } from 'react';
-import { Link, Route, Routes } from 'react-router';
+import { Link, Navigate, Route, Routes, useParams } from 'react-router';
 import { BottomNav, SettingsLink, TopNav } from './components/AppNav.tsx';
 import { ModelsSetup } from './components/ModelsSetup.tsx';
 import { InstallBanner, UpdateBanner } from './components/PwaPrompts.tsx';
@@ -11,17 +11,18 @@ import { DialogHost } from './ui/Dialog.tsx';
 import { APP_VERSION, versionLabel } from './version.ts';
 import { useWakeLock } from './lib/wakeLock.ts';
 import { IconButton } from './ui/Button.tsx';
+import { useStudioLayout } from './lib/studioLayout.ts';
 
 // The library opens first; every other screen (and its heavy libraries) loads on demand.
 const named = <K extends string>(load: () => Promise<Record<K, React.ComponentType<any>>>, name: K) =>
   lazy(async () => ({ default: (await load())[name] }));
 const NewSong = named(() => import('./pages/NewSong.tsx'), 'NewSong');
 const Song = named(() => import('./pages/Song.tsx'), 'Song');
+const SongRoute = () => { const { id } = useParams(); return <Song key={id} />; };
 const EditChart = named(() => import('./pages/EditChart.tsx'), 'EditChart');
 const Setlists = named(() => import('./pages/Setlists.tsx'), 'Setlists');
 const SetlistEdit = named(() => import('./pages/SetlistEdit.tsx'), 'SetlistEdit');
 const Settings = named(() => import('./pages/Settings.tsx'), 'Settings');
-const Scores = named(() => import('./pages/Scores.tsx'), 'Scores');
 const SongScore = named(() => import('./pages/SongScore.tsx'), 'SongScore');
 const FolderPage = named(() => import('./pages/FolderPage.tsx'), 'FolderPage');
 const StoragePage = named(() => import('./pages/StoragePage.tsx'), 'StoragePage');
@@ -67,9 +68,10 @@ export const App = () => (
 
 const Layout = () => {
   useAutoHideBars();
+  const studio = useStudioLayout();
   return (
-  <div className="flex min-h-dvh flex-col">
-    <header className="glass sticky top-0 z-20 border-b border-border pt-[env(safe-area-inset-top)]">
+  <div className={`${studio ? 'studio-layout ' : ''}flex min-h-dvh flex-col`}>
+    <header hidden={studio} className="glass sticky top-0 z-20 border-b border-border pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
         <Link to="/" className="inline-flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight">
           <img src={`${import.meta.env.BASE_URL}icons/mark-96.png`} alt="" width={32} height={32} className="size-8 rounded-lg" />
@@ -88,16 +90,16 @@ const Layout = () => {
         </div>
       </div>
     </header>
-    <InstallBanner />
-    <main className="pb-nav mx-auto w-full max-w-5xl flex-1 px-4 pt-6">
+    {!studio && <InstallBanner />}
+    <main className={`${studio ? 'max-w-7xl pb-28 pt-[calc(env(safe-area-inset-top)+1rem)]' : 'pb-nav max-w-5xl pt-6'} mx-auto w-full flex-1 px-4`}>
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/" element={<Library />} />
           <Route path="/nova" element={<NewSong />} />
-          <Route path="/musica/:id" element={<Song />} />
+          <Route path="/musica/:id" element={<SongRoute />} />
           <Route path="/musica/:id/editar" element={<EditChart />} />
           <Route path="/musica/:id/partitura" element={<SongScore />} />
-          <Route path="/partituras" element={<Scores />} />
+          <Route path="/partituras" element={<Navigate to="/?aba=partituras" replace />} />
           <Route path="/pasta" element={<FolderPage />} />
           <Route path="/microfone" element={<MicPage />} />
           <Route path="/estudo" element={<StudyHome />} />
@@ -112,7 +114,7 @@ const Layout = () => {
         </Routes>
       </Suspense>
     </main>
-    <BottomNav />
+    {!studio && <BottomNav />}
     <UpdateBanner />
     <ModelsSetup />
   </div>

@@ -22,6 +22,7 @@ describe('removing a song from the library list', () => {
     await createManualSong('Asa Branca', 'Luiz Gonzaga');
     await createManualSong('Garota de Ipanema', 'Tom Jobim');
     open();
+    await userEvent.click(screen.getByRole('tab', { name: 'Cifras' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Excluir “Asa Branca”' }));
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Asa Branca');
     await userEvent.click(screen.getByRole('button', { name: 'Excluir' }));
@@ -33,6 +34,7 @@ describe('removing a song from the library list', () => {
   it('keeps the song when cancelled', async () => {
     await createManualSong('Asa Branca', 'Luiz Gonzaga');
     open();
+    await userEvent.click(screen.getByRole('tab', { name: 'Cifras' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Excluir “Asa Branca”' }));
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(screen.getByText('Asa Branca')).toBeInTheDocument();

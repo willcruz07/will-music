@@ -38,6 +38,19 @@ export const saveScore = async (score: ScoreRecord): Promise<void> => {
   await db.scores.put(score);
 };
 
+/** Delete the saved score; source songs with audio/charts keep their own data. */
+export const deleteSavedScore = async (songId: string): Promise<void> => {
+  await db.transaction('rw', db.scores, db.songs, db.audio, db.charts, db.analyses, async () => {
+    const score = await db.scores.get(songId);
+    if (!score) return;
+    const hasOtherData = (await db.audio.where(':id').equals(songId).count()) > 0
+      || (await db.charts.where('songId').equals(songId).count()) > 0
+      || (await db.analyses.where('songId').equals(songId).count()) > 0;
+    await db.scores.delete(songId);
+    if (score.savedType && !hasOtherData) await db.songs.delete(songId);
+  });
+};
+
 /** A usable tempo: the given one when it is plausible (40–240 BPM), else an estimate from the onsets. */
 export const safeBpm = (bpm: number | undefined, notes: readonly { start: number }[]): number =>
   bpm !== undefined && Number.isFinite(bpm) && bpm >= 40 && bpm <= 240 ? Math.round(bpm) : estimateTempo(notes.map((n) => n.start));
@@ -57,17 +70,19 @@ export const buildSongScore = (song: Pick<Song, 'title' | 'artist'>, analysis: A
 /** Whether the stored score already has what a type needs. */
 export const hasScoreType = (score: ScoreRecord | undefined, type: ScoreType): boolean =>
   !!score &&
-  (type === 'keys'
+  (score.documents ? !!score.documents[type] : (type === 'keys'
     ? !!score.piano?.notes.length
     : type === 'drums'
       ? !!score.drums?.hits.length
       : type === 'choir'
         ? !!score.choir && VOICE_PARTS.some((v) => score.choir!.voices[v].length > 0)
-        : score.notes.length > 0);
+        : type === 'guitar' ? !!(score.guitar?.notes.length || score.notes.length) : score.notes.length > 0));
 
 /** The tempo grid a score type is written on: the same one buildScoreXml uses, so song time maps onto the drawing. */
 export const scoreGrid = (type: ScoreType, analysis: AnalysisLike, score: ScoreRecord | undefined): Grid | null => {
   if (!score || !hasScoreType(score, type)) return null;
+  if (score.documents?.[type] && score.documentGrids?.[type]) return score.documentGrids[type]!;
+  if (score.documents?.[type] && score.documentGrid) return score.documentGrid;
   const chordStarts = usableChords(analysis).map((c) => c.start);
   const onsets =
     type === 'choir'
@@ -76,7 +91,7 @@ export const scoreGrid = (type: ScoreType, analysis: AnalysisLike, score: ScoreR
         ? score.piano!.notes.map((n) => n.start)
         : type === 'drums'
           ? score.drums!.hits.map((h) => h.time)
-          : score.notes.map((n) => n.start);
+          : (type === 'guitar' ? score.guitar?.notes ?? score.notes : score.notes).map((n) => n.start);
   return buildGrid(safeBpm(score.bpm, onsets.map((start) => ({ start }))), onsets, chordStarts);
 };
 
@@ -88,8 +103,9 @@ export const buildScoreXml = (
   score: ScoreRecord | undefined,
   extra: { lyrics?: readonly { time: number; text: string }[] } = {},
 ): string | null => {
+  if (score?.documents?.[type]) return score.documents[type]!;
   if (!score || !hasScoreType(score, type)) return null;
-  if (type === 'melody' || type === 'guitar') return buildSongScore(song, analysis, score, { tab: type === 'guitar' });
+  if (type === 'melody' || type === 'guitar') return buildSongScore(song, analysis, type === 'guitar' && score.guitar ? { ...score, notes: score.guitar.notes } : score, { tab: type === 'guitar' });
   const grid = scoreGrid(type, analysis, score)!;
   const bpm = grid.bpm;
   if (type === 'choir') {
@@ -119,7 +135,7 @@ const quantizePoly = (notes: readonly NoteEvent[], grid: ReturnType<typeof build
     return { pitch: n.pitch, start, dur: Math.max(1, tickAt(grid, n.end) - start) };
   });
 
-const decodeMono = async (blob: Blob, rate: number): Promise<Float32Array> => {
+export const decodeMono = async (blob: Blob, rate: number): Promise<Float32Array> => {
   const context = new OfflineAudioContext(1, 1, rate);
   const buffer = await context.decodeAudioData(await blob.arrayBuffer());
   const out = new Float32Array(buffer.length);
@@ -130,22 +146,26 @@ const decodeMono = async (blob: Blob, rate: number): Promise<Float32Array> => {
   return out;
 };
 
-const runWorker = (pcm: Float32Array, poly: boolean, onProgress: (p: ScoreProgress) => void): Promise<{ notes: NoteEvent[]; model: string }> =>
+export const runWorker = (pcm: Float32Array, poly: boolean, onProgress: (p: ScoreProgress) => void, signal?: AbortSignal): Promise<{ notes: NoteEvent[]; model: string }> =>
   new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new DOMException('Cancelado', 'AbortError')); return; }
     const worker = new Worker(new URL('../worker/transcription.worker.ts', import.meta.url), { type: 'module' });
+    const cleanup = () => { worker.terminate(); signal?.removeEventListener('abort', abort); };
+    const abort = () => { cleanup(); reject(new DOMException('Cancelado', 'AbortError')); };
+    signal?.addEventListener('abort', abort, { once: true });
     worker.onmessage = (event: MessageEvent<TranscriptionResponse>) => {
       const msg = event.data;
       if (msg.type === 'progress') return onProgress(msg);
-      worker.terminate();
+      cleanup();
       if (msg.type === 'result') resolve(msg);
       else reject(new Error(msg.message));
     };
     worker.onerror = (e) => {
-      worker.terminate();
+      cleanup();
       reject(new Error(e.message || 'A transcrição das notas falhou.'));
     };
     const request: TranscriptionRequest = { type: 'transcribe', pcm, poly };
-    worker.postMessage(request, [pcm.buffer]);
+    try { worker.postMessage(request, [pcm.buffer]); } catch (error) { cleanup(); reject(error); }
   });
 
 /** Merges a newly transcribed part into the stored score, keeping the other parts. */

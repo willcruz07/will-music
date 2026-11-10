@@ -34,6 +34,7 @@ export const BottomSheet = ({
 
   useEffect(() => {
     const body = document.body;
+    const previousFocus = document.activeElement as HTMLElement | null;
     const before = body.style.overflow;
     body.style.overflow = 'hidden';
     const p = panel.current;
@@ -63,6 +64,7 @@ export const BottomSheet = ({
     return () => {
       body.style.overflow = before;
       document.removeEventListener('keydown', onKey);
+      if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, []);
 
@@ -114,4 +116,4 @@ export const BottomSheet = ({
   );
 };
 
-const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';

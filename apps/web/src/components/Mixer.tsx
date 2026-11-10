@@ -1,5 +1,6 @@
 import { Headphones, VolumeX } from 'lucide-react';
 import type { MixTrack } from '../lib/mixer.ts';
+import type { ReactNode } from 'react';
 
 export const TRACK_LABELS: Record<string, string> = {
   instrumental: 'Instrumental',
@@ -13,7 +14,7 @@ export const TRACK_LABELS: Record<string, string> = {
   other: 'Outros',
 };
 
-export const Mixer = ({ tracks, onChange }: { tracks: MixTrack[]; onChange: (tracks: MixTrack[]) => void }) => {
+export const Mixer = ({ tracks, onChange, renderWave }: { tracks: MixTrack[]; onChange: (tracks: MixTrack[]) => void; renderWave?: (name: string) => ReactNode }) => {
   const set = (name: string, patch: Partial<MixTrack>) => onChange(tracks.map((t) => (t.name === name ? { ...t, ...patch } : t)));
   const anySolo = tracks.some((t) => t.solo);
   return (
@@ -22,7 +23,7 @@ export const Mixer = ({ tracks, onChange }: { tracks: MixTrack[]; onChange: (tra
         const label = TRACK_LABELS[t.name] ?? t.name;
         const silent = t.muted || (anySolo && !t.solo);
         return (
-          <li key={t.name} className={`grid grid-cols-[minmax(0,7.5rem)_1fr_auto] items-center gap-3 rounded-lg px-2 py-1.5 ${silent ? 'opacity-50' : ''}`}>
+          <li key={t.name} className={`grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-1.5 ${silent ? 'opacity-50' : ''}`}>
             <span className="truncate text-sm font-semibold">{label}</span>
             <input
               type="range"
@@ -31,7 +32,7 @@ export const Mixer = ({ tracks, onChange }: { tracks: MixTrack[]; onChange: (tra
               value={Math.round(t.volume * 100)}
               aria-label={`Volume de ${label}`}
               onChange={(e) => set(t.name, { volume: Number(e.target.value) / 100 })}
-              className="w-full accent-[var(--primary)]"
+              className="min-w-0 w-full accent-[var(--primary)]"
             />
             <span className="flex gap-1">
               <button
@@ -55,6 +56,7 @@ export const Mixer = ({ tracks, onChange }: { tracks: MixTrack[]; onChange: (tra
                 <Headphones className="size-4" />
               </button>
             </span>
+            {renderWave && <div className="col-span-3 mb-3">{renderWave(t.name)}</div>}
           </li>
         );
       })}

@@ -12,6 +12,8 @@ type Props = {
   /** Key the chart is shown in; when given, chord spelling follows it. */
   spellKey?: string;
   autoScroll?: boolean;
+  /** Studio uses a quiet margin marker instead of painting the whole line. */
+  highlight?: 'background' | 'marker';
   /** Editor mode: called with (lyric line index, plain character index) when a word is tapped. */
   onPick?: (lyricLineIndex: number, charIndex: number) => void;
   /** Reading mode: called with the shown chord when it is tapped (to show how to play it). */
@@ -51,7 +53,7 @@ const Words = ({ text, offset, onPick }: { text: string; offset: number; onPick:
   );
 };
 
-export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize, activeLineIndex = -1, autoScroll = false, onPick, onChordTap }: Props) => {
+export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize, activeLineIndex = -1, autoScroll = false, highlight = 'background', onPick, onChordTap }: Props) => {
   const { lines } = useMemo(() => parseChordPro(chordPro), [chordPro]);
   const activeRef = useRef<HTMLDivElement | null>(null);
   const t = (chord: string) => transposeChord(chord, transpose, spellKey ?? preferFlats);
@@ -90,7 +92,7 @@ export const ChartView = ({ chordPro, transpose, preferFlats, spellKey, fontSize
             data-line
             data-active={active ? 'true' : 'false'}
             ref={active ? activeRef : undefined}
-            className={`-ml-3 flex flex-wrap items-end rounded-r-lg py-1 pl-3 transition-[background,box-shadow] duration-300 ${active ? 'now-playing' : ''}`}
+            className={`-ml-3 flex flex-wrap items-end rounded-r-lg py-1 pl-3 transition-[background,box-shadow] duration-300 ${active ? highlight === 'marker' ? 'now-playing-marker' : 'now-playing' : ''}`}
           >
             {line.parts.map((part, j) => {
               const base = offset;

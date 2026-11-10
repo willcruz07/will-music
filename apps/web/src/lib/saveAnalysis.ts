@@ -21,7 +21,7 @@ export const savePendingAnalysis = async (songId: string): Promise<void> => {
       await db.analyses.where('songId').equals(songId).delete();
       await db.analyses.add(analysis);
       await db.charts.put(chart);
-      await db.songs.update(songId, { key: pending.song.key, durationSec: song.durationSec || pending.song.durationSec, analysisStatus: 'done', analysisError: undefined, updatedAt: now() });
+      await db.songs.update(songId, { key: pending.song.key, tempo: song.tempo ?? pending.song.tempo, durationSec: song.durationSec || pending.song.durationSec, analysisStatus: 'done', analysisError: undefined, updatedAt: now() });
     });
     if (getPendingAnalysis(songId) === pending) clearPendingAnalysis(songId);
   } catch (error) {

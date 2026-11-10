@@ -1,6 +1,6 @@
 import type { StemMode } from '@will-music/engine';
 import { Download, Layers, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { formatBytes, hasPredictableQuota, storageStatus } from '../../lib/storage.ts';
 import { StorageProtection } from '../StorageProtection.tsx';
 import { downloadBlob } from '../../lib/download.ts';
@@ -9,6 +9,7 @@ import type { StemsState } from '../../lib/useStems.ts';
 import { Button } from '../../ui/Button.tsx';
 import { confirmDialog } from '../../ui/Dialog.tsx';
 import { Mixer } from '../Mixer.tsx';
+import { TracksSkeleton } from '../StudioSkeletons.tsx';
 
 const mb = (n: number) => Math.round(n / 1e6);
 
@@ -35,11 +36,16 @@ const StorageNote = () => {
 };
 
 /** Separation types, the running job, the active set's mixer and the MP3 export, all inside the player drawer. */
-export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; title: string; hasAudio: boolean }) => {
+export const StemsPanel = ({ stems, title, hasAudio, mixer, automaticMix = false }: { stems: StemsState; title: string; hasAudio: boolean; mixer?: ReactNode; automaticMix?: boolean }) => {
   const { hasStems, activeMode, modes, mix, setMix, useMix, setUseMix, progress, error, separate, cancel, select, remove, exportMix } = stems;
   const [choosing, setChoosing] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const exportButton = <Button variant={automaticMix ? 'primary' : 'outline'} disabled={!!exporting} onClick={() => {
+    setExportError(null); setExporting('Preparando');
+    void exportMix(setExporting).then(blob => downloadBlob(blob, `${title || 'música'} (mixagem).mp3`))
+      .catch((e: unknown) => setExportError(e instanceof Error ? e.message : 'Não foi possível salvar o MP3.')).finally(() => setExporting(null));
+  }}><Download className="size-4" />{exporting ?? 'Exportar mix em MP3'}</Button>;
 
   if (!hasAudio) return <p className="text-sm text-muted-foreground">Esta música não tem áudio para separar.</p>;
 
@@ -58,6 +64,7 @@ export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; titl
         <Button variant="ghost" className="mt-1" onClick={cancel}>
           <X className="size-4" /> Cancelar
         </Button>
+        {automaticMix && <TracksSkeleton />}
       </div>
     );
   }
@@ -120,33 +127,20 @@ export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; titl
       ) : (
         <>
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-sm">
+            {!automaticMix && <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={useMix} onChange={(e) => setUseMix(e.target.checked)} className="size-4 accent-[var(--primary)]" />
               Tocar pelas faixas
-            </label>
+            </label>}
             <span className="flex-1" />
-            <Button variant="outline" className="min-h-9 px-3" onClick={() => setChoosing(true)}>
+            {automaticMix ? exportButton : <Button variant="outline" className="min-h-9 px-3" onClick={() => setChoosing(true)}>
               <Layers className="size-4" /> {activeMode ? MODE_INFO[activeMode].label : 'Tipo'}
-            </Button>
+            </Button>}
           </div>
           <div className={useMix ? '' : 'pointer-events-none opacity-50'}>
-            <Mixer tracks={mix} onChange={setMix} />
+            {mixer ?? <Mixer tracks={mix} onChange={setMix} />}
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              disabled={!!exporting}
-              onClick={() => {
-                setExportError(null);
-                setExporting('Preparando');
-                void exportMix(setExporting)
-                  .then((blob) => downloadBlob(blob, `${title || 'música'} (mixagem).mp3`))
-                  .catch((e: unknown) => setExportError(e instanceof Error ? e.message : 'Não foi possível salvar o MP3.'))
-                  .finally(() => setExporting(null));
-              }}
-            >
-              <Download className="size-4" /> {exporting ?? 'Salvar mixagem em MP3'}
-            </Button>
+          {!automaticMix && <div className="mt-3 flex flex-wrap gap-2">
+            {exportButton}
             <Button
               variant="ghost"
               className="text-danger"
@@ -159,7 +153,7 @@ export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; titl
             >
               <Trash2 className="size-4" /> Apagar esta separação
             </Button>
-          </div>
+          </div>}
           {exportError && (
             <p className="mt-2 text-sm text-danger" role="alert">
               {exportError}

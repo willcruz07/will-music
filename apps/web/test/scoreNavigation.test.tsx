@@ -28,7 +28,8 @@ describe('score page navigation', () => {
     );
     await userEvent.click(await screen.findByRole('button', { name: /Gerar partitura/ }));
     await userEvent.click(screen.getByRole('link', { name: 'ir para B' }));
-    expect(await screen.findByRole('link', { name: /Canção B/ })).toBeInTheDocument();
+    expect(await screen.findByText('Canção B', { selector: 'p' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Biblioteca' })).toHaveAttribute('href', '/?aba=partituras');
     await act(async () => finish({ songId: a.id, notes: [{ pitch: 60, start: 0, end: 1, velocity: 1 }], bpm: 100, source: 'mix', model: 'x', createdAt: '' }));
     expect(screen.queryByTestId('score')).toBeNull();
     expect(screen.getByRole('button', { name: /Gerar partitura/ })).toBeEnabled();

@@ -7,7 +7,7 @@ export type SongInfo = { title: string; artist: string; capo?: number; tempo?: n
 
 const field = 'mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 outline-none focus:border-primary';
 
-export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: SongInfo) => void }) => {
+export const SongInfoForm = ({ song, onSave, basic = false }: { song: Song; onSave: (info: SongInfo) => void; basic?: boolean }) => {
   const [title, setTitle] = useState(song.title);
   const [artist, setArtist] = useState(song.artist);
   const [capo, setCapo] = useState(song.capo ?? 0);
@@ -16,12 +16,13 @@ export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: Song
   const [folder, setFolder] = useState(song.folder ?? '');
   const [folders, setFolders] = useState<string[]>([]);
   useEffect(() => {
+    if (basic) return;
     void db.songs.toArray().then((all) => setFolders([...new Set(all.map((s) => s.folder).filter((f): f is string => !!f))].sort()));
-  }, []);
+  }, [basic]);
 
   return (
     <form
-      className="mt-6 grid max-w-2xl gap-3 rounded-lg border border-border p-4 sm:grid-cols-2"
+      className={`grid max-w-2xl gap-3 sm:grid-cols-2 ${basic ? '' : 'mt-6 rounded-lg border border-border p-4'}`}
       onSubmit={(e) => {
         e.preventDefault();
         if (!title.trim()) return;
@@ -30,12 +31,11 @@ export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: Song
           artist: artist.trim(),
           capo: capo || undefined,
           tempo: tempo ? Number(tempo) : undefined,
-          timeSignature: timeSignature || undefined,
-          folder: folder.trim() || undefined,
+          ...(basic ? {} : { timeSignature: timeSignature || undefined, folder: folder.trim() || undefined }),
         });
       }}
     >
-      <h2 className="text-lg font-semibold sm:col-span-2">Dados da música</h2>
+      {!basic && <h2 className="text-lg font-semibold sm:col-span-2">Dados da música</h2>}
       <label className="block">
         <span className="text-sm font-semibold">Música</span>
         <input aria-label="Música" value={title} onChange={(e) => setTitle(e.target.value)} className={field} />
@@ -58,7 +58,7 @@ export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: Song
         <span className="text-sm font-semibold">Andamento (BPM)</span>
         <input aria-label="Andamento (BPM)" inputMode="numeric" value={tempo} onChange={(e) => setTempo(e.target.value.replace(/\D/gu, ''))} className={field} />
       </label>
-      <label className="block">
+      {!basic && <><label className="block">
         <span className="text-sm font-semibold">Compasso</span>
         <SheetSelect
           label="Compasso"
@@ -76,7 +76,7 @@ export const SongInfoForm = ({ song, onSave }: { song: Song; onSave: (info: Song
             <option key={f} value={f} />
           ))}
         </datalist>
-      </label>
+      </label></>}
       <div className="flex items-end">
         <Button type="submit">Salvar dados</Button>
       </div>

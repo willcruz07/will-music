@@ -1,8 +1,8 @@
-@import 'tailwindcss';
-@import '@fontsource/atkinson-hyperlegible-next/400.css';
-@import '@fontsource/atkinson-hyperlegible-next/600.css';
-@import '@fontsource/atkinson-hyperlegible-next/700.css';
-@import '@fontsource-variable/unbounded';
+@import "tailwindcss";
+@import "@fontsource/atkinson-hyperlegible-next/400.css";
+@import "@fontsource/atkinson-hyperlegible-next/600.css";
+@import "@fontsource/atkinson-hyperlegible-next/700.css";
+@import "@fontsource-variable/unbounded";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -66,8 +66,9 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 4px);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
-  --font-display: 'Unbounded Variable', 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+  --font-sans: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --font-display:
+    "Unbounded Variable", "Atkinson Hyperlegible Next", system-ui, sans-serif;
 }
 
 html {
@@ -82,7 +83,7 @@ html {
 a,
 button,
 label,
-[role='button'] {
+[role="button"] {
   touch-action: manipulation;
 }
 
@@ -130,7 +131,9 @@ h1 {
 /* The line being played: a thin cyan rail with a soft halo. */
 .now-playing {
   border-color: var(--glow);
-  box-shadow: inset 3px 0 0 var(--glow), 0 0 24px -12px var(--glow);
+  box-shadow:
+    inset 3px 0 0 var(--glow),
+    0 0 24px -12px var(--glow);
   background: color-mix(in oklab, var(--glow) 8%, transparent);
 }
 
@@ -148,13 +151,13 @@ h1 {
   --bar-shift: 0px;
   --player-shift: 0px;
 }
-:root[data-bars='hidden'] {
+:root[data-bars="hidden"] {
   /* + the raised "+" button, which sits 2rem above the bar */
   --bar-shift: calc(var(--nav-height) + env(safe-area-inset-bottom) + 3rem);
   --player-shift: calc(var(--nav-height) + 0.5rem);
 }
 @media (min-width: 1024px) {
-  :root[data-bars='hidden'] {
+  :root[data-bars="hidden"] {
     --bar-shift: 0px;
     --player-shift: 0px;
   }
@@ -176,19 +179,27 @@ h1 {
 }
 
 /* Sideways strips: fade the edge that still hides options (data-more is set by ScrollStrip). */
-.scroll-strip[data-more='end'] {
+.scroll-strip[data-more="end"] {
   mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
 }
-.scroll-strip[data-more='start'] {
+.scroll-strip[data-more="start"] {
   mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent);
 }
-.scroll-strip[data-more='both'] {
-  mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+.scroll-strip[data-more="both"] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 2.5rem,
+    #000 calc(100% - 2.5rem),
+    transparent
+  );
 }
 
 /* Space left at the bottom for the floating nav (mobile) and the safe area. */
 .pb-nav {
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + 1.5rem);
+  padding-bottom: calc(
+    var(--nav-height) + env(safe-area-inset-bottom) + 1.5rem
+  );
 }
 
 /* From 1024px the bottom bar gives way to the menu in the header (tablets in portrait keep the bar). */
@@ -233,7 +244,8 @@ h1 {
 /* Wide content (fretboard, tab, rhythm grid) that scrolls sideways keeps a slim visible bar as the cue. */
 .thin-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent) transparent;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent)
+    transparent;
 }
 .thin-scrollbar::-webkit-scrollbar {
   height: 6px;
@@ -256,6 +268,181 @@ h1 {
 }
 
 /* Screens without the bottom bar (inside a study): nothing keeps room for it. */
-:root[data-nav='none'] {
+:root[data-nav="none"] {
   --nav-height: 0px;
+}
+
+.studio-layout {
+  background:
+    radial-gradient(
+      ellipse at top left,
+      color-mix(in oklab, var(--primary) 7%, transparent),
+      transparent 55%
+    ),
+    var(--background);
+}
+.studio-shell {
+  min-height: 80dvh;
+  padding-bottom: 1.5rem;
+}
+.studio-player-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding-top: env(safe-area-inset-top);
+}
+.studio-player-sticky .studio-player {
+  transition:
+    padding 220ms ease,
+    border-radius 220ms ease,
+    background-color 220ms ease;
+}
+.studio-player-wave {
+  transition: margin-top 220ms ease;
+}
+.studio-player-wave canvas {
+  transition: height 220ms ease;
+}
+.studio-player-artist {
+  max-height: 2rem;
+  opacity: 1;
+  transition:
+    max-height 220ms ease,
+    opacity 180ms ease;
+}
+.studio-player-sticky[data-compact="true"] {
+  background: color-mix(in oklab, var(--surface) 95%, transparent);
+  backdrop-filter: blur(18px);
+}
+.studio-player-sticky[data-compact="true"] .studio-player {
+  padding: 0.5rem 1rem;
+  border-radius: 0 0 1rem 1rem;
+}
+.studio-player-sticky[data-compact="true"] .studio-player-wave {
+  margin-top: 0.5rem;
+}
+.studio-player-sticky[data-compact="true"] .studio-player-wave canvas {
+  height: 2.5rem;
+}
+.studio-player-sticky[data-compact="true"] .studio-player-artist {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+.studio-body {
+  min-height: 22rem;
+  padding: 2rem 0;
+}
+.studio-body [hidden] {
+  display: none;
+}
+.studio-tabs {
+  position: fixed;
+  z-index: 35;
+  bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  justify-content: center;
+}
+.studio-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  border-radius: 0.75rem;
+}
+.studio-icon:hover {
+  background: var(--muted);
+}
+.library-key { display: inline-flex; align-items: baseline; gap: .5rem; padding: .35rem .7rem; border-radius: .75rem; background: color-mix(in oklab, var(--primary) 12%, transparent); color: var(--chord); }
+.library-key > span { font-size: .75rem; }
+.library-key > strong { font-family: var(--font-display); font-size: 1.375rem; line-height: 1.3; font-weight: 600; }
+.about-invitation { background: var(--surface); }
+.about-project { background: radial-gradient(ellipse at top left, color-mix(in oklab, var(--primary) 14%, transparent), transparent 65%), var(--surface); }
+.library-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.library-tab { min-width: 0; min-height: 6rem; padding: .875rem; border: 1px solid var(--border); border-radius: 1rem; text-align: left; background: color-mix(in oklab, var(--surface) 85%, transparent); color: var(--muted-foreground); transition: border-color 180ms ease, background 180ms ease; }
+.library-tab:hover { border-color: color-mix(in oklab, var(--primary) 50%, var(--border)); }
+.library-tab.is-current { color: var(--chord); border-color: color-mix(in oklab, var(--primary) 60%, var(--border)); background: linear-gradient(135deg, color-mix(in oklab, var(--primary) 14%, var(--surface)), var(--surface)); }
+.library-card { display: flex; min-width: 0; flex-direction: column; border: 1px solid var(--border); border-radius: 1rem; background: linear-gradient(145deg, color-mix(in oklab, var(--primary) 4%, var(--surface)), var(--surface) 60%); transition: border-color 180ms ease, box-shadow 180ms ease; }
+.library-card:hover { border-color: color-mix(in oklab, var(--primary) 45%, var(--border)); box-shadow: 0 10px 30px -24px var(--primary); }
+.library-card-icon { display: inline-flex; width: 2.25rem; height: 2.25rem; align-items: center; justify-content: center; flex-shrink: 0; border-radius: .75rem; background: color-mix(in oklab, var(--primary) 12%, transparent); color: var(--chord); }
+.library-card-score .library-card-icon { background: color-mix(in oklab, var(--glow) 12%, transparent); color: var(--glow); }
+.library-card-chart .library-card-icon { background: var(--surface-2); }
+@media (min-width: 768px) { .library-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; } }
+@media (min-width: 1200px) { .library-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .library-tab, .library-card { transition: none; } }
+.chart-shape-card {
+  display: grid;
+  grid-template-rows: 120px 40px 40px;
+  gap: 0.5rem;
+  width: 11rem;
+  break-inside: avoid;
+}
+.chart-shape-drawing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+.chart-shape-drawing figure {
+  height: 100%;
+  max-height: 200px;
+  min-height: 0;
+  justify-content: center;
+}
+.chart-shape-drawing figcaption,
+.chart-shape-drawing p {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.chart-shape-drawing figure > [role="img"] {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chart-shape-drawing svg {
+  max-height: 164px;
+  width: 100%;
+  height: auto;
+}
+.now-playing-marker {
+  position: relative;
+}
+.now-playing-marker::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 25%;
+  height: 50%;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--primary);
+}
+.studio-chord-dock {
+  min-height: 6rem;
+  margin-top: 0.75rem;
+  padding: 1rem 1rem 2rem;
+  border-radius: 1rem;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--primary) 9%, var(--surface)),
+    var(--background) 82%,
+    transparent
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-shell .animate-pulse {
+    animation: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-player-sticky *,
+  .studio-player-sticky .studio-player {
+    transition: none;
+  }
 }

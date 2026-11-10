@@ -26,6 +26,7 @@ export const ScorePlayer = ({
   songPlayer,
   handle,
   onWithMusic,
+  scoreOnly = false,
 }: {
   events: SynthEvent[];
   grid: Grid;
@@ -35,6 +36,7 @@ export const ScorePlayer = ({
   handle: MutableRefObject<ScorePlayerHandle | null>;
   /** Turns the score notes on along with the song (runs inside the tap, for iOS audio). */
   onWithMusic: () => void;
+  scoreOnly?: boolean;
 }) => {
   const [mode, setMode] = useState<Mode>('score');
   const [playing, setPlaying] = useState(false);
@@ -204,7 +206,7 @@ export const ScorePlayer = ({
         <span className="w-11 shrink-0 text-xs tabular-nums text-muted-foreground">{formatClock(end)}</span>
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        <div role="radiogroup" aria-label="O que tocar" className="inline-flex rounded-lg border border-border p-0.5">
+        {!scoreOnly && <div role="radiogroup" aria-label="O que tocar" className="inline-flex rounded-lg border border-border p-0.5">
           {(
             [
               ['score', 'Só a partitura'],
@@ -222,7 +224,7 @@ export const ScorePlayer = ({
               {label}
             </button>
           ))}
-        </div>
+        </div>}
         {mode === 'score' ? (
           <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             Velocidade

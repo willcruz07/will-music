@@ -1,0 +1,7 @@
+export const ChordsSkeleton = () => <div aria-hidden className="mt-5 grid grid-cols-2 gap-3 motion-reduce:animate-none sm:grid-cols-4 lg:grid-cols-6">{Array.from({ length: 12 }, (_, i) => <div key={i} className="space-y-3 rounded-xl border border-border p-4"><div className="h-3 w-16 animate-pulse rounded bg-muted" /><div className="h-6 w-12 animate-pulse rounded bg-muted" /></div>)}</div>;
+
+export const ChordShapeSkeleton = () => <div aria-label="Preparando formação do acorde" role="status" className="mx-auto flex w-28 flex-col items-center gap-3 py-3"><div className="h-5 w-12 animate-pulse rounded bg-muted" /><div className="h-28 w-24 animate-pulse rounded-lg bg-muted" /></div>;
+
+export const TracksSkeleton = () => <div aria-hidden className="mt-5 space-y-5">{['Voz', 'Bateria', 'Baixo', 'Guitarra', 'Piano', 'Outros'].map(name => <div key={name}><div className="mb-2 flex items-center justify-between"><span className="text-sm text-muted-foreground">{name}</span><div className="h-5 w-16 animate-pulse rounded bg-muted" /></div><div className="h-14 animate-pulse rounded-lg bg-muted" /></div>)}</div>;
+
+export const ScoreSkeleton = () => <div aria-hidden className="mt-5 space-y-6 rounded-xl border border-border bg-surface p-5">{Array.from({ length: 3 }, (_, i) => <div key={i} className="space-y-2 py-3">{Array.from({ length: 5 }, (_, j) => <div key={j} className="h-0.5 animate-pulse rounded bg-muted-foreground/20" />)}</div>)}</div>;

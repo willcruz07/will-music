@@ -1,7 +1,7 @@
-import { ArrowLeft, FileText, Info, Minus, MonitorPlay, Music4, Pencil, Plus, RefreshCw, Timer, Trash2 } from 'lucide-react';
+import { ArrowLeft, Info, Minus, Plus, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
-import { ScrollStrip } from '../components/ScrollStrip.tsx';
+import { Link, useParams } from 'react-router';
+import { ChartOptions } from '../components/ChartOptions.tsx';
 import { AnalysisProgress, LyricsSkeleton, TranscribingBar, formatElapsed } from '../components/AnalysisProgress.tsx';
 import { ChartView } from '../components/ChartView.tsx';
 import { LyricsPanel } from '../components/LyricsPanel.tsx';
@@ -11,28 +11,31 @@ import { applyLyrics } from '../lib/lyricsApply.ts';
 import { Player, type PlayerControls, activeIndexAt } from '../components/Player.tsx';
 import { SongInfoForm } from '../components/SongInfoForm.tsx';
 import { setChordProMeta } from '../lib/chordProEdit.ts';
-import { type Analysis, type Chart, type Song as SongRecord, db, deleteSong, updateSong } from '../lib/db.ts';
+import { type Analysis, type Chart, type Song as SongRecord, db, updateSong } from '../lib/db.ts';
 import { isRunning, startAnalysis, subscribeAnalysis } from '../lib/jobs.ts';
 import { type PipelineProgress, runPipeline } from '../lib/pipeline.ts';
 import { prefersFlats, transposeChord, transposeKey } from '../lib/transpose.ts';
 import { toDisplayLabel } from '@will-music/engine';
-import { AddToSetlist } from '../components/AddToSetlist.tsx';
 import { ExportButton } from '../components/PackageButtons.tsx';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
 import { ChordHelp } from '../components/ChordHelp.tsx';
 import { useScrollPrefs, useSteadyScroll } from '../lib/steadyScroll.ts';
 import { TranscribeLyrics } from '../components/TranscribeLyrics.tsx';
 import { useStems } from '../lib/useStems.ts';
-import { ChordPanel, readInstrument } from '../components/ChordPanel.tsx';
+import { readInstrument } from '../components/ChordPanel.tsx';
+import { ChartChordShapes } from '../components/ChartChordShapes.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
 import { confirmDialog } from '../ui/Dialog.tsx';
-import { getPendingAnalysis } from '../lib/pendingAnalysis.ts';
+import { getPendingAnalysis, retainSessionAnalysis } from '../lib/pendingAnalysis.ts';
 import { savePendingAnalysis } from '../lib/saveAnalysis.ts';
 import { diagnoseAudioImport } from '../lib/importDiagnostics.ts';
+import { Studio } from '../components/Studio.tsx';
+import { ChordVariations } from '../components/ChordVariations.tsx';
+import { BottomSheet } from '../ui/BottomSheet.tsx';
+import { remapLineTimes } from '../lib/lineTimes.ts';
 
 export const Song = () => {
   const { id = '' } = useParams();
-  const navigate = useNavigate();
   const [song, setSong] = useState<SongRecord | null | undefined>(undefined);
   const [chart, setChart] = useState<Chart | undefined>();
   const [analysis, setAnalysis] = useState<Analysis | undefined>();
@@ -43,19 +46,23 @@ export const Song = () => {
   const [diagnosingResult, setDiagnosingResult] = useState(false);
   const [resultDiagnostic, setResultDiagnostic] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string>();
-  const stems = useStems(id, audioUrl);
+  const stems = useStems(id, audioUrl, true);
   const [progress, setProgress] = useState<PipelineProgress | null>(null);
   const [activeLine, setActiveLine] = useState(-1);
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [autoScroll, setAutoScroll] = useState(false);
   const [scroll, setScroll] = useScrollPrefs();
   const [isPlaying, setIsPlaying] = useState(false);
   const [help, setHelp] = useState<{ chord: string; anchor: DOMRect } | null>(null);
   const closeHelp = useCallback(() => setHelp(null), []);
   const [showLyrics, setShowLyrics] = useState(false);
-  const [editingInfo, setEditingInfo] = useState(false);
   const [showCurrent, setShowCurrent] = useState(true);
+  const [studioOptions, setStudioOptions] = useState(false);
+  const [scoreBusy, setScoreBusy] = useState(false);
+  const [studioChord, setStudioChord] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(-1);
   const lineStarts = useRef<number[]>([]);
   const player = useRef<PlayerControls | null>(null);
+  const chartContent = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const [s, c, a] = await Promise.all([
@@ -66,7 +73,7 @@ export const Song = () => {
     const pending = getPendingAnalysis(id);
     const shownChart = pending?.chart ?? c;
     const shownAnalysis = pending?.analysis ?? a;
-    setUnsaved(!!pending);
+    setUnsaved(!!pending && !pending.sessionOnly);
     setSong(pending?.song ?? s ?? null);
     setChart(shownChart);
     setAnalysis(shownAnalysis);
@@ -86,6 +93,7 @@ export const Song = () => {
           void load();
           return;
         }
+        if (event.tempo !== undefined) setSong(current => current && current.tempo !== event.tempo ? { ...current, tempo: event.tempo } : current);
         if (event.lyricsPending && !chartShown.current) {
           chartShown.current = true;
           void load();
@@ -98,7 +106,7 @@ export const Song = () => {
   const analyze = useCallback(() => {
     setRuntimeError(null);
     setProgress({ label: 'Preparando o áudio' });
-    startAnalysis(id, (onProgress) => runPipeline(id, onProgress)).catch((error: unknown) => {
+    startAnalysis(id, (onProgress) => runPipeline(id, onProgress, { persist: false })).catch((error: unknown) => {
       setRuntimeError(error instanceof Error ? error.message : 'A análise falhou.');
     });
     return follow();
@@ -106,6 +114,9 @@ export const Song = () => {
 
   useEffect(() => {
     let cancelled = false;
+    const releaseAnalysis = retainSessionAnalysis(id);
+    setAudioUrl(undefined);
+    setCurrentIndex(-1);
     let url: string | undefined;
     let unsubscribe = () => {};
     void (async () => {
@@ -117,11 +128,12 @@ export const Song = () => {
         setAudioUrl(url);
       }
       if (isRunning(id)) unsubscribe = follow();
-      else if (s && (s.analysisStatus === 'pending' || s.analysisStatus === 'running')) unsubscribe = analyze();
+      else if (s && audio && !getPendingAnalysis(id)) unsubscribe = analyze();
     })();
     return () => {
       cancelled = true;
       unsubscribe();
+      releaseAnalysis();
       if (url) URL.revokeObjectURL(url);
     };
   }, [id, load, analyze, follow]);
@@ -136,15 +148,16 @@ export const Song = () => {
   const onTime = useCallback((t: number) => {
     setActiveLine(activeIndexAt(lineStarts.current, t));
     const i = activeIndexAt(chordStarts.current.starts, t);
+    setCurrentIndex(i);
     setCurrentRaw(i >= 0 ? chordStarts.current.raws[i]! : null);
   }, []);
 
   const saveChart = async (patch: Partial<Chart>) => {
     if (!chart) return;
-    setChart({ ...chart, ...patch });
     const pending = getPendingAnalysis(id);
-    if (pending) { pending.chart = { ...pending.chart, ...patch, updatedAt: new Date().toISOString() }; return; }
+    if (pending) { pending.chart = { ...pending.chart, ...patch, updatedAt: new Date().toISOString() }; setChart({ ...chart, ...patch }); return; }
     await db.charts.update(chart.id, { ...patch, updatedAt: new Date().toISOString() });
+    setChart({ ...chart, ...patch });
   };
 
   const lyricsPending = !!progress?.lyricsPending;
@@ -196,9 +209,41 @@ export const Song = () => {
     );
   }
 
+  if (audioUrl) return <>
+    <Studio key={id} song={song} chart={chart} analysis={analysis} progress={progress} stems={stems}
+      onScoreBusyChange={setScoreBusy}
+      tools={<Button variant="ghost" onClick={() => setStudioOptions(true)}><Info className="size-4" /> Dados da música</Button>}
+      activeLine={activeLine} currentIndex={currentIndex} shownKey={shownKey} playing={isPlaying} autoScroll={autoScroll && scroll.mode === 'follow'}
+      onSeek={time => player.current?.playFrom(time)} getTime={() => player.current?.currentTime() ?? 0} onChord={setStudioChord}
+      onRetry={() => { if (!scoreBusy) void analyze(); }} error={runtimeError ?? (song.analysisStatus === 'error' ? song.analysisError : null)}
+      onEdit={async chordPro => {
+        if (!chart) return;
+        await saveChart({ chordPro, origin: 'edited', lineTimes: remapLineTimes(chart.chordPro, chordPro, chart.lineTimes ?? lineStarts.current) });
+        await load();
+      }}
+      recovery={unsaved && !progress ? <details className="mt-4 rounded-xl border border-border p-3 text-sm"><summary>Salvar ou exportar resultado</summary><p className="mt-2 text-muted-foreground">Este resultado está nesta sessão. Salve ou exporte antes de fechar o app.</p><div className="mt-3 flex flex-wrap gap-2"><Button disabled={savingResult} onClick={() => { setSavingResult(true); void savePendingAnalysis(id).then(load).catch((e: unknown) => setResultSaveError(String(e))).finally(() => setSavingResult(false)); }}>Tentar salvar sem reanalisar</Button><ExportButton songIds={[id]} title={song.title} label="Exportar resultado" /></div>{resultSaveError && <p role="alert" className="mt-2 text-danger">{resultSaveError}</p>}</details> : null}
+      player={<Player key={id} sources={stems.sources} songId={id} title={song.title} onTime={onTime} controls={player}
+        deferWaveform={!!progress}
+        studio={{ artist: song.artist, tempo: song.tempo, keyLabel: shownKey }}
+        extra={<section className="space-y-5 border-t border-border px-4 py-4">
+          <h2 className="text-sm font-semibold">Tom e apresentação da cifra</h2>
+          <p className="text-sm text-muted-foreground">A transposição altera a cifra e os diagramas. O áudio mantém o tom original.</p>
+          <div className="flex items-center gap-3"><span className="mr-auto">Tom: {shownKey || 'Não identificado'}</span><IconButton label="Meio tom abaixo" disabled={!chart} onClick={() => { if (chart) void saveChart({ transpose: chart.transpose - 1 }); }}><Minus className="size-4" /></IconButton><span>{chart?.transpose ?? 0}</span><IconButton label="Meio tom acima" disabled={!chart} onClick={() => { if (chart) void saveChart({ transpose: chart.transpose + 1 }); }}><Plus className="size-4" /></IconButton></div>
+          {chart && <label className="flex items-center gap-3">Tamanho da letra <input aria-label="Tamanho da letra" type="range" min={12} max={40} value={chart.fontSize} onChange={e => void saveChart({ fontSize: Number(e.target.value) })} className="min-w-0 flex-1 accent-[var(--primary)]" /></label>}
+        </section>}
+        autoScroll={autoScroll} onAutoScrollChange={setAutoScroll} scrollMode={scroll.mode} onScrollModeChange={mode => setScroll({ mode })} scrollSpeed={scroll.speed} onScrollSpeedChange={speed => setScroll({ speed })} onTransport={t => setIsPlaying(t.playing)} />}
+    />
+    {studioOptions && <BottomSheet title="Dados da música" onClose={() => setStudioOptions(false)}>{() => <div className="space-y-4 overflow-auto px-4 pb-5">
+      <Button variant="outline" disabled={!!progress || !!stems.progress || unsaved || scoreBusy} onClick={() => { setStudioOptions(false); void analyze(); }}><RefreshCw className="size-4" /> Analisar de novo</Button>
+      {!progress && <SongInfoForm basic song={song} onSave={info => void (async () => { try { await updateSong(id, info); const pending = getPendingAnalysis(id); if (pending) pending.song = { ...pending.song, ...info }; if (chart) await saveChart({ chordPro: setChordProMeta(chart.chordPro, { title: info.title, artist: info.artist }) }); await load(); setStudioOptions(false); } catch (e) { setResultSaveError(String(e)); } })()} />}
+      {resultSaveError && <p className="text-sm text-danger" role="alert">{resultSaveError}</p>}
+    </div>}</BottomSheet>}
+    {studioChord && <BottomSheet title={`Como tocar ${studioChord}`} onClose={() => setStudioChord(null)}>{() => <ChordVariations key={studioChord} chord={studioChord} />}</BottomSheet>}
+  </>;
+
   return (
     <section>
-      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
+      <Link to="/?aba=cifras" className="-ml-1 inline-flex items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
         <ArrowLeft className="size-4" /> Biblioteca
       </Link>
 
@@ -218,90 +263,10 @@ export const Song = () => {
         )}
       </div>
 
-      {editingInfo && (
-        <SongInfoForm
-          song={song}
-          onSave={(info) =>
-            void (async () => {
-              await updateSong(song.id, info);
-              if (chart) {
-                const chordPro = setChordProMeta(chart.chordPro, { title: info.title, artist: info.artist });
-                await db.charts.update(chart.id, { chordPro, updatedAt: new Date().toISOString() });
-              }
-              setEditingInfo(false);
-              await load();
-            })()
-          }
-        />
-      )}
-
-      {chart && (
-        <ScrollStrip
-          role="toolbar"
-          label="Ferramentas da música"
-          className="mt-5 border-y border-border py-1.5 md:mx-0"
-          stripClassName="md:overflow-visible md:px-0"
-          innerClassName="items-center gap-2 md:w-auto md:flex-wrap"
-        >
-          <span className="text-sm text-muted-foreground">Transpor</span>
-          <IconButton label="Meio tom abaixo" onClick={() => void saveChart({ transpose: chart.transpose - 1 })}>
-            <Minus className="size-4" />
-          </IconButton>
-          <span className="w-8 text-center tabular-nums">{chart.transpose > 0 ? `+${chart.transpose}` : chart.transpose}</span>
-          <IconButton label="Meio tom acima" onClick={() => void saveChart({ transpose: chart.transpose + 1 })}>
-            <Plus className="size-4" />
-          </IconButton>
-          <span className="ml-4 text-sm text-muted-foreground">Letra</span>
-          <IconButton label="Diminuir letra" onClick={() => void saveChart({ fontSize: Math.max(12, chart.fontSize - 2) })}>
-            <span className="text-sm font-bold">A−</span>
-          </IconButton>
-          <IconButton label="Aumentar letra" onClick={() => void saveChart({ fontSize: Math.min(40, chart.fontSize + 2) })}>
-            <span className="text-lg font-bold">A+</span>
-          </IconButton>
-          <span className="flex-1" />
-          {audioUrl && lyricTexts(chart.chordPro).length > 0 && !syncing && (
-            <Button variant="ghost" onClick={startSync}>
-              <Timer className="size-4" /> Sincronizar
-            </Button>
-          )}
-          {!unsaved && <><Link to={`/musica/${song.id}/editar`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
-            <Pencil className="size-4" /> Editar letra e acordes
-          </Link>
-          <Link to={`/palco/musica/${song.id}`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
-            <MonitorPlay className="size-4" /> Palco
-          </Link>
-          <Link to={`/musica/${song.id}/partitura`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
-            <Music4 className="size-4" /> Partitura
-          </Link>
-          <AddToSetlist songId={song.id} /></>}
-          <ExportButton songIds={[song.id]} title={song.title} />
-          {!unsaved && <Button variant="ghost" onClick={() => setEditingInfo((v) => !v)} aria-pressed={editingInfo}>
-            <Info className="size-4" /> Dados
-          </Button>}
-          {!unsaved && analysis?.lyrics && (
-            <Button variant="ghost" onClick={() => setShowLyrics((v) => !v)} aria-pressed={showLyrics}>
-              <FileText className="size-4" /> Trocar letra
-            </Button>
-          )}
-          {audioUrl && (
-            <IconButton label="Analisar de novo" onClick={() => void analyze()} disabled={unsaved || !!progress || !!stems.progress}>
-              <RefreshCw className="size-4" />
-            </IconButton>
-          )}
-          <IconButton
-            label="Excluir música"
-            onClick={() => {
-              void confirmDialog({ title: 'Excluir música?', message: `“${song.title}” sai da biblioteca, com o áudio, a cifra e as faixas.`, confirmLabel: 'Excluir' }).then(
-                (ok) => {
-                  if (ok) void deleteSong(song.id).then(() => navigate('/'));
-                },
-              );
-            }}
-          >
-            <Trash2 className="size-4" />
-          </IconButton>
-        </ScrollStrip>
-      )}
+      {chart && <ChartOptions key={chart.id} chart={chart} song={song} shownKey={shownKey} content={chartContent} disabled={unsaved}
+        onPatch={saveChart}
+        onEdit={async chordPro => { await saveChart({ chordPro, origin: 'edited', lineTimes: remapLineTimes(chart.chordPro, chordPro, chart.lineTimes ?? lineStarts.current) }); await load(); }}
+      />}
 
       {progress && !lyricsPending && <AnalysisProgress progress={progress} />}
       {progress && lyricsPending && <TranscribingBar progress={progress} />}
@@ -396,7 +361,7 @@ export const Song = () => {
       {chart && lyricsPending && <LyricsSkeleton />}
 
       {chart && showChart && (
-        <div className={`mt-6 ${syncing ? 'cursor-pointer select-none' : ''}`} onClick={syncing ? syncMode.mark : undefined}>
+        <div ref={chartContent} className={`mt-6 ${syncing ? 'cursor-pointer select-none' : ''}`} onClick={syncing ? syncMode.mark : undefined}>
           <ChartView
             chordPro={chart.chordPro}
             transpose={chart.transpose}
@@ -407,12 +372,12 @@ export const Song = () => {
             autoScroll={(autoScroll && scroll.mode === 'follow') || syncing}
             onChordTap={syncing ? undefined : (chord, anchor) => setHelp({ chord, anchor })}
           />
+          <ChartChordShapes chart={chart} spellKey={shownKey} onChange={(chordShapes, chordInstrument) => void saveChart({ chordShapes, chordInstrument })} />
         </div>
       )}
 
       {help && <ChordHelp strict chord={help.chord} anchor={help.anchor} onClose={closeHelp} />}
 
-      {chart && showChart && <ChordPanel strict chordPro={chart.chordPro} transpose={chart.transpose} spellKey={shownKey} />}
 
       {audioUrl && currentRaw && showCurrent && (
         <div className="glass fixed right-4 z-30 rounded-xl border border-border p-3 shadow-sm bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+9rem)] lg:bottom-28">

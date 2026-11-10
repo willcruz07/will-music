@@ -47,7 +47,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,jpeg,webp,woff2,wasm}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,woff2,wasm}'],
         // The WebGPU runtime is only needed to separate tracks: fetch it on first use, then keep it.
         globIgnores: ['**/ort-wasm-simd-threaded.jsep-*.wasm', '**/ort-wasm-simd-threaded.asyncify-*.wasm', '**/ort-wasm-simd-threaded.jspi-*.wasm'],
         runtimeCaching: [{ urlPattern: /\.wasm$/, handler: 'CacheFirst', options: { cacheName: 'wm-runtime-wasm' } }],

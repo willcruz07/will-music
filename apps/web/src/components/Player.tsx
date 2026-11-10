@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Pause, Play, Repeat, ScrollText, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pause, Play, Repeat, ScrollText, X, SkipBack, SkipForward, Square } from 'lucide-react';
 import { type ReactNode, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
 import { normalizeLoop } from '../lib/loop.ts';
 import { driftCorrections } from '../lib/mixer.ts';
@@ -7,6 +7,7 @@ import type { StemsState } from '../lib/useStems.ts';
 import { StemsPanel } from './player/StemsPanel.tsx';
 import { Waveform } from './player/Waveform.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
+import { BottomSheet } from '../ui/BottomSheet.tsx';
 
 export const activeIndexAt = (starts: readonly number[], t: number): number => {
   let lo = 0;
@@ -32,6 +33,9 @@ export type ScrollMode = 'follow' | 'steady';
 export type Transport = { playing: boolean; time: number; rate: number };
 
 type Props = {
+  /** Studio shares the same audio engine, with transport and waveform at the top. */
+  studio?: { artist: string; tempo?: number; keyLabel?: string };
+  deferWaveform?: boolean;
   /** One file, or several synced tracks (the first is the master clock). */
   src?: string;
   sources?: PlayerSource[];
@@ -76,6 +80,9 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
 );
 
 const SPEEDS = [50, 75, 90, 100];
+const PlayerDrawer = ({ studio, id, onClose, children }: { studio: boolean; id: string; onClose: () => void; children: ReactNode }) => studio
+  ? <BottomSheet title="BPM, tom e leitura" onClose={onClose}>{() => <div id={id} className="overflow-y-auto">{children}</div>}</BottomSheet>
+  : <div id={id} className="mx-auto max-h-[min(62dvh,36rem)] max-w-5xl overflow-y-auto overscroll-contain border-b border-border">{children}</div>;
 
 export const Player = (props: Props) => {
   const { src, sources, onTime, title, songId, autoScroll = true, onAutoScrollChange, stems, extra, controls } = props;
@@ -89,10 +96,15 @@ export const Player = (props: Props) => {
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(100);
+  const baseBpm = props.studio?.tempo;
+  const bpmMode = !!props.studio;
+  const currentBpm = baseBpm ? Math.round(baseBpm * speed / 100) : undefined;
   const [markA, setMarkA] = useState<number | null>(null);
   const [markB, setMarkB] = useState<number | null>(null);
+  const [loopEnabled, setLoopEnabled] = useState(true);
   const [peaks, setPeaks] = useState<Float32Array | null>(null);
-  const loop = normalizeLoop(markA, markB, duration);
+  const selectedLoop = normalizeLoop(markA, markB, duration);
+  const loop = loopEnabled ? selectedLoop : null;
   const loopRef = useRef(loop);
   loopRef.current = loop;
   const transportRef = useRef(props.onTransport);
@@ -103,6 +115,9 @@ export const Player = (props: Props) => {
 
   const seekAll = (t: number) => {
     for (const a of all()) a.currentTime = t;
+    lastTime.current = t;
+    setTime(t);
+    onTime(t);
     if (audioRef.current && !audioRef.current.paused) notify(true, t);
   };
   useImperativeHandle(controls, () => ({
@@ -197,7 +212,7 @@ export const Player = (props: Props) => {
 
   // The waveform is drawn only once the drawer has been opened (decoding costs a moment).
   useEffect(() => {
-    if (!open || peaks || !songId) return;
+    if ((!open && !props.studio) || peaks || !songId || props.deferWaveform) return;
     let cancelled = false;
     void getPeaks(songId)
       .then((p) => {
@@ -207,7 +222,7 @@ export const Player = (props: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [open, peaks, songId]);
+  }, [open, peaks, songId, !!props.studio, props.deferWaveform]);
 
   useEffect(() => {
     if (!open) return;
@@ -272,10 +287,10 @@ export const Player = (props: Props) => {
   return (
     <>
     {/* While the controls are open the page behind dims and blurs, like the other sheets; a tap on it closes them. */}
-    {open && <div data-testid="player-backdrop" aria-hidden onClick={() => setOpen(false)} className="sheet-backdrop fixed inset-0 z-[29] bg-black/55 backdrop-blur-sm" />}
+    {open && !props.studio && <div data-testid="player-backdrop" aria-hidden onClick={() => setOpen(false)} className="sheet-backdrop fixed inset-0 z-[29] bg-black/55 backdrop-blur-sm" />}
     {/* Phones: the chart fades out behind the floating player and the bottom bar instead of showing in the gap. */}
-    <div aria-hidden className="player-slide pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(var(--nav-height)+env(safe-area-inset-bottom)+7.5rem)] bg-gradient-to-t from-background via-background/95 to-transparent lg:hidden" />
-    <div className="glass-strong player-slide fixed inset-x-3 z-30 overflow-hidden rounded-2xl border border-border shadow-[0_12px_40px_-16px_rgb(0_0_0/0.45)] bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+1.25rem)] lg:inset-x-0 lg:bottom-0 lg:rounded-none lg:border-x-0 lg:border-b-0 lg:pb-[env(safe-area-inset-bottom)]">
+    {!props.studio && <div aria-hidden className="player-slide pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(var(--nav-height)+env(safe-area-inset-bottom)+7.5rem)] bg-gradient-to-t from-background via-background/95 to-transparent lg:hidden" />}
+    <div className={props.studio ? 'studio-player glass rounded-2xl border border-border p-4 md:p-5' : 'glass-strong player-slide fixed inset-x-3 z-30 overflow-hidden rounded-2xl border border-border shadow-[0_12px_40px_-16px_rgb(0_0_0/0.45)] bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+1.25rem)] lg:inset-x-0 lg:bottom-0 lg:rounded-none lg:border-x-0 lg:border-b-0 lg:pb-[env(safe-area-inset-bottom)]'}>
       <audio
         ref={audioRef}
         src={tracks[0]?.src}
@@ -313,9 +328,9 @@ export const Player = (props: Props) => {
       ))}
 
       {open && (
-        <div id={drawerId} className="mx-auto max-h-[min(62dvh,36rem)] max-w-5xl overflow-y-auto overscroll-contain border-b border-border">
-          <Section title="Treinar um trecho">
-            {songId && (
+        <PlayerDrawer studio={!!props.studio} id={drawerId} onClose={() => setOpen(false)}>
+          <Section title={props.studio ? 'Velocidade' : 'Treinar um trecho'}>
+            {songId && !props.studio && (
               <Waveform
                 peaks={peaks}
                 duration={duration}
@@ -329,10 +344,10 @@ export const Player = (props: Props) => {
                 }}
               />
             )}
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className={props.studio ? 'hidden' : 'mt-1 text-xs text-muted-foreground'}>
               {songId ? 'Arraste sobre a onda para marcar o trecho que vai repetir, ou use A e B enquanto toca.' : 'Marque o início (A) e o fim (B) do trecho que vai repetir.'}
             </p>
-            <div className="mt-2 flex flex-wrap items-center gap-1 text-sm">
+            <div className={props.studio ? 'hidden' : 'mt-2 flex flex-wrap items-center gap-1 text-sm'}>
               <button type="button" onClick={() => setMarkA(audioRef.current?.currentTime ?? 0)} className={`min-h-9 rounded-lg px-3 ${markA !== null ? 'bg-muted font-semibold' : 'text-muted-foreground hover:bg-muted'}`} aria-label="Marcar A">
                 A
               </button>
@@ -347,27 +362,28 @@ export const Player = (props: Props) => {
               )}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-              <span className="font-semibold">Velocidade</span>
+              <span className="font-semibold">{bpmMode ? 'Andamento estimado' : 'Velocidade'}</span>
               <input
                 type="range"
-                aria-label="Velocidade"
-                min={50}
-                max={150}
-                step={5}
-                value={speed}
-                onChange={(e) => setSpeed(Number(e.target.value))}
+                aria-label={bpmMode ? 'Andamento em BPM' : 'Velocidade'}
+                min={bpmMode && baseBpm ? Math.round(baseBpm * 0.5) : 50}
+                max={bpmMode && baseBpm ? Math.round(baseBpm * 1.5) : 150}
+                step={bpmMode ? 1 : 5}
+                value={bpmMode && baseBpm ? currentBpm : speed}
+                disabled={bpmMode && !baseBpm}
+                onChange={(e) => setSpeed(bpmMode && baseBpm ? Number(e.target.value) / baseBpm * 100 : Number(e.target.value))}
                 className="min-w-32 flex-1 accent-[var(--primary)]"
               />
-              <span className="w-11 text-right tabular-nums">{speed}%</span>
+              <span className="min-w-11 text-right tabular-nums">{bpmMode ? currentBpm ? `≈ ${currentBpm} BPM` : 'BPM…' : `${speed}%`}</span>
               <span className="flex gap-1">
                 {SPEEDS.map((s) => (
-                  <button key={s} type="button" onClick={() => setSpeed(s)} className={`min-h-9 rounded-lg px-2.5 text-xs ${speed === s ? 'bg-primary/15 font-semibold text-chord' : 'text-muted-foreground hover:bg-muted'}`}>
-                    {s}%
+                  <button key={s} type="button" disabled={bpmMode && !baseBpm} onClick={() => setSpeed(s)} className={`min-h-9 rounded-lg px-2.5 text-xs disabled:opacity-40 ${Math.round(speed) === s ? 'bg-primary/15 font-semibold text-chord' : 'text-muted-foreground hover:bg-muted'}`}>
+                    {bpmMode ? baseBpm ? `≈ ${Math.round(baseBpm * s / 100)} BPM` : '—' : `${s}%`}
                   </button>
                 ))}
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Mais devagar sem mudar o tom.</p>
+            <p className="mt-1 text-xs text-muted-foreground">{bpmMode ? baseBpm ? `Andamento original: ≈ ${baseBpm} BPM. A velocidade muda sem alterar o tom do áudio.` : 'Aguardando uma estimativa de andamento. Se não for identificada, informe o BPM nos dados da música.' : 'Mais devagar sem mudar o tom.'}</p>
           </Section>
 
           {onAutoScrollChange && (
@@ -427,10 +443,34 @@ export const Player = (props: Props) => {
           )}
 
           {extra}
-        </div>
+        </PlayerDrawer>
       )}
 
-      <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-2.5 md:px-4">
+      {props.studio ? <>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+          <div className="min-w-0"><h1 className="truncate text-xl font-bold">{title}</h1><p className="studio-player-artist truncate text-sm text-muted-foreground">{props.studio.artist || 'Artista desconhecido'}</p></div>
+          <div className="col-span-2 col-start-1 row-start-2 flex items-center justify-center gap-2 md:col-span-1 md:col-start-2 md:row-start-1">
+            <button type="button" className="studio-icon" aria-label="Voltar dez segundos" onClick={() => seekAll(Math.max(0, time - 10))}><SkipBack className="size-5" /></button>
+            <button type="button" onClick={toggle} aria-label={playing ? 'Pausar' : 'Tocar'} className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground">{playing ? <Pause /> : <Play />}</button>
+            <button type="button" className="studio-icon" aria-label="Parar" onClick={() => { all().forEach(a => a.pause()); seekAll(0); }}><Square className="size-4" /></button>
+            <button type="button" className="studio-icon" aria-label="Avançar dez segundos" onClick={() => seekAll(Math.min(duration, time + 10))}><SkipForward className="size-5" /></button>
+            <button type="button" className="studio-icon" aria-label="Loop A–B" aria-pressed={!!loop} onClick={() => { if (selectedLoop) setLoopEnabled(v => !v); else { setMarkA(0); setMarkB(duration || null); setLoopEnabled(true); } }}><Repeat className={`size-5 ${loop ? 'text-primary' : ''}`} /></button>
+          </div>
+          <button type="button" className="col-start-2 row-start-1 flex min-h-11 w-max flex-nowrap items-baseline justify-end justify-self-end gap-4 bg-transparent text-chord hover:text-primary md:col-start-3" aria-label="BPM e tom" aria-expanded={open} aria-controls={drawerId} onClick={() => setOpen(true)}>
+            <span className="inline-flex shrink-0 items-baseline gap-1.5 whitespace-nowrap">
+              <span className="font-[family-name:var(--font-display)] text-xl font-semibold sm:text-2xl">{currentBpm ? `≈ ${currentBpm}` : '—'}</span>
+              <span className="font-sans text-xs text-muted-foreground">BPM</span>
+            </span>
+            <span className="inline-flex shrink-0 items-baseline gap-1.5 whitespace-nowrap">
+              <span className="font-[family-name:var(--font-display)] text-xl font-semibold sm:text-2xl">{props.studio.keyLabel || '—'}</span>
+              <span className="font-sans text-xs text-muted-foreground">Tom</span>
+            </span>
+          </button>
+        </div>
+        {songId && <div className="studio-player-wave mt-5"><Waveform peaks={peaks} duration={duration} time={time} loop={selectedLoop} onSeek={seekAll} onSelect={(a, b) => { setMarkA(a); setMarkB(b); setLoopEnabled(true); seekAll(a); }} /></div>}
+        <input type="range" aria-label="Posição" min={0} max={duration || 0} step={0.1} value={time} onChange={e => seekAll(Number(e.target.value))} className="mt-2 w-full accent-[var(--primary)]" />
+        <div className="mt-1 flex flex-wrap justify-between gap-2 text-xs tabular-nums text-muted-foreground"><span>{clock(time)} / {clock(duration)}</span>{selectedLoop ? <button type="button" onClick={clearLoop}>A {clock(selectedLoop.a)} — B {clock(selectedLoop.b)} · Limpar trecho</button> : <span>Arraste na onda para repetir um trecho</span>}</div>
+      </> : <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-2.5 md:px-4">
         <button
           type="button"
           onClick={toggle}
@@ -488,7 +528,7 @@ export const Player = (props: Props) => {
         >
           {open ? <ChevronDown className="size-5" /> : <ChevronUp className="size-5" />}
         </button>
-      </div>
+      </div>}
     </div>
     </>
   );
