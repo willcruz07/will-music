@@ -52,7 +52,7 @@ export const InstrumentToggle = ({ value, onChange }: { value: Instrument; onCha
   </div>
 );
 
-export const ChordPanel = ({ chordPro, transpose, spellKey }: { chordPro: string; transpose: number; spellKey?: string }) => {
+export const ChordPanel = ({ chordPro, transpose, spellKey, strict = false }: { chordPro: string; transpose: number; spellKey?: string; strict?: boolean }) => {
   const [instrument, setInstrument] = useState<Instrument>(readInstrument);
   const chords = useMemo(() => chartChords(chordPro, transpose, spellKey), [chordPro, transpose, spellKey]);
   if (chords.length === 0) return null;
@@ -64,7 +64,7 @@ export const ChordPanel = ({ chordPro, transpose, spellKey }: { chordPro: string
       </div>
       <div className="mt-4 flex flex-wrap gap-4">
         {chords.map((c) => (
-          <ChordDiagram key={c} chord={c} instrument={instrument} />
+          <ChordDiagram key={c} chord={c} instrument={instrument} strict={strict} />
         ))}
       </div>
     </section>

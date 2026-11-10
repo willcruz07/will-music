@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router';
 import { createManualSong } from '../lib/chartEdit.ts';
 import { createSong } from '../lib/db.ts';
 import { readTags } from '../lib/metadata.ts';
-import { explainQuota, isQuotaError } from '../lib/storage.ts';
+import { diagnoseAudioImport } from '../lib/importDiagnostics.ts';
+import { explainQuota, formatBytes, isQuotaError, storageStatus } from '../lib/storage.ts';
 import { Button } from '../ui/Button.tsx';
 
 const minutes = (sec: number) => (sec ? `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}` : '');
@@ -18,11 +19,15 @@ export const NewSong = () => {
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<string | null>(null);
+  const lastFailure = useRef<unknown>(null);
   const submitting = useRef(false);
 
   const choose = async (picked: File | undefined) => {
-    if (!picked || submitting.current) return;
+    if (!picked || submitting.current || diagnosing) return;
     setSaveError(null);
+    setDiagnostic(null);
     setFile(picked);
     const tags = await readTags(picked);
     setTitle(tags.title);
@@ -31,19 +36,21 @@ export const NewSong = () => {
   };
 
   const submit = async () => {
-    if (!file || !title.trim() || submitting.current) return;
+    if (!file || !title.trim() || submitting.current || diagnosing) return;
     submitting.current = true;
     setSaveError(null);
+    setDiagnostic(null);
     setSaving(true);
     try {
       const song = await createSong({ title: title.trim(), artist: artist.trim(), durationSec: duration }, file);
       navigate(`/musica/${song.id}`);
     } catch (error) {
+      lastFailure.current = error;
       console.error('Não foi possível salvar a música e o áudio no armazenamento local.', error);
       const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       setSaveError(
         isQuotaError(error)
-          ? explainQuota({})
+          ? `${explainQuota(await storageStatus())} Arquivo: ${formatBytes(file.size)}. O arquivo selecionado e os campos foram mantidos; você pode tentar novamente sem recarregar a página.`
           : `Não foi possível salvar a música no aparelho. Tente novamente. Detalhe: ${detail}`,
       );
     } finally {
@@ -73,7 +80,7 @@ export const NewSong = () => {
         {file ? <FileAudio className="size-8 text-primary" /> : <Upload className="size-8 text-primary" />}
         <span className="font-semibold">{file ? file.name : 'Escolha um arquivo de áudio ou arraste para cá'}</span>
         <span className="text-sm text-muted-foreground">{file ? minutes(duration) : 'MP3, WAV, M4A ou OGG'}</span>
-        <input type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg" className="sr-only" aria-label="Arquivo de áudio" disabled={saving} onChange={(e) => void choose(e.target.files?.[0])} />
+        <input type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg" className="sr-only" aria-label="Arquivo de áudio" disabled={saving || diagnosing} onChange={(e) => void choose(e.target.files?.[0])} />
       </label>
 
       {!file && (
@@ -97,10 +104,29 @@ export const NewSong = () => {
           </label>
           <label className="block">
             <span className="text-sm font-semibold">Artista</span>
-            <input value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Ajuda a encontrar a letra" className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 outline-none placeholder:text-muted-foreground focus:border-primary" />
+            <input value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Artista da música" className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-3 outline-none placeholder:text-muted-foreground focus:border-primary" />
           </label>
-          {saveError && <p role="alert" className="text-sm text-danger">{saveError}</p>}
-          <Button onClick={() => void submit()} disabled={saving || !title.trim()} className="w-full sm:w-auto">
+          {saveError && (
+            <div>
+              <p role="alert" className="text-sm text-danger">{saveError}</p>
+              <Button variant="outline" className="mt-2" disabled={diagnosing || saving} onClick={() => {
+                setDiagnosing(true);
+                void diagnoseAudioImport(lastFailure.current, file)
+                  .then((report) => { setDiagnostic(report); console.info('Diagnóstico de importação will-music', report); })
+                  .catch((error: unknown) => setDiagnostic(`Não foi possível concluir o diagnóstico: ${String(error)}`))
+                  .finally(() => setDiagnosing(false));
+              }}>
+                {diagnosing ? 'Verificando armazenamento…' : 'Diagnosticar armazenamento'}
+              </Button>
+              {diagnostic && (
+                <label className="mt-3 block text-sm">
+                  Copie este diagnóstico para investigar a falha. Nenhum áudio foi incluído.
+                  <textarea readOnly aria-label="Diagnóstico de armazenamento" value={diagnostic} rows={8} className="mt-1 w-full rounded-lg border border-border bg-surface p-2 font-mono text-xs" onFocus={(event) => event.currentTarget.select()} />
+                </label>
+              )}
+            </div>
+          )}
+          <Button onClick={() => void submit()} disabled={saving || diagnosing || !title.trim()} className="w-full sm:w-auto">
             {saving ? 'Salvando…' : 'Analisar música'}
           </Button>
         </div>

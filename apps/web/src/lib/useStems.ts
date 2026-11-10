@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PlayerSource } from '../components/Player.tsx';
 import type { StemsRecord } from './db.ts';
 import { exportMixMp3 } from './exportMix.ts';
-import { isRunning, subscribeAnalysis } from './jobs.ts';
+import { isRunning, subscribeAnalysisFinished } from './jobs.ts';
+import { getSessionStems, retainSessionStems, setSessionStems } from './sessionStems.ts';
 import { isIOS } from './ios.ts';
 import { confirmDialog } from '../ui/Dialog.tsx';
 import { type MixTrack, mixVolumes } from './mixer.ts';
@@ -17,20 +18,26 @@ export const useStems = (songId: string, originalUrl?: string) => {
   const [modes, setModes] = useState<StemMode[]>([]);
   const [urls, setUrls] = useState<{ name: string; url: string }[] | null>(null);
   const [mix, setMix] = useState<MixTrack[]>([]);
-  const [useMix, setUseMix] = useState(true);
+  const [useMix, setUseMix] = useState(false);
   const [progress, setProgress] = useState<(SeparationProgress & { mode: StemMode }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
+  const urlHandles = useRef<{ name: string; url: string }[] | null>(null);
+  const generation = useRef(0);
+  const [temporaryTracks, setTemporaryTracks] = useState(false);
 
   const load = useCallback(async () => {
+    const current = generation.current;
     const sets = await listStemSets(songId);
-    const record = sets.find((set) => set.mode === 'six');
-    setModes(sets.map((s) => s.mode));
+    if (generation.current !== current) return;
+    const temporary = getSessionStems(songId);
+    const record = temporary ?? sets.find((set) => set.mode === 'six');
+    setTemporaryTracks(!!temporary);
+    setModes([...new Set([...sets.map((s) => s.mode), ...(temporary ? [temporary.mode] : [])])]);
     setActive(record ?? null);
-    setUrls((previous) => {
-      previous?.forEach((u) => URL.revokeObjectURL(u.url));
-      return record ? record.tracks.map((t) => ({ name: t.name, url: URL.createObjectURL(t.blob) })) : null;
-    });
+    urlHandles.current?.forEach((u) => URL.revokeObjectURL(u.url));
+    urlHandles.current = record ? record.tracks.map((t) => ({ name: t.name, url: URL.createObjectURL(t.blob) })) : null;
+    setUrls(urlHandles.current);
     // A new set of tracks starts with every track at full volume.
     setMix((current) => {
       const names = record?.tracks.map((t) => t.name) ?? [];
@@ -39,16 +46,21 @@ export const useStems = (songId: string, originalUrl?: string) => {
   }, [songId]);
 
   useEffect(() => {
+    setUseMix(false);
+    const release = retainSessionStems(songId, () => { void load(); });
     void load();
     return () => {
+      generation.current++;
       abort.current?.abort();
-      setUrls((previous) => (previous?.forEach((u) => URL.revokeObjectURL(u.url)), null));
+      release();
+      urlHandles.current?.forEach((u) => URL.revokeObjectURL(u.url));
+      urlHandles.current = null;
     };
   }, [load]);
 
   const separate = useCallback(
     async (mode: StemMode = 'six') => {
-      if (abort.current) return; // one separation at a time
+      if (abort.current || isRunning(songId)) return; // the pipeline owns separation while analyzing
       setError(null);
       const controller = new AbortController();
       abort.current = controller;
@@ -63,7 +75,9 @@ export const useStems = (songId: string, originalUrl?: string) => {
           });
           if (!proceed || controller.signal.aborted) return;
         }
-        await separateSong(songId, (p) => setProgress({ ...p, mode }), { mode, signal: controller.signal });
+        const result = await separateSong(songId, (p) => setProgress({ ...p, mode }), { mode, signal: controller.signal, persist: false });
+        if (controller.signal.aborted) return;
+        setSessionStems(songId, result.persisted ? undefined : result.record);
         await load();
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return;
@@ -77,45 +91,27 @@ export const useStems = (songId: string, originalUrl?: string) => {
     [songId, load],
   );
 
-  // Wait for chord/lyric analysis before starting another heavy model. Existing six-track results are reused.
   useEffect(() => {
-    if (!originalUrl) return;
-    let cancelled = false;
-    let started = false;
-    const prepare = async () => {
-      if (cancelled || started) return;
-      started = true;
-      try {
+    let mounted = true;
+    const unsubscribe = subscribeAnalysisFinished((finishedId, succeeded) => {
+      if (finishedId !== songId || !succeeded || !originalUrl) return;
+      void (async () => {
         const sets = await listStemSets(songId);
-        if (cancelled) return;
-        if (sets.some((set) => set.mode === 'six')) {
-          await load();
-          return;
-        }
-        // On iOS, separation starts only from the explicit action in the player, after the memory notice.
-        if (isIOS()) return;
+        if (getSessionStems(songId)?.mode === 'six' || sets.some((set) => set.mode === 'six')) return;
         const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
-        // Unsupported devices retain manual access and the original audio without starting a failing job.
-        if (!(await hasUsableWebGpu(gpu)) || cancelled) return;
-        await separate('six');
-      } catch (error) {
-        if (!cancelled) setError(error instanceof Error ? error.message : 'Não foi possível preparar as faixas.');
-      }
-    };
-    const unsubscribe = isRunning(songId)
-      ? subscribeAnalysis(songId, (event) => { if (event === 'done') void prepare(); })
-      : (void prepare(), () => {});
-    return () => {
-      cancelled = true;
-      unsubscribe();
-      abort.current?.abort();
-    };
-  }, [songId, originalUrl, separate, load]);
+        if (await hasUsableWebGpu(gpu) && mounted) await separate('six');
+      })().catch((error: unknown) => {
+        if (mounted) setError(error instanceof Error ? error.message : 'Não foi possível preparar a separação automática.');
+      });
+    });
+    return () => { mounted = false; unsubscribe(); };
+  }, [songId, originalUrl, separate]);
 
   const cancel = useCallback(() => abort.current?.abort(), []);
 
   const select = useCallback(
     async (mode: StemMode) => {
+      if (getSessionStems(songId)?.mode === mode) return;
       await selectStemSet(songId, mode);
       await load();
     },
@@ -126,7 +122,8 @@ export const useStems = (songId: string, originalUrl?: string) => {
     async (mode?: StemMode) => {
       const target = mode ?? active?.mode;
       if (!target) return;
-      await deleteStemSet(songId, target);
+      if (getSessionStems(songId)?.mode === target) setSessionStems(songId, undefined);
+      else await deleteStemSet(songId, target);
       await load();
     },
     [songId, active, load],
@@ -144,7 +141,7 @@ export const useStems = (songId: string, originalUrl?: string) => {
   const sources: PlayerSource[] | undefined =
     urls && useMix ? urls.map((u) => ({ name: u.name, src: u.url, volume: volumes[u.name] ?? 1 })) : originalUrl ? [{ name: 'mix', src: originalUrl, volume: 1 }] : undefined;
 
-  return { hasStems: !!urls, activeMode: active?.mode ?? null, modes, mix, setMix, useMix, setUseMix, progress, error, separate, cancel, select, remove, exportMix, sources };
+  return { hasStems: !!urls, activeMode: active?.mode ?? null, modes, mix, setMix, useMix, setUseMix, progress, error, temporaryTracks, separate, cancel, select, remove, exportMix, sources };
 };
 
 export type StemsState = ReturnType<typeof useStems>;

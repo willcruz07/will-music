@@ -14,7 +14,7 @@ export const TranscribeLyrics = ({ songId, hasStems, onApply }: { songId: string
     <div className="mt-6 max-w-2xl rounded-lg border border-border p-4">
       <h2 className="text-lg font-semibold">Transcrever a letra do áudio</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Para músicas que não estão no LRCLIB. O Whisper escuta a música e escreve a letra com o tempo de cada linha. Na primeira vez baixa o modelo: cerca de 300 MB onde há WebGPU, ou uma versão mais leve, de cerca de 80 MB, no iPhone e em aparelhos sem WebGPU.
+        O Whisper escuta a voz isolada, quando disponível, e escreve a letra com o tempo de cada linha. Na primeira vez baixa o modelo: cerca de 300 MB onde há WebGPU, ou uma versão mais leve, de cerca de 80 MB, em aparelhos sem WebGPU.
         {!hasStems && ' Sem separar a voz, a transcrição erra mais.'}
         {!gpu && ' Este navegador não tem WebGPU: vai funcionar, mas pode levar muitos minutos.'}
       </p>

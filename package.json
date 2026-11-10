@@ -10,7 +10,8 @@
   "scripts": {
     "test": "npm test --workspaces --if-present",
     "typecheck": "tsc -p packages/engine && tsc -p tools/phase0 && tsc -p apps/web",
-    "dev": "npm run dev -w @will-music/web"
+    "dev": "npm run dev -w @will-music/web",
+    "dev:chords": "node tools/lv-chordia/dev.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

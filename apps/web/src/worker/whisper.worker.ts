@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
-import { WhisperTextStreamer, pipeline } from '@huggingface/transformers';
+import { WhisperTextStreamer, pipeline, type AutomaticSpeechRecognitionPipeline } from '@huggingface/transformers';
 import { type WhisperChunk, windowCount } from '../lib/transcript.ts';
 import { whisperModelFor } from '../lib/whisperModel.ts';
+import { isWordTimestampFailure } from '../lib/analysisExecution.ts';
 
 /** `preload` only downloads and caches the model (first-run setup); `transcribe` runs it on audio. */
 export type WhisperRequest = { type: 'transcribe'; audio: Float32Array } | { type: 'preload' };
@@ -10,13 +11,14 @@ export type WhisperResponse =
   /** While transcribing: 30 s windows done of the total, and the latest words heard (shows it is not stuck). */
   | { type: 'transcribing'; done: number; total: number; heard: string }
   | { type: 'result'; chunks: WhisperChunk[]; device: 'webgpu' | 'wasm'; words: boolean }
-  | { type: 'ready' }
+  | { type: 'ready'; device: 'webgpu' | 'wasm' }
   | { type: 'error'; message: string };
 
 const post = (m: WhisperResponse) => (self as DedicatedWorkerGlobalScope).postMessage(m);
 
 self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
   const request = event.data;
+  let asr: AutomaticSpeechRecognitionPipeline | undefined;
   try {
     // A GPU object is not enough (blocklisted GPUs return no adapter); fall back to wasm on any WebGPU failure.
     const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
@@ -38,7 +40,6 @@ self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
         post({ type: 'progress', loaded, total });
       },
     });
-    let asr;
     try {
       asr = await load(device);
     } catch (error) {
@@ -46,8 +47,13 @@ self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
       device = 'wasm';
       asr = await load(device);
     }
-    if (request.type === 'preload') return post({ type: 'ready' });
+    if (request.type === 'preload') {
+      await asr.dispose().catch(() => {});
+      asr = undefined;
+      return post({ type: 'ready', device });
+    }
     const total = windowCount(request.audio.length, 16000);
+    const recognizer = asr;
     const run = (timestamps: true | 'word') => {
       let done = 0;
       let heard = '';
@@ -60,7 +66,7 @@ self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
       };
       report(true);
       // One generate() per 30 s window: its end marks a window done; the words keep coming in between.
-      const streamer = new WhisperTextStreamer(asr.tokenizer as ConstructorParameters<typeof WhisperTextStreamer>[0], {
+      const streamer = new WhisperTextStreamer(recognizer.tokenizer as ConstructorParameters<typeof WhisperTextStreamer>[0], {
         skip_prompt: true,
         callback_function: (text: string) => {
           heard = `${heard}${text}`.slice(-80);
@@ -71,19 +77,24 @@ self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
           report(true);
         },
       });
-      return asr(request.audio, { language: 'portuguese', task: 'transcribe', return_timestamps: timestamps, chunk_length_s: 30, stride_length_s: 5, streamer }) as Promise<{ chunks?: WhisperChunk[] }>;
+      return recognizer(request.audio, { language: 'portuguese', task: 'transcribe', return_timestamps: timestamps, chunk_length_s: 30, stride_length_s: 5, streamer }) as Promise<{ chunks?: WhisperChunk[] }>;
     };
     // Word timestamps put each line where its first word is sung; segment timestamps are the fallback.
     let words = true;
     let output: { chunks?: WhisperChunk[] };
     try {
       output = await run('word');
-    } catch {
+    } catch (error) {
+      if (!isWordTimestampFailure(error)) throw error;
       words = false;
       output = await run(true);
     }
+    await asr.dispose().catch(() => {});
+    asr = undefined;
     post({ type: 'result', chunks: output.chunks ?? [], device, words });
   } catch (error) {
     post({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+  } finally {
+    if (asr) await asr.dispose().catch(() => {});
   }
 };

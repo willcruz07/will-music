@@ -1,7 +1,7 @@
 import { AlertTriangle, Check, Download, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MODELS, type ModelId } from '@will-music/engine';
-import { downloadModels, missingModels } from '../lib/models.ts';
+import { CHORD_MODELS, downloadModels, missingModels } from '../lib/models.ts';
 import { MODELS_CHANGED, neverRemind, reminderDue, reminderWait, snoozeReminder } from '../lib/modelsReminder.ts';
 import { formatBytes } from '../lib/storage.ts';
 import { WHISPER_BYTES, detectWhisperDevice, preloadWhisper, whisperCached } from '../lib/whisper.ts';
@@ -19,9 +19,9 @@ type Item = { id: ItemId; label: string; about: string; models: ModelId[] | 'whi
 
 // The lyrics model depends on the device (lighter where there is no WebGPU); its size shows the larger one until known.
 const ITEMS: Item[] = [
-  { id: 'chords', label: 'Acordes e tom', about: 'para montar a cifra de cada música', models: ['chordnet', 'cqtPlan', 'skey'] },
+  { id: 'chords', label: 'Acordes e tom', about: 'para montar a cifra de cada música', models: CHORD_MODELS },
   { id: 'split', label: 'Separar faixas', about: '6 faixas: voz, bateria, baixo, guitarra, piano e outros', models: ['demucs6s'] },
-  { id: 'lyrics', label: 'Transcrição da letra', about: 'quando a letra não é encontrada na internet', models: 'whisper' },
+  { id: 'lyrics', label: 'Transcrição da letra', about: 'para reconhecer a letra a partir da voz da música', models: 'whisper' },
   { id: 'notes', label: 'Notas da partitura', about: 'para gerar partituras e tablaturas', models: ['basicPitch'] },
 ];
 const BASIC = ITEMS;

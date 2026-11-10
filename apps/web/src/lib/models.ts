@@ -118,7 +118,7 @@ export const listCachedModels = async (): Promise<{ id: ModelId; bytes: number }
   const urls = new Set((await cache.keys()).map((r) => r.url));
   const out: { id: ModelId; bytes: number }[] = [];
   for (const id of Object.keys(MODELS) as ModelId[]) {
-    if (!urls.has(MODELS[id].url)) continue;
+    if (!urls.has(new URL(MODELS[id].url, globalThis.location.href).href)) continue;
     // Cached files were verified by SHA-256 on the way in, so their size is the pinned one (no need to read 285 MB).
     out.push({ id, bytes: MODELS[id].bytes });
   }
@@ -137,7 +137,8 @@ export const deleteCachedModel = async (id: ModelId): Promise<void> => {
 };
 
 /** The models the first actions need: chords and key, six-track separation, the notes of a score. */
-export const BASIC_MODELS: ModelId[] = ['chordnet', 'cqtPlan', 'skey', 'demucs6s', 'basicPitch'];
+export const CHORD_MODELS: ModelId[] = ['lv0', 'lv1', 'lv2', 'lv3', 'lv4', 'lvDictionary', 'lvPlans', 'skey'];
+export const BASIC_MODELS: ModelId[] = [...CHORD_MODELS, 'demucs6s', 'basicPitch'];
 
 /** Which of `ids` are not on the device yet. */
 export const missingModels = async (ids: ModelId[] = BASIC_MODELS): Promise<ModelId[]> => {
@@ -149,7 +150,7 @@ export const missingModels = async (ids: ModelId[] = BASIC_MODELS): Promise<Mode
 
 /** Downloads every model not yet on the device (for using the app offline later), one at a time. */
 export const downloadAllModels = (onProgress: (done: number, total: number) => void, fetchFn: typeof fetch = fetch): Promise<void> =>
-  downloadModels(Object.keys(MODELS) as ModelId[], onProgress, fetchFn);
+  downloadModels((Object.keys(MODELS) as ModelId[]).filter((id) => id !== 'chordnet' && id !== 'cqtPlan'), onProgress, fetchFn);
 
 /** Downloads the given models that are missing, one at a time, reporting overall progress. */
 export const downloadModels = async (ids: ModelId[], onProgress: (done: number, total: number) => void, fetchFn: typeof fetch = fetch): Promise<void> => {

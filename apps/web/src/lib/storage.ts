@@ -6,6 +6,12 @@ export const formatBytes = (n: number): string => {
 
 type StorageApi = { estimate?: () => Promise<{ usage?: number; quota?: number }>; persisted?: () => Promise<boolean>; persist?: () => Promise<boolean> };
 
+/** Chromium can report usage + exactly 10 GiB for privacy, independently of the enforced limit. */
+export const hasPredictableQuota = (estimate: { usage?: number; quota?: number }): boolean =>
+  typeof navigator !== 'undefined' && /Chrome\/|Chromium\/|Edg\//.test(navigator.userAgent) &&
+  estimate.usage !== undefined && estimate.quota !== undefined &&
+  estimate.quota - estimate.usage === 10 * 1024 ** 3;
+
 const api = (): StorageApi | undefined => (navigator as Navigator & { storage?: StorageApi }).storage;
 
 export const storageStatus = async (): Promise<{ usage?: number; quota?: number; persisted: boolean }> => {
@@ -25,12 +31,25 @@ export const requestPersistence = async (): Promise<boolean> => {
 };
 
 /** The browser refused to store more data for this site (also when the error crossed a worker as text). */
-export const isQuotaError = (error: unknown): boolean =>
-  (error instanceof DOMException && error.name === 'QuotaExceededError') || (error instanceof Error && (error.name === 'QuotaExceededError' || /QuotaExceededError|quota exceeded/i.test(error.message)));
+export const isQuotaError = (error: unknown): boolean => {
+  const seen = new Set<object>();
+  const pending: unknown[] = [error];
+  while (pending.length) {
+    const value = pending.pop();
+    if (!value || typeof value !== 'object' || seen.has(value)) continue;
+    seen.add(value);
+    const detail = value as { name?: unknown; message?: unknown; inner?: unknown; cause?: unknown };
+    if (detail.name === 'QuotaExceededError' || (typeof detail.message === 'string' && /QuotaExceededError|quota exceeded/i.test(detail.message))) return true;
+    pending.push(detail.inner, detail.cause);
+  }
+  return false;
+};
 
 /** What to tell the user when the site's storage is full, with the browser's own numbers. */
 export const explainQuota = (estimate: { usage?: number; quota?: number }): string => {
-  const numbers = estimate.usage !== undefined && estimate.quota ? ` (usando ${formatBytes(estimate.usage)} de ${formatBytes(estimate.quota)} permitidos)` : '';
+  const numbers = hasPredictableQuota(estimate)
+    ? ` (uso estimado: ${formatBytes(estimate.usage!)}; o navegador não informa o limite real disponível)`
+    : estimate.usage !== undefined && estimate.quota ? ` (usando ${formatBytes(estimate.usage)}; cota estimada: ${formatBytes(estimate.quota)})` : '';
   return (
     `O navegador recusou a gravação dos dados do will-music${numbers}. ` +
     'A cota informada é uma estimativa e não garante espaço disponível para esta gravação. ' +
@@ -43,7 +62,7 @@ export const explainQuota = (estimate: { usage?: number; quota?: number }): stri
 /** Throws the explanation above when clearly less than `needed` bytes are left for this site. */
 export const ensureRoom = async (needed: number, storage: StorageApi | undefined = api()): Promise<void> => {
   const estimate = await storage?.estimate?.().catch(() => undefined);
-  if (!estimate?.quota || estimate.usage === undefined) return; // unknown: let the browser decide
+  if (!estimate?.quota || estimate.usage === undefined || hasPredictableQuota(estimate)) return; // unknown: let the browser decide
   if (estimate.quota - estimate.usage < needed) throw new Error(explainQuota(estimate));
 };
 

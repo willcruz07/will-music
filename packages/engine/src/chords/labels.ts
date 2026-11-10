@@ -18,7 +18,24 @@ export const toDisplayLabel = (raw: string): string => {
   if (raw === NO_CHORD) return 'N.C.';
   if (raw === UNKNOWN_CHORD) return '?';
   const { root, quality } = split(raw);
-  return `${root}${DISPLAY_SUFFIX[quality] ?? quality}`;
+  const [structure = 'maj', bass] = quality.split('/');
+  const match = /^([^()]+)(.*)$/u.exec(structure);
+  const basic = match?.[1] ?? structure;
+  const decorations = match?.[2] ?? '';
+  const extended: Record<string, string> = { '9': '7(9)', '11': '7(9,11)', '13': '7(9,11,13)', min9: 'm7(9)', min11: 'm7(9,11)', min13: 'm7(9,11,13)', maj9: '7M(9)', maj13: '7M(9,11,13)' };
+  let label = `${root}${DISPLAY_SUFFIX[basic] ?? extended[basic] ?? basic}${decorations}`;
+  if (bass) {
+    const degree = /^(b*|#*)(\d+)$/u.exec(bass);
+    const rootMatch = /^([A-G])([#b]?)$/u.exec(root);
+    if (degree && rootMatch) {
+      const natural: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+      const intervals = [0, 2, 4, 5, 7, 9, 11];
+      const alteration = [...degree[1]!].reduce((sum, accidental) => sum + (accidental === '#' ? 1 : -1), 0);
+      const pc = (natural[rootMatch[1]!]! + (rootMatch[2] === '#' ? 1 : rootMatch[2] === 'b' ? -1 : 0) + intervals[(Number(degree[2]) - 1) % 7]! + alteration + 24) % 12;
+      label += `/${CHORD_ROOTS[pc]}`;
+    }
+  }
+  return label;
 };
 
 export const toMajMin = (raw: string): MajMin | null => {

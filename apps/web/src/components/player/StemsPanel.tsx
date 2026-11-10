@@ -1,7 +1,7 @@
 import type { StemMode } from '@will-music/engine';
 import { Download, Layers, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { formatBytes, storageStatus } from '../../lib/storage.ts';
+import { formatBytes, hasPredictableQuota, storageStatus } from '../../lib/storage.ts';
 import { StorageProtection } from '../StorageProtection.tsx';
 import { downloadBlob } from '../../lib/download.ts';
 import { MODE_INFO, availableModes, heavyOnThisDevice } from '../../lib/stems.ts';
@@ -18,9 +18,11 @@ const StorageNote = () => {
   const refresh = () => void storageStatus().then(setStatus);
   useEffect(refresh, []);
   if (!status) return null;
-  const free = status.quota !== undefined && status.usage !== undefined ? status.quota - status.usage : undefined;
+  const fixedQuota = hasPredictableQuota(status);
+  const free = !fixedQuota && status.quota !== undefined && status.usage !== undefined ? status.quota - status.usage : undefined;
   return (
     <div className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
+      {fixedQuota && <p>Uso estimado: {formatBytes(status.usage!)}. Este navegador informa uma cota padronizada por privacidade; o espaço real disponível não é informado.</p>}
       {free !== undefined && (
         <p>
           Margem estimada da cota: <span className="font-semibold text-foreground">{formatBytes(Math.max(0, free))}</span> (usando {formatBytes(status.usage!)}). Não representa espaço livre garantido no aparelho.
@@ -94,6 +96,11 @@ export const StemsPanel = ({ stems, title, hasAudio }: { stems: StemsState; titl
 
   return (
     <div>
+      {stems.temporaryTracks && (
+        <p className="mb-2 text-sm text-muted-foreground" role="status">
+          As faixas ficam temporariamente nesta sessão para reduzir o uso de armazenamento. Você pode ouvir, ajustar e exportar a mixagem. Ao sair desta tela após a análise ou recarregar, será necessário separar novamente. O MP3 original continua salvo.
+        </p>
+      )}
       {error && (
         <p className="mb-2 text-sm text-danger" role="alert">
           {error}

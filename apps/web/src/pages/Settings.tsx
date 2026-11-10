@@ -5,13 +5,14 @@ import { AboutButton } from '../components/About.tsx';
 import { InstallApp } from '../components/PwaPrompts.tsx';
 import { db } from '../lib/db.ts';
 import { deleteCachedModel, deleteCachedModels, downloadAllModels, listCachedModels } from '../lib/models.ts';
-import { formatBytes, storageStatus } from '../lib/storage.ts';
+import { formatBytes, hasPredictableQuota, storageStatus } from '../lib/storage.ts';
 import { StorageProtection } from '../components/StorageProtection.tsx';
 import { useThemePref } from '../lib/theme.ts';
 import { Button } from '../ui/Button.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
+import { readExecutionPreference, saveExecutionPreference, type ExecutionPreference } from '../lib/analysisExecution.ts';
 
-const MODEL_NAMES: Record<string, string> = { chordnet: 'Acordes (ChordMini)', cqtPlan: 'Plano de frequências dos acordes', skey: 'Tom (S-KEY)', kara2Core: 'Separação de faixas (estrutura)', kara2Data: 'Separação de faixas (pesos)', basicPitch: 'Notas da partitura (Basic Pitch)', demucs6s: 'Separação em 4 e 6 faixas (HTDemucs)' };
+const MODEL_NAMES: Record<string, string> = { lv0: 'Acordes (LV-Chordia 1/5)', lv1: 'Acordes (LV-Chordia 2/5)', lv2: 'Acordes (LV-Chordia 3/5)', lv3: 'Acordes (LV-Chordia 4/5)', lv4: 'Acordes (LV-Chordia 5/5)', lvPlans: 'Planos de frequência (LV-Chordia)', lvDictionary: 'Dicionário (LV-Chordia)', chordnet: 'Acordes (ChordMini)', cqtPlan: 'Plano de frequências dos acordes', skey: 'Tom (S-KEY)', kara2Core: 'Separação de faixas (estrutura)', kara2Data: 'Separação de faixas (pesos)', basicPitch: 'Notas da partitura (Basic Pitch)', demucs6s: 'Separação em 4 e 6 faixas (HTDemucs)' };
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section className="border-t border-border py-6">
@@ -27,6 +28,7 @@ export const Settings = () => {
   const [songIds, setSongIds] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [execution, setExecution] = useState(readExecutionPreference);
 
   const refresh = () => {
     void listCachedModels().then(setModels).catch(() => setModels([]));
@@ -61,6 +63,20 @@ export const Settings = () => {
       <Section title="Aplicativo">
         <p className="mb-3 text-sm text-muted-foreground">Instalado, o will-music abre como um app, em tela cheia, e funciona sem internet no ensaio ou na igreja.</p>
         <InstallApp />
+      </Section>
+
+      <Section title="Processamento das músicas">
+        <label className="block text-sm font-semibold">Acordes e transcrição
+          <select aria-label="Execução das análises" value={execution} onChange={(event) => {
+            const value = event.target.value as ExecutionPreference;
+            setExecution(value); saveExecutionPreference(value);
+          }} className="mt-2 block min-h-11 w-full rounded-lg border border-border bg-surface px-3">
+            <option value="auto">Automático</option>
+            <option value="parallel">Em paralelo — testar as duas tarefas juntas</option>
+            <option value="sequential">Uma tarefa por vez</option>
+          </select>
+        </label>
+        <p className="mt-2 text-sm text-muted-foreground">No automático, iPhone e iPad executam uma tarefa por vez. Em computadores com GPU disponível e ao menos quatro processadores lógicos, o app permite execução paralela. O modo paralelo é experimental e pode usar mais memória. Após a letra e os acordes, o app inicia a separação de faixas quando há GPU compatível. No iPhone ou iPad, pede confirmação antes de separar.</p>
       </Section>
 
       <Section title="Modelos de análise">
@@ -107,7 +123,9 @@ export const Settings = () => {
       <Section title="Armazenamento">
         {storage?.usage !== undefined && storage.quota !== undefined && (
           <p>
-            Usando {formatBytes(storage.usage)} de uma cota estimada de {formatBytes(storage.quota)}.
+            {hasPredictableQuota(storage)
+              ? `Uso estimado: ${formatBytes(storage.usage)}. O navegador informa uma cota padronizada por privacidade; o limite real disponível não é informado.`
+              : `Usando ${formatBytes(storage.usage)} de uma cota estimada de ${formatBytes(storage.quota)}.`}
           </p>
         )}
         <StorageProtection />

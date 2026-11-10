@@ -1,0 +1,9 @@
+# Install CPU torch from https://download.pytorch.org/whl/cpu before this file.
+torch==2.15.0+cpu
+numpy==2.5.4
+onnx==1.23.2
+onnxruntime==1.31.1
+onnxscript==0.7.2
+librosa==1.0.0
+soundfile==0.14.0
+lv-chordia @ git+https://github.com/openmirlab/lv-chordia.git@d8ab9ac99bce081bb79065d717f96e2c3b2099c8

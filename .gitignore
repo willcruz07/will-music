@@ -11,4 +11,6 @@ tools/lv-chordia/.venv/
 # áudios de teste ficam fora do repositório
 test-audio/
 tools/phase0/.cache/
+tools/lv-chordia/.cache/
+tools/lv-chordia/.venv/
 .superpowers/

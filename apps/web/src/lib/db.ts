@@ -1,6 +1,7 @@
 import type { ChordSegment, DrumHit, KeyResult, NoteEvent, StemMode, VoicePart } from '@will-music/engine';
 import Dexie, { type EntityTable, type Table } from 'dexie';
-import { requestPersistence } from './storage.ts';
+import { isQuotaError, requestPersistence } from './storage.ts';
+import { clearPendingAnalysis } from './pendingAnalysis.ts';
 
 export type AnalysisStatus = 'pending' | 'running' | 'done' | 'error';
 
@@ -31,7 +32,9 @@ export type Analysis = {
   models: Record<string, string>;
   key: KeyResult;
   chords: ChordSegment[];
-  lyrics?: { source: 'lrclib' | 'manual'; lrclibId?: number; lines: LyricLine[]; warning?: string; chosenByUser?: boolean };
+  lyrics?: { source: 'lrclib' | 'manual' | 'transcription'; lrclibId?: number; lines: LyricLine[]; warning?: string; chosenByUser?: boolean };
+  warnings?: string[];
+  processing?: { execution: 'parallel' | 'sequential'; chordsMs: number; lyricsMs: number; totalMs: number; transcriptionRetried?: boolean };
   createdAt: string;
   updatedAt: string;
 };
@@ -51,6 +54,7 @@ export type Chart = {
 };
 
 export type AudioRecord = { songId: string; blob: Blob; mimeType: string };
+type StoredAudioRecord = Omit<AudioRecord, 'blob'> & { blob: Blob | ArrayBuffer };
 
 export type StemName = 'instrumental' | 'lead' | 'backing' | 'vocals' | 'drums' | 'bass' | 'guitar' | 'piano' | 'other';
 /** One separation of a song; a song may keep several (one per mode). The most recently selected one plays. */
@@ -113,17 +117,56 @@ db.version(6).stores({ stems: null });
 // v7: app settings that must survive (e.g. the connected device folder handle).
 db.version(7).stores({ settings: 'key' });
 
+// Public readers always receive a Blob, including the binary fallback used for refused Blob writes.
+// No schema upgrade is needed: only the non-indexed audio payload changes representation.
+const isBinaryAudio = (value: Blob | ArrayBuffer): value is ArrayBuffer =>
+  Object.prototype.toString.call(value) === '[object ArrayBuffer]';
+db.audio.hook('reading', (record: StoredAudioRecord | undefined) =>
+  record && isBinaryAudio(record.blob)
+    ? { ...record, blob: new Blob([record.blob], { type: record.mimeType }) }
+    : record,
+);
+
+// A binary retry needs a full memory copy. Keep it bounded for large WAVs and mobile devices.
+const MAX_BINARY_RETRY_BYTES = 64 * 1024 * 1024;
+
+export type AudioImportAttempt = { format: 'blob' | 'binary'; stage: 'song' | 'audio' | 'commit'; error: string };
+const importFailures = new WeakMap<object, AudioImportAttempt[]>();
+export const getAudioImportAttempts = (error: unknown): AudioImportAttempt[] =>
+  error && typeof error === 'object' ? importFailures.get(error) ?? [] : [];
+
 export const now = (): string => new Date().toISOString();
 
 export const createSong = async (input: { title: string; artist: string; durationSec: number }, audio: Blob): Promise<Song> => {
   // First saved song: ask the browser to keep this site's data (spec §5.4).
-  if ((await db.songs.count()) === 0) void requestPersistence();
+  if ((await db.songs.count()) === 0) await requestPersistence();
   const stamp = now();
   const song: Song = { id: crypto.randomUUID(), ...input, favorite: false, analysisStatus: 'pending', createdAt: stamp, updatedAt: stamp };
-  await db.transaction('rw', db.songs, db.audio, async () => {
-    await db.songs.add(song);
-    await db.audio.put({ songId: song.id, blob: audio, mimeType: audio.type });
-  });
+  const attempts: AudioImportAttempt[] = [];
+  const save = async (blob: Blob | ArrayBuffer) => {
+    let stage: AudioImportAttempt['stage'] = 'song';
+    try {
+      await db.transaction('rw', db.songs, db.audio, async () => {
+        await db.songs.add(song);
+        stage = 'audio';
+        await db.table<StoredAudioRecord, string>('audio').put({ songId: song.id, blob, mimeType: audio.type });
+        stage = 'commit';
+      });
+    } catch (error) {
+      attempts.push({ format: isBinaryAudio(blob) ? 'binary' : 'blob', stage, error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) });
+      if (error && typeof error === 'object') importFailures.set(error, [...attempts]);
+      throw error;
+    }
+  };
+  try {
+    await save(audio);
+  } catch (error) {
+    if (!isQuotaError(error) || audio.size > MAX_BINARY_RETRY_BYTES) throw error;
+    // Retry only after the failed transaction rolled back, with the same id and exact file bytes.
+    // This can recover a Blob-storage refusal; it cannot bypass an exhausted origin/device quota.
+    const bytes = await audio.arrayBuffer();
+    await save(bytes);
+  }
   return song;
 };
 
@@ -141,6 +184,7 @@ export const deleteSong = async (id: string): Promise<void> => {
     await db.analyses.where('songId').equals(id).delete();
     await db.charts.where('songId').equals(id).delete();
   });
+  clearPendingAnalysis(id);
 };
 
 export const listSongs = (): Promise<Song[]> => db.songs.orderBy('updatedAt').reverse().toArray();

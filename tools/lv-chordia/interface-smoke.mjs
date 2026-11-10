@@ -1,0 +1,23 @@
+// Execute the actual browser worker module with a minimal message shim, against the local Vite bridge.
+import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+const origin = 'http://127.0.0.1:5175';
+const nativeFetch = globalThis.fetch;
+globalThis.fetch = (resource, options) => nativeFetch(typeof resource === 'string' && resource.startsWith('/') ? origin + resource : resource, options);
+const buffer = await readFile(new URL('./.cache/imperfeito-30s.f32', import.meta.url));
+const pcm = new Float32Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+const messages = [];
+let complete;
+const done = new Promise(resolve => { complete = resolve; });
+globalThis.self = { postMessage(message) { messages.push(message); console.log(message.type === 'progress' ? message.label : message.type); if (message.type !== 'progress') complete(message); } };
+await import('../../apps/web/src/worker/lvChordia.worker.ts');
+const status = await (await fetch('/__lv/status')).json();
+assert.equal(status.ready, true);
+await self.onmessage({ data: { pcm } });
+const result = await done;
+assert.equal(result.type, 'result', result.message);
+const reference = JSON.parse(await readFile(new URL('./.cache/audio-report.json', import.meta.url), 'utf8'));
+assert.deepEqual(result.chords.map(chord => chord.raw), reference.segments.map(chord => chord.raw));
+assert(result.chords.some(chord => chord.label === 'A/E'));
+await writeFile(new URL('./.cache/interface-smoke.json', import.meta.url), JSON.stringify({ ...result, scope: 'actual worker and local HTTP bridge under Node; no visual/mobile validation' }, null, 2));
+console.log(`PASS: ${result.chords.length} segments, ${result.seconds.toFixed(2)} s, same labels as Python; A/E displayed.`);
