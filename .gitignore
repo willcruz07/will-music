@@ -1,6 +1,12 @@
 node_modules/
 dist/
 .env*
+# Ambientes Python e arquivos gerados localmente
+.venv/
+__pycache__/
+*.py[cod]
+tools/lv-chordia/.cache/
+tools/lv-chordia/.venv/
 *.local
 # áudios de teste ficam fora do repositório
 test-audio/
