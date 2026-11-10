@@ -1,7 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isRunning, startAnalysis, subscribeAnalysis } from '../src/lib/jobs.ts';
+import { isRunning, startAnalysis, subscribeAnalysis, subscribeAnalysisFinished } from '../src/lib/jobs.ts';
 
 describe('analysis jobs', () => {
+  it('does not announce full success when the pipeline resolves with failed lyrics', async () => {
+    const finished = vi.fn();
+    const unsubscribe = subscribeAnalysisFinished(finished);
+    try {
+      await startAnalysis('partial', async (progress) => {
+        progress({ label: 'Montando sua música…', tasks: [
+          { id: 'chords', label: 'Acordes', status: 'done' },
+          { id: 'lyrics', label: 'Letra', status: 'error' },
+        ] });
+      });
+      expect(finished).toHaveBeenCalledWith('partial', false);
+    } finally { unsubscribe(); }
+  });
   it('lets a page that mounts later follow a running analysis to the end', async () => {
     let report!: (p: { label: string }) => void;
     let finish!: () => void;

@@ -16,8 +16,16 @@ export const ProgressBar = ({ fraction, className = 'mt-3 h-2' }: { fraction?: n
 export const AnalysisProgress = ({ progress }: { progress: PipelineProgress }) => (
   <div className="mt-10 max-w-md" role="status" aria-live="polite">
     <p className="text-lg font-semibold">{progress.label}</p>
-    <ProgressBar fraction={progress.fraction} />
-    <p className="mt-3 text-sm text-muted-foreground">Tudo é processado no seu aparelho. Na primeira vez, os modelos (cerca de 17 MB) são baixados e ficam guardados.</p>
+    {progress.tasks ? <div className="mt-3 space-y-3" aria-label="Progresso das tarefas">
+      {progress.tasks.map((task) => <div key={task.id} className="rounded-lg border border-border p-3">
+        <p className="text-sm font-semibold">{task.id === 'chords' ? 'Acordes e tom' : 'Letra'}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{task.label}</p>
+        {task.status === 'running' && <ProgressBar fraction={task.fraction} className="mt-2 h-1.5" />}
+        {task.detail && <p className="mt-1 text-xs text-muted-foreground">{task.detail}</p>}
+      </div>)}
+    </div> : <><ProgressBar fraction={progress.fraction} />
+      {progress.detail && <p className="mt-2 text-sm text-muted-foreground">{progress.detail}</p>}</>}
+    <p className="mt-3 text-sm text-muted-foreground">Tudo é processado no seu aparelho. Os modelos necessários são baixados na primeira utilização e reutilizados nas próximas músicas.</p>
   </div>
 );
 

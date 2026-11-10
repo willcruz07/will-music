@@ -10,14 +10,29 @@ export const INSTRUMENT_NAMES: Record<Instrument, string> = { violao: 'Violão',
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#13211c';
 
 /** Shapes of a chord on a fretted instrument: the chord book for the guitar, computed for the cavaquinho. */
-const frettedShapes = async (chord: string, instrument: 'violao' | 'cavaquinho'): Promise<GuitarShape[]> => {
-  if (instrument === 'violao') return guitarShapes(chord);
+const frettedShapes = async (chord: string, instrument: 'violao' | 'cavaquinho', strict: boolean): Promise<GuitarShape[]> => {
+  if (instrument === 'violao' && !strict) return guitarShapes(chord);
   const pcs = chordNotes(chord);
   if (!pcs) return [];
+  if (strict) {
+    const tuning = instrument === 'violao' ? [40, 45, 50, 55, 59, 64] : CAVAQUINHO.tuning;
+    const root = chordNotes(/^([A-G][#b]?)/u.exec(chord)?.[1] ?? '')?.[0];
+    if (root === undefined) return [];
+    const required = pcs.length > tuning.length ? pcs.filter((pc) => pc !== (root + 7) % 12) : pcs;
+    const matches = (shape: GuitarShape) => {
+      const notes = shape.frets.flatMap((fret, string) => fret < 0 ? [] : [tuning[string]! + (fret > 0 ? fret + shape.baseFret - 1 : 0)]);
+      const classes = notes.map((note) => note % 12);
+      return notes.length > 0 && classes.every((pc) => pcs.includes(pc)) && required.every((pc) => classes.includes(pc)) && (!chord.includes('/') || Math.min(...notes) % 12 === pcs[0]);
+    };
+    const stored = instrument === 'violao' ? (await guitarShapes(chord)).filter(matches) : [];
+    if (stored.length) return stored;
+    return findVoicings(pcs, root, tuning, { strictBass: chord.includes('/'), strictNotes: true })
+      .filter(matches).filter((shape) => shape.frets.filter((fret) => fret > 0).length <= 4);
+  }
   return findVoicings(pcs, pcs[0]!, CAVAQUINHO.tuning);
 };
 
-const Fretted = ({ chord, instrument, variant, onVariants }: { chord: string; instrument: 'violao' | 'cavaquinho'; variant: number; onVariants?: (n: number) => void }) => {
+const Fretted = ({ chord, instrument, variant, onVariants, strict }: { chord: string; instrument: 'violao' | 'cavaquinho'; variant: number; onVariants?: (n: number) => void; strict: boolean }) => {
   const box = useRef<HTMLDivElement>(null);
   const [missing, setMissing] = useState(false);
   const report = useRef(onVariants);
@@ -25,7 +40,7 @@ const Fretted = ({ chord, instrument, variant, onVariants }: { chord: string; in
   useEffect(() => {
     let cancelled = false;
     setMissing(false);
-    void frettedShapes(chord, instrument).then((shapes) => {
+    void frettedShapes(chord, instrument, strict).then((shapes) => {
       const el = box.current;
       if (cancelled || !el) return;
       el.innerHTML = '';
@@ -56,7 +71,7 @@ const Fretted = ({ chord, instrument, variant, onVariants }: { chord: string; in
     return () => {
       cancelled = true;
     };
-  }, [chord, instrument, variant]);
+  }, [chord, instrument, variant, strict]);
   // The box stays mounted (hidden when there is no shape) so the next chord can draw into it.
   return (
     <>
@@ -127,15 +142,17 @@ export const ChordDiagram = ({
   variant = 0,
   onVariants,
   size = 'sm',
+  strict = false,
 }: {
   chord: string;
   instrument: Instrument;
   variant?: number;
   onVariants?: (n: number) => void;
   size?: 'sm' | 'lg';
+  strict?: boolean;
 }) => (
   <figure className={`flex flex-col items-center ${size === 'lg' ? 'w-44' : 'w-28'}`}>
     <figcaption className="mb-1 text-lg font-bold text-chord">{chord}</figcaption>
-    {instrument === 'teclado' ? <Keyboard chord={chord} variant={variant} onVariants={onVariants} /> : <Fretted chord={chord} instrument={instrument} variant={variant} onVariants={onVariants} />}
+    {instrument === 'teclado' ? <Keyboard chord={chord} variant={variant} onVariants={onVariants} /> : <Fretted chord={chord} instrument={instrument} variant={variant} onVariants={onVariants} strict={strict} />}
   </figure>
 );

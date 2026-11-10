@@ -1,6 +1,6 @@
 import { MODELS } from '@will-music/engine';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchModel } from '../src/lib/models.ts';
+import { downloadAllModels, fetchModel, listCachedModels } from '../src/lib/models.ts';
 
 const store = new Map<string, Response>();
 const fakeCaches = {
@@ -8,7 +8,7 @@ const fakeCaches = {
     match: async (url: string) => store.get(url)?.clone(),
     put: async (url: string, response: Response) => void store.set(url, new Response(await response.arrayBuffer())),
     delete: async (url: string) => store.delete(url),
-    keys: async () => [...store.keys()].map((url) => new Request(url)),
+    keys: async () => [...store.keys()].map((url) => new Request(new URL(url, location.href).href)),
   }),
 };
 
@@ -21,6 +21,20 @@ beforeEach(() => {
 });
 
 describe('fetchModel', () => {
+  it('recognizes same-origin LV assets in the model inventory', async () => {
+    store.set(MODELS.lv0.url, new Response('cached'));
+    expect(await listCachedModels()).toEqual([{ id: 'lv0', bytes: MODELS.lv0.bytes }]);
+  });
+
+  it('does not download the legacy microphone models when installing the current model set', async () => {
+    for (const [id, model] of Object.entries(MODELS)) {
+      if (id !== 'chordnet' && id !== 'cqtPlan') store.set(model.url, new Response('cached'));
+    }
+    const fetchFn = vi.fn();
+    await downloadAllModels(() => {}, fetchFn);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it('streams a download into the cache without hashing the whole model in one buffer (iPad memory)', async () => {
     const bytes = new TextEncoder().encode('modelo grande'.repeat(1000));
     const original = MODELS.skey.sha256;

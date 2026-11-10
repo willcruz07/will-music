@@ -1,90 +1,144 @@
 import { analyzeInWorker } from '../worker/client.ts';
 import { buildChart, keyToChord } from './chart.ts';
-import { type Analysis, type Chart, type LyricLine, db, now, updateSong } from './db.ts';
+import { type Analysis, type Chart, db, now, updateSong } from './db.ts';
 import { decodeForAnalysis } from './decode.ts';
-import { distributePlainLyrics, parseLrc, pickBestLyrics, searchLyrics } from './lrclib.ts';
-import { applyLyrics, lyricsToKeep } from './lyricsApply.ts';
+import { retainSessionStems } from './sessionStems.ts';
+import { lyricsToKeep } from './lyricsApply.ts';
 import { transcribeSong } from './whisper.ts';
 import { describeTranscription } from './transcript.ts';
+import { getPendingAnalysis, setPendingAnalysis } from './pendingAnalysis.ts';
+import { savePendingAnalysis } from './saveAnalysis.ts';
+import { isQuotaError } from './storage.ts';
 
-/**
- * `lyricsPending`: the chart with the chords is saved and only the lyrics are still being transcribed, so the song
- * page can show the chords already. `detail`: the latest words heard, so a slow transcription does not look stuck.
- */
-export type PipelineProgress = { label: string; fraction?: number; detail?: string; lyricsPending?: boolean };
-
+import { resolveAnalysisExecution, isResourceFailure, type ExecutionPreference } from './analysisExecution.ts';
+export type AnalysisTaskProgress = { id: 'chords' | 'lyrics'; label: string; detail?: string; fraction?: number; status: 'waiting' | 'running' | 'done' | 'error' | 'skipped' };
+/** Two independent task snapshots, plus the already-published chord chart while lyrics finish. */
+export type PipelineProgress = { label: string; fraction?: number; detail?: string; lyricsPending?: boolean; tasks?: AnalysisTaskProgress[] };
 const mb = (bytes: number) => (bytes / 1e6).toFixed(0);
 
-export const runPipeline = async (songId: string, onProgress: (p: PipelineProgress) => void): Promise<void> => {
+export const runPipeline = async (songId: string, onProgress: (p: PipelineProgress) => void, options: { execution?: ExecutionPreference } = {}): Promise<void> => {
   const song = await db.songs.get(songId);
   const audio = await db.audio.get(songId);
   if (!song || !audio) throw new Error('Música não encontrada.');
   await updateSong(songId, { analysisStatus: 'running', analysisError: undefined });
+  const release = retainSessionStems(songId);
+  const controller = new AbortController();
+  let stopped = false;
+  let assembling = false;
+  let chartPublished = false;
+  const started = performance.now();
+  let chordsMs = 0;
+  let lyricsMs = 0;
+  let transcriptionRetried = false;
   try {
-    onProgress({ label: 'Preparando o áudio' });
-    const { channels, durationSec } = await decodeForAnalysis(audio.blob);
-
-    const result = await analyzeInWorker(channels, (e) => {
-      if (e.stage === 'models') onProgress({ label: `Baixando os modelos (${mb(e.done)} MB de ${mb(e.total)} MB)`, fraction: e.done / e.total });
-      else if (e.stage === 'chords') onProgress({ label: `Detectando os acordes (${e.done} de ${e.total})`, fraction: e.done / e.total });
-      else onProgress({ label: 'Detectando o tom' });
-    });
-
+    const execution = await resolveAnalysisExecution(options.execution);
+    const warnings: string[] = [];
     const previous = await db.analyses.where('songId').equals(songId).first();
     let lyrics = lyricsToKeep(previous?.lyrics);
-    if (!lyrics) {
-      onProgress({ label: 'Buscando a letra' });
-      const picked = pickBestLyrics(await searchLyrics(song.title, song.artist), durationSec, song.artist);
-      if (picked) {
-        const lines: LyricLine[] = picked.result.syncedLyrics
-          ? parseLrc(picked.result.syncedLyrics)
-          : distributePlainLyrics(picked.result.plainLyrics ?? '', durationSec);
-        lyrics = { source: 'lrclib', lrclibId: picked.result.id, lines, warning: picked.warning };
-      }
-    }
-    const lines = lyrics?.lines ?? [];
+    const chordsTask: AnalysisTaskProgress = { id: 'chords', label: 'Preparando o áudio dos acordes', status: 'running' };
+    const lyricsTask: AnalysisTaskProgress = { id: 'lyrics', label: lyrics?.lines.length ? 'Letra preservada' : 'Aguardando a transcrição', status: lyrics?.lines.length ? 'skipped' : 'waiting' };
+    const snapshot = () => [{ ...chordsTask }, { ...lyricsTask }];
+    const publish = () => {
+      if (stopped || controller.signal.aborted || assembling) return;
+      const active = chordsTask.status === 'running' ? chordsTask : lyricsTask;
+      const both = chordsTask.status === 'running' && lyricsTask.status === 'running';
+      onProgress({ label: both ? 'Analisando acordes e transcrevendo a letra…' : active.label, detail: active.detail, fraction: active.fraction, lyricsPending: chartPublished && lyricsTask.status === 'running', tasks: snapshot() });
+    };
+    publish();
+    // Decode the chord input first; do not overlap two full native audio decoders on long files.
+    const { channels, durationSec } = await decodeForAnalysis(audio.blob, { mono: true });
+    let lyricsFailure: unknown;
+    let lyricsPromise: Promise<void> | undefined;
+    const launchLyrics = () => {
+      const taskStarted = performance.now();
+      lyricsFailure = undefined;
+      lyricsTask.status = 'running';
+      lyricsTask.label = transcriptionRetried ? 'Tentando a transcrição sem concorrência…' : 'Transcrevendo a letra…';
+      lyricsTask.fraction = undefined;
+      lyricsTask.detail = undefined;
+      publish();
+      lyricsPromise = transcribeSong(songId, (p) => { Object.assign(lyricsTask, describeTranscription(p)); publish(); }, { original: true, signal: controller.signal })
+        .then((heard) => { lyrics = { source: 'transcription', lines: heard.lines }; lyricsTask.status = 'done'; lyricsTask.label = 'Letra transcrita'; lyricsTask.fraction = 1; })
+        .catch((error: unknown) => { if (!controller.signal.aborted) { lyricsFailure = error; lyricsTask.status = 'error'; lyricsTask.label = 'A transcrição não terminou'; } })
+        .finally(() => { lyricsMs += performance.now() - taskStarted; publish(); });
+    };
+    const chordPromise = analyzeInWorker(channels, (e) => {
+      chordsTask.label = e.stage === 'models' ? 'Carregando modelos de acordes (' + mb(e.done) + ' de ' + mb(e.total) + ' MB)' : e.stage === 'key' ? 'Identificando o tom…' : 'Analisando acordes… (bloco ' + Math.min(e.total, e.done + 1) + ' de ' + e.total + ')';
+      chordsTask.detail = e.detail;
+      chordsTask.fraction = e.total ? e.done / e.total : undefined;
+      publish();
+    }, controller.signal);
+    if (execution === 'parallel' && !lyrics?.lines.length) launchLyrics();
+    const result = await chordPromise;
+    chordsMs = performance.now() - started;
+    chordsTask.status = 'done'; chordsTask.label = 'Tom e acordes prontos'; chordsTask.fraction = 1;
+    const saveResult = async () => {
+      assembling = true;
+      onProgress({ label: 'Montando sua música…', tasks: snapshot() });
+      // A user may have corrected lyrics in another view while the models were running.
+      const latest = await db.analyses.where('songId').equals(songId).first();
+      lyrics = lyricsToKeep(latest?.lyrics) ?? lyrics;
+      const lines = lyrics?.lines ?? [];
 
-    const stamp = now();
-    const analysis: Analysis = {
-      id: crypto.randomUUID(),
-      songId,
-      schemaVersion: 1,
-      models: result.models,
-      key: result.key,
-      chords: result.chords,
-      lyrics,
-      createdAt: stamp,
-      updatedAt: stamp,
+      const stamp = now();
+      const analysis: Analysis = {
+        id: crypto.randomUUID(),
+        songId,
+        schemaVersion: 1,
+        models: { ...result.models, audioSource: 'original' },
+        key: result.key,
+        chords: result.chords,
+        lyrics,
+        warnings,
+        processing: { execution, chordsMs, lyricsMs, totalMs: performance.now() - started, transcriptionRetried },
+        createdAt: stamp,
+        updatedAt: stamp,
     };
     const chordPro = buildChart({ title: song.title, artist: song.artist, key: result.key, chords: result.chords, lines });
 
-    await db.transaction('rw', [db.analyses, db.charts, db.songs], async () => {
-      await db.analyses.where('songId').equals(songId).delete();
-      await db.analyses.add(analysis);
-      const existing = await db.charts.where('songId').equals(songId).first();
-      if (!existing) {
-        const chart: Chart = { id: crypto.randomUUID(), songId, chordPro, lineTimes: lines.map((l) => l.start), transpose: 0, fontSize: 18, origin: 'generated', generatedFromAnalysisId: analysis.id, createdAt: stamp, updatedAt: stamp };
-        await db.charts.add(chart);
-      } else if (existing.origin === 'generated') {
-        await db.charts.update(existing.id, { chordPro, lineTimes: lines.map((l) => l.start), generatedFromAnalysisId: analysis.id, updatedAt: stamp });
-      }
-      await updateSong(songId, { key: keyToChord(result.key), durationSec: song.durationSec || durationSec, analysisStatus: 'done' });
-    });
-
-    // An audio never stays without lyrics: when the search finds nothing, Whisper listens and writes them.
-    // The chart is already saved; if the transcription fails (an instrumental, say), the song keeps its chords.
-    if (!lines.length) {
-      onProgress({ label: 'Preparando a transcrição da letra', lyricsPending: true });
-      try {
-        const { lines: heard } = await transcribeSong(songId, (p) => onProgress({ ...describeTranscription(p), lyricsPending: true }));
-        await applyLyrics(songId, { source: 'manual', lines: heard });
-      } catch (error) {
-        console.warn('Transcrição automática da letra não deu certo', error);
-      }
+    const existing = getPendingAnalysis(songId)?.chart ?? await db.charts.where('songId').equals(songId).first();
+    const chart: Chart = existing && existing.origin !== 'generated' ? existing : {
+      id: existing?.id ?? crypto.randomUUID(), songId, transpose: existing?.transpose ?? 0, fontSize: existing?.fontSize ?? 18,
+      chordPro, lineTimes: lines.map((line) => line.start), origin: 'generated', generatedFromAnalysisId: analysis.id,
+      createdAt: existing?.createdAt ?? stamp, updatedAt: stamp,
+    };
+    setPendingAnalysis({ analysis, chart, song: { ...song, key: keyToChord(result.key), durationSec: song.durationSec || durationSec, analysisStatus: 'done', analysisError: undefined, updatedAt: stamp } });
+    try { await savePendingAnalysis(songId); }
+    catch (error) {
+      if (!isQuotaError(error)) throw error;
+      console.warn('Análise concluída, mas a gravação foi recusada. Resultado preservado na sessão.', { songId, error });
     }
+
+      assembling = false;
+    };
+    if (!lyrics?.lines.length && (lyricsTask.status === 'running' || execution === 'sequential')) {
+      await saveResult();
+      chartPublished = true;
+      if (execution === 'sequential') launchLyrics();
+      publish();
+    }
+    await lyricsPromise;
+    // A resource-related overlap failure gets one isolated retry after the chord worker has ended.
+    if (execution === 'parallel' && lyricsFailure && isResourceFailure(lyricsFailure)) {
+      if (!chartPublished) { await saveResult(); chartPublished = true; }
+      transcriptionRetried = true;
+      launchLyrics();
+      await lyricsPromise;
+    }
+    if (lyricsFailure) {
+      warnings.push('Não foi possível transcrever a letra. Você pode tentar novamente ou inserir a letra manualmente.');
+      console.warn('Transcrição automática da letra não deu certo', lyricsFailure);
+    }
+    await saveResult();
   } catch (error) {
+    controller.abort();
     const message = error instanceof Error ? error.message : String(error);
-    await updateSong(songId, { analysisStatus: 'error', analysisError: message });
+    try { await updateSong(songId, { analysisStatus: 'error', analysisError: message }); }
+    catch (statusError) { console.warn('Não foi possível registrar o estado de erro da análise.', { songId, error, statusError }); }
     throw error;
+  } finally {
+    stopped = true;
+    controller.abort();
+    release();
   }
 };

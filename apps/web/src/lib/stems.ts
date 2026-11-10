@@ -83,6 +83,7 @@ export const hasUsableWebGpu = async (gpu: GpuLike | undefined): Promise<boolean
 };
 
 type Deps = {
+  persist?: boolean;
   mode?: StemMode;
   storage?: StorageApi;
   cachedModels?: () => Promise<{ id: ModelId }[]>;
@@ -92,8 +93,8 @@ type Deps = {
   run?: (planar: Float32Array, samples: number, mode: StemMode, onProgress: (p: SeparationProgress) => void, signal?: AbortSignal) => Promise<SeparationTracks>;
 };
 
-/** Separates a song with the chosen mode and stores all its tracks together (MP3); on failure nothing is written. */
-export const separateSong = async (songId: string, onProgress: (p: SeparationProgress) => void, deps: Deps = {}): Promise<void> => {
+/** Separates and stores MP3 tracks; a quota refusal returns the completed tracks for session-only playback. */
+export const separateSong = async (songId: string, onProgress: (p: SeparationProgress) => void, deps: Deps = {}): Promise<{ record: StemsRecord; persisted: boolean }> => {
   const mode = deps.mode ?? 'six';
   const gpu = 'gpu' in deps ? deps.gpu : (navigator as Navigator & { gpu?: GpuLike }).gpu;
   if (!(await hasUsableWebGpu(gpu))) throw new Error(NO_WEBGPU);
@@ -105,9 +106,10 @@ export const separateSong = async (songId: string, onProgress: (p: SeparationPro
   const song = await db.songs.get(songId);
   const trackBytes = (song?.durationSec || 300) * 24000 * STEM_MODES[mode].tracks.length;
   void requestPersistence();
-  await ensureRoom((modelBytes + trackBytes) * 1.1, deps.storage);
+  await ensureRoom((modelBytes + (deps.persist === false ? 0 : trackBytes)) * 1.1, deps.storage);
   const { planar, samples } = await step('preparar o áudio', () => (deps.decode ?? decodeForSeparation)(audio.blob));
   const tracks = await step('separar as faixas', () => (deps.run ?? runSeparationInWorker)(planar, samples, mode, onProgress, deps.signal));
+  deps.signal?.throwIfAborted();
   const names = STEM_MODES[mode].tracks;
   if (names.some((n) => !tracks[n])) throw new Error('A separação veio incompleta. Tente de novo.');
   const stamp = now();
@@ -121,20 +123,30 @@ export const separateSong = async (songId: string, onProgress: (p: SeparationPro
     selectedAt: `${stamp}${await laterThanOthers(songId, stamp)}`,
   };
   const outputBytes = record.tracks.reduce((sum, track) => sum + track.blob.size, 0);
-  await ensureRoom(outputBytes * 1.1, deps.storage);
+  if (deps.persist === false) return { record, persisted: false };
+  try {
+    await ensureRoom(outputBytes * 1.1, deps.storage);
+  } catch {
+    // The estimate may change during processing. Keep the result without attempting a write.
+    return { record, persisted: false };
+  }
+  deps.signal?.throwIfAborted();
   try {
     await step(`guardar ${record.tracks.length} faixas (${formatBytes(outputBytes)})`, () => db.stemSets.put(record));
   } catch (error) {
     // Preserve the storage error and the actual write size for diagnosing browser-specific failures.
-    console.error('Falha ao guardar as faixas separadas no IndexedDB', {
+    console.warn('Falha ao guardar as faixas separadas no IndexedDB', {
       songId,
       mode,
       totalBytes: outputBytes,
       tracks: record.tracks.map((track) => ({ name: track.name, bytes: track.blob.size })),
       error,
     });
+    // A refused write must not discard tracks that were already generated successfully.
+    if (isQuotaError(error)) return { record, persisted: false };
     throw error;
   }
+  return { record, persisted: true };
 };
 
 export const listStemSets = (songId: string): Promise<StemsRecord[]> => db.stemSets.where('songId').equals(songId).toArray();

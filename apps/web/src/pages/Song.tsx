@@ -2,7 +2,7 @@ import { ArrowLeft, FileText, Info, Minus, MonitorPlay, Music4, Pencil, Plus, Re
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
-import { AnalysisProgress, LyricsSkeleton, TranscribingBar } from '../components/AnalysisProgress.tsx';
+import { AnalysisProgress, LyricsSkeleton, TranscribingBar, formatElapsed } from '../components/AnalysisProgress.tsx';
 import { ChartView } from '../components/ChartView.tsx';
 import { LyricsPanel } from '../components/LyricsPanel.tsx';
 import { chartLineStarts, lyricTexts } from '../lib/lineTimes.ts';
@@ -26,6 +26,9 @@ import { useStems } from '../lib/useStems.ts';
 import { ChordPanel, readInstrument } from '../components/ChordPanel.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
 import { confirmDialog } from '../ui/Dialog.tsx';
+import { getPendingAnalysis } from '../lib/pendingAnalysis.ts';
+import { savePendingAnalysis } from '../lib/saveAnalysis.ts';
+import { diagnoseAudioImport } from '../lib/importDiagnostics.ts';
 
 export const Song = () => {
   const { id = '' } = useParams();
@@ -33,6 +36,12 @@ export const Song = () => {
   const [song, setSong] = useState<SongRecord | null | undefined>(undefined);
   const [chart, setChart] = useState<Chart | undefined>();
   const [analysis, setAnalysis] = useState<Analysis | undefined>();
+  const [unsaved, setUnsaved] = useState(false);
+  const [savingResult, setSavingResult] = useState(false);
+  const [resultSaveError, setResultSaveError] = useState<string | null>(null);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [diagnosingResult, setDiagnosingResult] = useState(false);
+  const [resultDiagnostic, setResultDiagnostic] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string>();
   const stems = useStems(id, audioUrl);
   const [progress, setProgress] = useState<PipelineProgress | null>(null);
@@ -54,11 +63,15 @@ export const Song = () => {
       db.charts.where('songId').equals(id).first(),
       db.analyses.where('songId').equals(id).first(),
     ]);
-    setSong(s ?? null);
-    setChart(c);
-    setAnalysis(a);
-    lineStarts.current = chartLineStarts(c, a?.lyrics?.lines);
-    return s;
+    const pending = getPendingAnalysis(id);
+    const shownChart = pending?.chart ?? c;
+    const shownAnalysis = pending?.analysis ?? a;
+    setUnsaved(!!pending);
+    setSong(pending?.song ?? s ?? null);
+    setChart(shownChart);
+    setAnalysis(shownAnalysis);
+    lineStarts.current = chartLineStarts(shownChart, shownAnalysis?.lyrics?.lines);
+    return pending?.song ?? s;
   }, [id]);
 
   // Follows the analysis through the module-level job registry, so leaving and reopening the page keeps showing it.
@@ -83,9 +96,10 @@ export const Song = () => {
   );
 
   const analyze = useCallback(() => {
+    setRuntimeError(null);
     setProgress({ label: 'Preparando o áudio' });
-    startAnalysis(id, (onProgress) => runPipeline(id, onProgress)).catch(() => {
-      // status and message are stored on the song
+    startAnalysis(id, (onProgress) => runPipeline(id, onProgress)).catch((error: unknown) => {
+      setRuntimeError(error instanceof Error ? error.message : 'A análise falhou.');
     });
     return follow();
   }, [id, follow]);
@@ -128,6 +142,8 @@ export const Song = () => {
   const saveChart = async (patch: Partial<Chart>) => {
     if (!chart) return;
     setChart({ ...chart, ...patch });
+    const pending = getPendingAnalysis(id);
+    if (pending) { pending.chart = { ...pending.chart, ...patch, updatedAt: new Date().toISOString() }; return; }
     await db.charts.update(chart.id, { ...patch, updatedAt: new Date().toISOString() });
   };
 
@@ -143,7 +159,7 @@ export const Song = () => {
       player.current?.pause();
       const chartId = chart?.id;
       if (!chartId) return;
-      void db.charts.update(chartId, { lineTimes: times, updatedAt: new Date().toISOString() }).then(() => load());
+      void saveChart({ lineTimes: times }).then(() => load());
     },
   });
   const syncing = syncMode.syncing;
@@ -248,7 +264,7 @@ export const Song = () => {
               <Timer className="size-4" /> Sincronizar
             </Button>
           )}
-          <Link to={`/musica/${song.id}/editar`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
+          {!unsaved && <><Link to={`/musica/${song.id}/editar`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
             <Pencil className="size-4" /> Editar letra e acordes
           </Link>
           <Link to={`/palco/musica/${song.id}`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
@@ -257,18 +273,18 @@ export const Song = () => {
           <Link to={`/musica/${song.id}/partitura`} className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm hover:bg-muted">
             <Music4 className="size-4" /> Partitura
           </Link>
-          <AddToSetlist songId={song.id} />
+          <AddToSetlist songId={song.id} /></>}
           <ExportButton songIds={[song.id]} title={song.title} />
-          <Button variant="ghost" onClick={() => setEditingInfo((v) => !v)} aria-pressed={editingInfo}>
+          {!unsaved && <Button variant="ghost" onClick={() => setEditingInfo((v) => !v)} aria-pressed={editingInfo}>
             <Info className="size-4" /> Dados
-          </Button>
-          {analysis?.lyrics && (
+          </Button>}
+          {!unsaved && analysis?.lyrics && (
             <Button variant="ghost" onClick={() => setShowLyrics((v) => !v)} aria-pressed={showLyrics}>
               <FileText className="size-4" /> Trocar letra
             </Button>
           )}
           {audioUrl && (
-            <IconButton label="Analisar de novo" onClick={() => void analyze()} disabled={!!progress}>
+            <IconButton label="Analisar de novo" onClick={() => void analyze()} disabled={unsaved || !!progress || !!stems.progress}>
               <RefreshCw className="size-4" />
             </IconButton>
           )}
@@ -290,25 +306,55 @@ export const Song = () => {
       {progress && !lyricsPending && <AnalysisProgress progress={progress} />}
       {progress && lyricsPending && <TranscribingBar progress={progress} />}
 
-      {!progress && song.analysisStatus === 'error' && (
+      {!progress && unsaved && (
+        <details className="mt-6 max-w-2xl rounded-lg border border-border p-4">
+          <summary className="cursor-pointer text-sm">Salvar ou exportar resultado</summary>
+          <p className="mt-1 text-sm text-muted-foreground">A letra e os acordes estão disponíveis nesta sessão. Recarregar ou fechar o app descarta este resultado. Exporte um pacote para preservá-lo ou tente salvar novamente. A edição completa fica disponível após salvar.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button disabled={savingResult || diagnosingResult} onClick={() => {
+              setSavingResult(true);
+              setResultSaveError(null);
+              void savePendingAnalysis(id).then(() => load())
+                .catch((error: unknown) => setResultSaveError(error instanceof Error ? error.message : 'O navegador recusou a gravação novamente.'))
+                .finally(() => setSavingResult(false));
+            }}>{savingResult ? 'Salvando…' : 'Tentar salvar sem reanalisar'}</Button>
+            <ExportButton songIds={[id]} title={song.title} label="Exportar resultado" />
+            <Button variant="outline" disabled={savingResult || diagnosingResult} onClick={() => {
+              setDiagnosingResult(true);
+              void (async () => {
+                const audio = await db.audio.get(id);
+                setResultDiagnostic(await diagnoseAudioImport(getPendingAnalysis(id)?.error, { size: audio?.blob.size ?? 0, type: audio?.mimeType ?? '' }));
+              })().catch((error: unknown) => setResultDiagnostic(String(error)))
+                .finally(() => setDiagnosingResult(false));
+            }}>{diagnosingResult ? 'Verificando armazenamento…' : 'Diagnosticar armazenamento'}</Button>
+          </div>
+          {resultSaveError && <p className="mt-2 text-sm text-danger" role="alert">{resultSaveError}</p>}
+          {resultDiagnostic && <textarea readOnly aria-label="Diagnóstico de armazenamento" value={resultDiagnostic} rows={8} className="mt-3 w-full rounded-lg border border-border bg-surface p-2 font-mono text-xs" onFocus={(event) => event.currentTarget.select()} />}
+        </details>
+      )}
+
+      {!progress && !unsaved && (runtimeError || song.analysisStatus === 'error') && (
         <div className="mt-8 max-w-lg rounded-lg border border-danger/40 p-4">
           <p className="font-semibold text-danger">A análise não terminou.</p>
-          <p className="mt-1 text-sm text-muted-foreground">{song.analysisError}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{runtimeError ?? song.analysisError}</p>
           <Button className="mt-4" onClick={() => void analyze()}>
             Tentar de novo
           </Button>
         </div>
       )}
 
+      {!progress && analysis?.processing && <p className="mt-3 text-xs text-muted-foreground">
+        Processamento {analysis.processing.execution === 'parallel' ? 'paralelo' : 'sequencial'} · Acordes: {formatElapsed(analysis.processing.chordsMs)} · Letra: {formatElapsed(analysis.processing.lyricsMs)} · Total: {formatElapsed(analysis.processing.totalMs)}.
+        {analysis.processing.transcriptionRetried && ' A transcrição precisou ser repetida sem concorrência.'}
+      </p>}
+      {!progress && analysis?.warnings?.map((warning, index) => <p key={index} className="mt-3 text-sm text-muted-foreground">{warning}</p>)}
       {!progress && analysis?.lyrics?.warning && <p className="mt-4 text-sm text-muted-foreground">{analysis.lyrics.warning}</p>}
       {!progress && analysis && !analysis.lyrics && (
-        <p className="mt-4 text-sm text-muted-foreground">Não encontramos a letra desta música. A cifra mostra só os acordes; busque ou cole a letra abaixo.</p>
+        <p className="mt-4 text-sm text-muted-foreground">Não foi possível transcrever a letra desta música. A cifra mostra só os acordes; tente transcrever novamente ou cole a letra abaixo.</p>
       )}
-      {!progress && analysis && (showLyrics || !analysis.lyrics) && (
+      {!progress && !unsaved && analysis && (showLyrics || !analysis.lyrics) && (
         <>
           <LyricsPanel
-            title={song.title}
-            artist={song.artist}
             durationSec={song.durationSec}
             onApply={(lyrics) =>
               void applyLyrics(song.id, lyrics).then(async () => {
@@ -364,16 +410,16 @@ export const Song = () => {
         </div>
       )}
 
-      {help && <ChordHelp chord={help.chord} anchor={help.anchor} onClose={closeHelp} />}
+      {help && <ChordHelp strict chord={help.chord} anchor={help.anchor} onClose={closeHelp} />}
 
-      {chart && showChart && <ChordPanel chordPro={chart.chordPro} transpose={chart.transpose} spellKey={shownKey} />}
+      {chart && showChart && <ChordPanel strict chordPro={chart.chordPro} transpose={chart.transpose} spellKey={shownKey} />}
 
       {audioUrl && currentRaw && showCurrent && (
         <div className="glass fixed right-4 z-30 rounded-xl border border-border p-3 shadow-sm bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+9rem)] lg:bottom-28">
           <button type="button" onClick={() => setShowCurrent(false)} className="absolute right-1 top-1 rounded px-1 text-xs text-muted-foreground hover:bg-muted" aria-label="Esconder acorde atual">
             ×
           </button>
-          <ChordDiagram chord={transposeChord(toDisplayLabel(currentRaw), chart?.transpose ?? 0, shownKey ?? false)} instrument={readInstrument()} />
+          <ChordDiagram strict chord={transposeChord(toDisplayLabel(currentRaw), chart?.transpose ?? 0, shownKey ?? false)} instrument={readInstrument()} />
         </div>
       )}
 

@@ -23,7 +23,7 @@ const FORM_LABEL: Record<Instrument, string> = { violao: 'Forma', teclado: 'Inve
  * How to play a chord, opened by tapping it in the chart: its notes, a diagram for the chosen
  * instrument and the other ways to play it.
  */
-export const ChordHelp = ({ chord, anchor, onClose }: { chord: string; anchor?: DOMRect; onClose: () => void }) => {
+export const ChordHelp = ({ chord, anchor, onClose, strict = false }: { chord: string; anchor?: DOMRect; onClose: () => void; strict?: boolean }) => {
   const [instrument, setInstrument] = useState<Instrument>(readInstrument);
   const [variant, setVariant] = useState(0);
   const [count, setCount] = useState(0);
@@ -72,7 +72,7 @@ export const ChordHelp = ({ chord, anchor, onClose }: { chord: string; anchor?: 
         <InstrumentToggle value={instrument} onChange={setInstrument} />
       </div>
       <div className="mt-3 flex justify-center">
-        <ChordDiagram chord={chord} instrument={instrument} variant={variant} onVariants={setCount} size="lg" />
+        <ChordDiagram chord={chord} instrument={instrument} variant={variant} onVariants={setCount} size="lg" strict={strict} />
       </div>
       {count > 1 && (
         <div className="mt-2 flex items-center justify-between text-sm">

@@ -8,10 +8,11 @@ export const CAVAQUINHO = { name: 'Cavaquinho', tuning: [62, 67, 71, 74] } as co
  * chord note sounds (the fifth may be left out when there are more notes than strings), within a
  * four-fret hand position. Shapes with the root in the bass and lower on the neck come first.
  */
-export const findVoicings = (pcs: readonly number[], rootPc: number, tuning: readonly number[], { maxFret = 12, max = 6 } = {}): GuitarShape[] => {
+export const findVoicings = (pcs: readonly number[], rootPc: number, tuning: readonly number[], { maxFret = 12, max = 6, strictBass = false, strictNotes = false } = {}): GuitarShape[] => {
   const strings = tuning.length;
   const unique = [...new Set(pcs.map((p) => ((p % 12) + 12) % 12))];
   const needed = unique.length > strings ? unique.filter((pc) => pc !== (rootPc + 7) % 12) : unique;
+  if (strictNotes && needed.length > strings) return [];
   const required = needed.slice(0, strings);
   const allowed = new Set(unique);
   const found = new Map<string, { shape: GuitarShape; score: number }>();
@@ -22,6 +23,7 @@ export const findVoicings = (pcs: readonly number[], rootPc: number, tuning: rea
       if (i === strings) {
         const notes = acc.map((f, s) => (tuning[s]! + f) % 12);
         if (!required.every((pc) => notes.includes(pc))) return;
+        if (strictBass && Math.min(...acc.map((fret, string) => tuning[string]! + fret)) % 12 !== pcs[0]) return;
         const fretted = acc.filter((f) => f > 0);
         const lo = fretted.length ? Math.min(...fretted) : 0;
         const hi = fretted.length ? Math.max(...fretted) : 0;

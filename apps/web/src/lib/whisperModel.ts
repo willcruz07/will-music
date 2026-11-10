@@ -12,6 +12,17 @@ export const whisperModelFor = (device: WhisperDevice): string =>
 /** Approximate download of each model, for the setup screen. */
 export const WHISPER_BYTES: Record<WhisperDevice, number> = { webgpu: 300 * 1024 * 1024, wasm: 80 * 1024 * 1024 };
 
+/** Config/tokenizer files alone do not make a model available offline. Both selected q4 networks are required. */
+export const whisperCacheReady = async (device: WhisperDevice): Promise<boolean> => {
+  if (typeof caches === 'undefined') return false;
+  try {
+    const name = whisperModelFor(device).split('/')[1]!;
+    const keys = (await (await caches.open('transformers-cache')).keys()).map((request) => new URL(request.url).pathname);
+    const required = ['config.json', 'tokenizer.json', 'tokenizer_config.json', 'preprocessor_config.json', 'onnx/encoder_model_q4.onnx', 'onnx/decoder_model_merged_q4.onnx'];
+    return required.every((file) => keys.some((path) => path.includes(`/${name}/resolve/`) && path.endsWith(`/${file}`)));
+  } catch { return false; }
+};
+
 /** The device this browser will use (a GPU object is not enough: blocklisted GPUs return no adapter). */
 export const detectWhisperDevice = async (): Promise<WhisperDevice> => {
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;

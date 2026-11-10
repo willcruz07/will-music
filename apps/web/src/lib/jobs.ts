@@ -5,6 +5,13 @@ type Job = { promise: Promise<void>; progress?: PipelineProgress; listeners: Set
 
 // Lives outside React so a song page mounted later can follow an analysis that is already running.
 const jobs = new Map<string, Job>();
+const finishedListeners = new Set<(songId: string, succeeded: boolean) => void>();
+
+/** Observe future jobs too, including analyses started after a song page mounts. */
+export const subscribeAnalysisFinished = (listener: (songId: string, succeeded: boolean) => void): (() => void) => {
+  finishedListeners.add(listener);
+  return () => { finishedListeners.delete(listener); };
+};
 
 export const isRunning = (songId: string): boolean => jobs.has(songId);
 
@@ -14,14 +21,21 @@ export const startAnalysis = (songId: string, run: (onProgress: (p: PipelineProg
   const job: Job = { promise: Promise.resolve(), listeners: new Set() };
   jobs.set(songId, job);
   job.promise = (async () => {
+    let succeeded = false;
     try {
       await run((p) => {
         job.progress = p;
         for (const listener of job.listeners) listener(p);
       });
+      // The pipeline can preserve chords while reporting a failed transcription.
+      // That partial result must not automatically launch another expensive model.
+      succeeded = !job.progress?.tasks?.some((task) => task.status === 'error');
     } finally {
       jobs.delete(songId);
       for (const listener of job.listeners) listener('done');
+      for (const listener of finishedListeners) {
+        try { listener(songId, succeeded); } catch (error) { console.error('Falha ao acompanhar conclusão da análise', error); }
+      }
     }
   })();
   return job.promise;

@@ -1,5 +1,6 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { type Analysis, type Chart, type ScoreRecord, type Setlist, type Song, db, now } from './db.ts';
+import { getPendingAnalysis } from './pendingAnalysis.ts';
 
 export const PACKAGE_VERSION = 1;
 const NOT_A_PACKAGE = 'Este arquivo não é um pacote do will-music.';
@@ -32,18 +33,19 @@ export const exportSongs = async (
   const ids: string[] = [];
   for (const id of songIds) {
     if (ids.includes(id)) continue;
-    const song = await db.songs.get(id);
+    const pending = getPendingAnalysis(id);
+    const song = pending?.song ?? await db.songs.get(id);
     if (!song) continue;
     ids.push(id);
     const base = `songs/${id}/`;
     files[`${base}song.json`] = json(song);
-    const chart = await db.charts.where('songId').equals(id).first();
+    const chart = pending?.chart ?? await db.charts.where('songId').equals(id).first();
     if (chart) {
       const { chordPro, ...rest } = chart;
       files[`${base}chart.cho`] = strToU8(chordPro);
       files[`${base}chart.json`] = json(rest);
     }
-    const analysis = await db.analyses.where('songId').equals(id).first();
+    const analysis = pending?.analysis ?? await db.analyses.where('songId').equals(id).first();
     if (analysis) files[`${base}analysis.json`] = json(analysis);
     const score = await db.scores.get(id);
     if (score) files[`${base}score.json`] = json(score);

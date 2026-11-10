@@ -1,5 +1,8 @@
 /// <reference lib="webworker" />
-import { analyzeChords, analyzeKey, downmixMean, estimateKeyFromChords, type KeyResult, MODELS, modelVersion, verifyCqtPlan } from '@will-music/engine';
+import { analyzeKey, downmixMean, estimateKeyFromChords, type KeyResult, type ModelId, MODELS, modelVersion } from '@will-music/engine';
+import { createLvAnalyzer } from '../lib/lvInference.ts';
+import { analyzeLvSong } from '../lib/lvSong.ts';
+import { CHORD_MODELS } from '../lib/models.ts';
 import { fetchModel } from '../lib/models.ts';
 import { createWebRunner } from '../lib/webRunner.ts';
 import type { WorkerRequest, WorkerResponse } from './protocol.ts';
@@ -9,19 +12,21 @@ const post = (message: WorkerResponse) => (self as DedicatedWorkerGlobalScope).p
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   if (event.data.type !== 'analyze') return;
   try {
-    const pcm = downmixMean(event.data.channels);
-    const total = MODELS.chordnet.bytes + MODELS.cqtPlan.bytes + MODELS.skey.bytes;
+    const pcm = event.data.channels.length === 1 ? event.data.channels[0]! : downmixMean(event.data.channels);
+    const total = CHORD_MODELS.reduce((sum, id) => sum + MODELS[id].bytes, 0);
     let base = 0;
-    const load = async (id: 'chordnet' | 'cqtPlan' | 'skey') => {
+    // Keep a session copy: if the browser refuses caching, subsequent blocks must not download again.
+    const assets = new Map<ModelId, Uint8Array<ArrayBuffer>>();
+    const load = async (id: ModelId) => {
       const bytes = await fetchModel(id, (loaded) => post({ type: 'progress', stage: 'models', done: base + loaded, total }));
       base += MODELS[id].bytes;
       return bytes;
     };
-    const plan = await verifyCqtPlan(await load('cqtPlan'));
-    const chordRunner = await createWebRunner(await load('chordnet'));
-    const keyRunner = await createWebRunner(await load('skey'));
+    for (const id of CHORD_MODELS) assets.set(id, await load(id));
+    const analyze = await createLvAnalyzer(async (id) => assets.get(id)!);
+    const chords = await analyzeLvSong(pcm, (clip, detail) => analyze(clip, detail), (done, runs, detail) => post({ type: 'progress', stage: 'chords', done, total: runs, detail }));
+    const keyRunner = await createWebRunner(assets.get('skey')!);
     try {
-      const chords = await analyzeChords(pcm, plan, chordRunner, (done, runs) => post({ type: 'progress', stage: 'chords', done, total: runs }));
       post({ type: 'progress', stage: 'key', done: 0, total: 1 });
       // A key-model failure (e.g. a very short clip) must not throw away the chords already detected.
       let key: KeyResult;
@@ -32,9 +37,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         key = estimateKeyFromChords(chords);
         keyModel = 'estimado-pelos-acordes';
       }
-      post({ type: 'result', key, chords, models: { chords: modelVersion('chordnet'), cqtPlan: modelVersion('cqtPlan'), key: keyModel, chordDecoder: 'adaptive-3-frame-v1' } });
+      post({ type: 'result', key, chords, models: { chords: modelVersion('lv0'), chordEnsemble: CHORD_MODELS.filter((id) => /^lv[0-4]$/.test(id)).map(modelVersion).join('+'), cqtPlan: modelVersion('lvPlans'), key: keyModel, chordDecoder: 'lv-polyphase-context-30s-v1' } });
     } finally {
-      await chordRunner.release();
       await keyRunner.release();
     }
   } catch (error) {
