@@ -34,6 +34,15 @@ const goTo = async (name: string) => {
 beforeEach(() => play.mockClear());
 
 describe('Constelação de acordes page', () => {
+  it('offers inversions of the current chord directly and preserves the chosen bass in the path', async () => {
+    await startAtC();
+    const positions = screen.getByRole('region', { name: 'Acorde atual: C · inversões' });
+    await userEvent.click(within(positions).getByRole('button', { name: 'C/E, 1ª inversão' }));
+    expect(screen.getByTestId('progression')).toHaveTextContent('C → C/E');
+    expect(screen.getByRole('region', { name: 'Acorde atual: C/E · inversões' })).toBeInTheDocument();
+    expect(play).toHaveBeenCalled();
+  });
+
   it('starts from a chosen chord and opens its orbit on tap', async () => {
     open();
     await userEvent.click(screen.getByRole('radio', { name: /^Dm,/ }));
@@ -73,7 +82,7 @@ describe('Constelação de acordes page', () => {
     await goTo('G7');
     const diary = screen.getByRole('list', { name: 'Caminho' });
     const g7 = within(diary).getByRole('button', { name: 'Voltar para G7' });
-    const motion = within(g7.closest('li')!).getByText('tensiona');
+    const motion = within(g7.closest('li')!).getByText('Preparação / tensão');
     expect(g7.style.color).toBe(motion.style.color);
     expect(g7.style.color).not.toBe('');
   });
@@ -83,7 +92,7 @@ describe('Constelação de acordes page', () => {
     await goTo('Am7');
     await goTo('G7');
     await goTo('C7M');
-    expect(screen.getByTestId('pattern')).toHaveTextContent('relaxa → tensiona → resolve');
+    expect(screen.getByTestId('pattern')).toHaveTextContent('Notas em comum → Preparação / tensão → Chegada local');
   });
 
   it('each type in the balloon is in the color of its own move, and the altered one says so', async () => {
@@ -91,16 +100,16 @@ describe('Constelação de acordes page', () => {
     await userEvent.pointer({ keys: '[TouchA]', target: star('G7') });
     const balloon = screen.getByRole('dialog', { name: /G/ });
     const label = (re: RegExp) => within(balloon).getByRole('radio', { name: re }).closest('label')!;
-    expect(label(/^G7,/).dataset.motion).toBe('tensiona');
-    expect(label(/^G7\(b9\)/).dataset.motion).toBe('tensão alterada');
+    expect(label(/^G7,/).dataset.motion).toBe('Preparação / tensão');
+    expect(label(/^G7\(b9\)/).dataset.motion).toBe('Tensão com alteração');
     // Not all green: the plain and the altered tension have different colors.
     expect(label(/^G7\(b9\)/).style.borderColor).not.toBe(label(/^G7,/).style.borderColor);
     await userEvent.click(within(balloon).getByRole('radio', { name: /^G7\(b9\)/ }));
-    expect(within(balloon).getByText('tensão alterada')).toBeInTheDocument();
+    expect(within(balloon).getByText('Tensão com alteração')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Ir' }));
     const diary = screen.getByRole('list', { name: 'Caminho' });
-    expect(within(diary).getByText('tensão alterada')).toBeInTheDocument();
-    expect(screen.getByTestId('pattern')).toHaveTextContent('tensão alterada');
+    expect(within(diary).getByText('Tensão com alteração')).toBeInTheDocument();
+    expect(screen.getByTestId('pattern')).toHaveTextContent('Tensão com alteração');
   });
 
   it('the balloon lists the types of the chosen root with a hint, and choosing one only selects', async () => {
@@ -110,18 +119,20 @@ describe('Constelação de acordes page', () => {
     expect(within(balloon).getByRole('radio', { name: /^G7,/ })).toBeChecked();
     await userEvent.click(within(balloon).getByRole('radio', { name: /^G7\(b9\)/ }));
     expect(within(balloon).getByRole('radio', { name: /^G7\(b9\)/ })).toBeChecked();
-    expect(within(balloon).getByText(/tensão escura/)).toBeInTheDocument();
-    expect(play).toHaveBeenLastCalledWith(expect.any(String), expect.any(Array));
+    expect(within(balloon).getByText(/nona menor/)).toBeInTheDocument();
+    expect(play).not.toHaveBeenCalled();
     expect(screen.getByTestId('progression')).toHaveTextContent(/^C$/);
     await userEvent.click(within(balloon).getByRole('button', { name: 'Ir' }));
     expect(screen.getByTestId('progression')).toHaveTextContent('C → G7(b9)');
     // The dark color asks for the minor resolution first.
-    expect(screen.getByRole('button', { name: 'Cm7, resolve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cm7, Chegada local' })).toBeInTheDocument();
   });
 
-  it('plays the chord when selecting and the whole trail on demand', async () => {
+  it('previews a transition explicitly and plays the preserved trail on demand', async () => {
     await startAtC();
     await userEvent.pointer({ keys: '[TouchA]', target: star('Dm7') });
+    expect(play).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Ouvir transição' }));
     expect(play).toHaveBeenLastCalledWith(expect.any(String), expect.any(Array));
     await userEvent.click(screen.getByRole('button', { name: 'Ir' }));
     await userEvent.click(screen.getByRole('button', { name: 'Ouvir o caminho' }));

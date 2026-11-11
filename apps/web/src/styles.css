@@ -24,6 +24,7 @@
   --motion-tension-text: #b45309;
   --motion-altered-text: #be185d;
   --motion-relax-text: #0e7490;
+  --motion-transform-text: #6d28d9;
   /* Chord names on a star filled with a move color. */
   --on-motion: #0b1220;
   --danger: #b42318;
@@ -47,6 +48,7 @@
   --motion-tension-text: #fbbf24;
   --motion-altered-text: #f472b6;
   --motion-relax-text: #22d3ee;
+  --motion-transform-text: #c4b5fd;
   --danger: #f97066;
 }
 

@@ -1,110 +1,11 @@
-import { Check, RotateCcw, Volume2, X } from 'lucide-react';
 import { useState } from 'react';
-import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
 import { harmonicField, pcOf, scaleNotes } from '../lib/chordTheory.ts';
-import { intervalName } from './blocks.tsx';
 import type { Block } from './types.ts';
 import { PlayButton, SilentModeHint, chordEvents, useStudySynth } from './widgets.tsx';
 import { ProgressionPractice } from './ProgressionPractice.tsx';
 
-const chip = (active: boolean) =>
-  `min-h-10 scroll-mx-4 whitespace-nowrap rounded-lg px-3 text-sm ${active ? 'bg-primary font-semibold text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`;
-
-/* ---------- Ear training: hear two notes, name the interval ---------- */
-
-const SETS = {
-  basicos: { label: 'Básicos', semis: [3, 4, 5, 7, 12] },
-  todos: { label: 'Todos', semis: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
-} as const;
-type SetId = keyof typeof SETS;
-
-const newQuestion = (set: SetId, random: () => number) => {
-  const pool = SETS[set].semis;
-  return { root: 55 + Math.floor(random() * 12), semis: pool[Math.floor(random() * pool.length)]! };
-};
-
-export const IntervalTrainer = ({ random = Math.random }: { random?: () => number }) => {
-  const synth = useStudySynth();
-  const [set, setSet] = useState<SetId>('basicos');
-  const [q, setQ] = useState(() => newQuestion('basicos', random));
-  const [answer, setAnswer] = useState<number | null>(null);
-  const [score, setScore] = useState({ right: 0, total: 0 });
-
-  const play = (harmonic = false) =>
-    synth.play(harmonic ? 'intervalo-juntas' : 'intervalo', harmonic ? [{ time: 0, dur: 1.2, pitch: q.root }, { time: 0, dur: 1.2, pitch: q.root + q.semis }] : [{ time: 0, dur: 0.7, pitch: q.root }, { time: 0.75, dur: 0.9, pitch: q.root + q.semis }]);
-  const next = (s: SetId = set) => {
-    synth.stop();
-    setQ(newQuestion(s, random));
-    setAnswer(null);
-  };
-  const choose = (semis: number) => {
-    if (answer !== null) return;
-    setAnswer(semis);
-    setScore((sc) => ({ right: sc.right + (semis === q.semis ? 1 : 0), total: sc.total + 1 }));
-  };
-
-  return (
-    <div className="mt-6 max-w-2xl">
-      <h2 className="text-xl font-semibold">Treino de intervalos</h2>
-      <p className="mt-1 text-muted-foreground">Ouça as duas notas e diga a distância entre elas. Cante o intervalo por dentro antes de responder.</p>
-      <ScrollStrip className="mt-4" role="radiogroup" label="Intervalos do treino" selected={set} onKeyDown={rovingKeys} innerClassName="gap-2">
-        {(Object.keys(SETS) as SetId[]).map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="radio"
-            aria-checked={set === id}
-            onClick={() => {
-              setSet(id);
-              next(id);
-            }}
-            className={chip(set === id)}
-          >
-            {SETS[id].label}
-          </button>
-        ))}
-      </ScrollStrip>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={() => play()} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 font-semibold text-primary-foreground">
-          <Volume2 className="size-4" /> Ouvir (melódico)
-        </button>
-        <button type="button" onClick={() => play(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 hover:bg-muted">
-          Ouvir juntas
-        </button>
-        <button type="button" onClick={() => next()} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 hover:bg-muted">
-          <RotateCcw className="size-4" /> Próximo
-        </button>
-      </div>
-      <SilentModeHint className="mt-1.5" />
-      <div role="group" aria-label="Qual é o intervalo?" className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {SETS[set].semis.map((s) => {
-          const state = answer === null ? '' : s === q.semis ? 'border-green-500 bg-green-500/15' : s === answer ? 'border-red-500 bg-red-500/15' : 'opacity-60';
-          return (
-            <button key={s} type="button" onClick={() => choose(s)} disabled={answer !== null} className={`min-h-11 rounded-lg border border-border px-3 text-left text-sm ${state}`}>
-              {intervalName(s)}
-            </button>
-          );
-        })}
-      </div>
-      <p role="status" className="mt-4 min-h-6 text-sm">
-        {answer !== null &&
-          (answer === q.semis ? (
-            <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
-              <Check className="size-4" /> Certo: {intervalName(q.semis).toLowerCase()}.
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
-              <X className="size-4" /> Era {intervalName(q.semis).toLowerCase()}.
-            </span>
-          ))}
-      </p>
-      <p className="text-sm text-muted-foreground">
-        Acertos: <span className="tabular-nums">{score.right} de {score.total}</span>
-      </p>
-    </div>
-  );
-};
+export { EarArena as IntervalTrainer } from './EarArena.tsx';
 
 /* ---------- Circle of fifths ---------- */
 

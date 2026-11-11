@@ -7,22 +7,25 @@ const at = (moves: Move[]) => Object.fromEntries(moves.map((m) => [chordName(m.t
 const pcs = (name: string) => new Set(chordNotes(name)!);
 
 describe('harmony v2: relax, tension, resolution', () => {
-  it('from G7 there is only resolution or more tension, never its own substitutes', () => {
+  it('from G7 distinguishes local resolution, substitution and continuation', () => {
     const m = at(neighbors({ root: 7, quality: '7' }, C));
     expect(m['C7M']!.motion).toBe('resolve');
-    for (const n of ['Am7', 'Em7', 'Ab7M']) expect(m[n]!.motion).toBe('resolve');
+    for (const n of ['Am7', 'Ab7M']) expect(m[n]!.motion).toBe('resolve');
+    expect(m['Em7']!.motion).toBe('relaxa');
+    expect(m['Db7']!.relation).toBe('substituicao');
     expect(m['C7']!.motion).toBe('tensiona');
     expect(m['F#7']!.motion).toBe('tensiona');
-    for (const n of ['Bm7(b5)', 'Db7', 'Dm7']) expect(m[n]).toBeUndefined();
+    for (const n of ['Bm7(b5)', 'Dm7']) expect(m[n]).toBeUndefined();
   });
 
-  it('no dominant ever offers a chord with its own tritone as the next step', () => {
+  it('a tritone substitution preserves the shared tritone and destination in every key', () => {
     for (let r = 0; r < 12; r++) {
       const tritone = [(r + 4) % 12, (r + 10) % 12];
       for (const move of neighbors({ root: r, quality: '7' }, startCenter({ root: r, quality: '7' }))) {
-        if (move.motion !== 'tensiona') continue;
+        if (move.relation !== 'substituicao') continue;
         const notes = pcs(chordName(move.to, move.nextCenter));
-        expect(tritone.every((p) => notes.has(p)), chordName(move.to, move.nextCenter)).toBe(false);
+        expect(tritone.every((p) => notes.has(p)), chordName(move.to, move.nextCenter)).toBe(true);
+        expect(move.resolvesTo?.root).toBe((r + 5) % 12);
       }
     }
   });
@@ -56,11 +59,11 @@ describe('harmony v2: relax, tension, resolution', () => {
     expect(m['G7']!.motion).toBe('tensiona');
   });
 
-  it('A7 → Dm7 resolves and moves the center to Dm (the ii of C); Dm7 still prepares G7', () => {
+  it('A7 → Dm7 resolves locally without replacing C as reference', () => {
     const toDm = at(neighbors({ root: 9, quality: '7' }, C))['Dm7']!;
     expect(toDm.motion).toBe('resolve');
-    expect(toDm.nextCenter).toEqual({ root: 2, minor: true });
-    expect(toDm.why).toContain('Dm (o ii de C)');
+    expect(toDm.nextCenter).toEqual(C);
+    expect(toDm.localTarget?.root).toBe(2);
     expect(at(neighbors(toDm.to, toDm.nextCenter))['G7']!.motion).toBe('tensiona');
   });
 
@@ -106,7 +109,7 @@ describe('harmony v2: relax, tension, resolution', () => {
     expect(Object.keys(o)).toEqual(expect.arrayContaining(['G', 'G7M', 'G7', 'G7(9)', 'G7(13)', 'G7(b9)', 'G7(#5)', 'G7sus4']));
     expect(o['G']!.motion).toBe('relaxa');
     expect(o['G7(b9)']!.motion).toBe('tensiona');
-    expect(o['G7M']!.nextCenter).toEqual({ root: 7, minor: false });
+    expect(o['G7M']!.nextCenter).toEqual(C);
     for (const x of g.options) expect(x.why.length).toBeGreaterThan(10);
   });
 
@@ -235,11 +238,11 @@ describe('altered chords', () => {
 });
 
 describe('a plain dominant offers both resolutions', () => {
-  it('E7 in C resolves to Am7 (local) and also to A7M, which moves the center to A', () => {
+  it('E7 offers local major and minor arrivals without automatic modulation', () => {
     const m = at(neighbors({ root: 4, quality: '7' }, C));
     expect(m['Am7']!.motion).toBe('resolve');
     expect(m['A7M']!.motion).toBe('resolve');
-    expect(m['A7M']!.nextCenter).toEqual({ root: 9, minor: false });
+    expect(m['A7M']!.nextCenter).toEqual(C);
     expect(m['A7M']!.options.map((o) => o.to.quality)).toEqual(expect.arrayContaining(['', '7M', '6']));
     const resolves = neighbors({ root: 4, quality: '7' }, C).filter((x) => x.motion === 'resolve');
     expect(chordName(resolves[0]!.to, resolves[0]!.nextCenter)).toBe('Am7');

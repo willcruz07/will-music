@@ -21,7 +21,7 @@ const TOOLS: { tab: string; label: string; about: string; icon: typeof Guitar }[
   { tab: 'ciclo', label: 'Ciclo de quintas e quartas', about: 'Armaduras, relativos e vizinhos', icon: CircleDot },
   { tab: 'progressoes', label: 'Progressões', about: 'Em qualquer tom, para ouvir e tocar', icon: ListMusic },
   { tab: 'braco', label: 'Explorador de escalas', about: 'Famílias, posições, teclado e tablatura', icon: Piano },
-  { tab: 'intervalos', label: 'Treino de ouvido', about: 'Reconheça intervalos', icon: Ear },
+  { tab: 'intervalos', label: 'Arena de Ouvido', about: 'Desafios musicais e treino de notas', icon: Ear },
 ];
 
 const levelLabel = (l: Level) => LEVELS.find((x) => x.id === l)!.label;

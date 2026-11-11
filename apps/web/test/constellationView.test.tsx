@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ALTERED_COLOR, ConstellationView, MOTION_COLOR, colorOf, textColorOf } from '../src/constellation/ConstellationView.tsx';
+import { ALTERED_COLOR, ConstellationView, MOTION_COLOR, colorOf, motionLabel, textColorOf } from '../src/constellation/ConstellationView.tsx';
 import { chordName, parseChord } from '../src/constellation/harmony.ts';
 import { type Web, openFocus, orbit, previewStars, startWeb, walk } from '../src/constellation/web.ts';
 
@@ -42,14 +42,14 @@ describe('ConstellationView', () => {
 
   it('labels every orbit star with its motion', () => {
     render(<ConstellationView web={openFocus(startWeb(parseChord('G7')!))} selected={null} {...handlers()} />);
-    expect(screen.getByRole('button', { name: 'C7M, resolve' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'C7, tensiona' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'C7M, Chegada local' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'C7, Preparação / tensão' })).toBeInTheDocument();
   });
 
   it('shows the sectors of the current orbit as a legend', () => {
     const { unmount } = render(<ConstellationView web={web()} selected={null} {...handlers()} />);
-    expect(screen.getByText('Relaxar')).toBeInTheDocument();
-    expect(screen.getByText('Tensionar')).toBeInTheDocument();
+    expect(screen.getByText('Continuidade / notas comuns')).toBeInTheDocument();
+    expect(screen.getByText('Preparação / tensão')).toBeInTheDocument();
     unmount();
   });
 
@@ -78,7 +78,7 @@ describe('ConstellationView', () => {
       const w = walk(start, first.move);
       const { unmount } = render(<ConstellationView web={w} selected={null} {...handlers()} />);
       for (const l of orbit(w)) {
-        const label = `${chordName(l.move.to, l.move.nextCenter)}, ${l.move.motion}`;
+        const label = `${chordName(l.move.to, l.move.nextCenter)}, ${motionLabel(l.move)}`;
         expect(screen.getByRole('button', { name: (n) => n === label || n === `${label}, alterado` })).toBeInTheDocument();
       }
       unmount();
@@ -110,9 +110,9 @@ describe('ConstellationView: review fixes', () => {
 describe('altered tensions in pink', () => {
   it('marks altered tensions with their own label and legend entry', () => {
     render(<ConstellationView web={web()} selected={null} {...handlers()} />);
-    expect(screen.getByRole('button', { name: 'C#°7, tensiona, alterado' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'G7, tensiona' })).toBeInTheDocument();
-    expect(screen.getByText('Tensão alterada')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'C#°7, Tensão com alteração' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'G7, Preparação / tensão' })).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'Movimentos' })).getByText('Tensão com alteração')).toBeInTheDocument();
   });
 });
 
@@ -181,9 +181,9 @@ describe('the trail in the colors of its actions', () => {
     expect(textColorOf(tension.move)).not.toBe('var(--motion-resolve-text)');
   });
 
-  it('always shows the four entries of the legend', () => {
+  it('always shows the five entries of the legend', () => {
     render(<ConstellationView web={web()} selected={null} {...handlers()} />);
-    for (const t of ['Resolver', 'Tensionar', 'Tensão alterada', 'Relaxar']) expect(screen.getByText(t)).toBeInTheDocument();
+    for (const t of ['Chegada local', 'Preparação / tensão', 'Tensão com alteração', 'Continuidade / notas comuns', 'Transformação / substituição']) expect(within(screen.getByRole('list', { name: 'Movimentos' })).getByText(t)).toBeInTheDocument();
   });
 });
 

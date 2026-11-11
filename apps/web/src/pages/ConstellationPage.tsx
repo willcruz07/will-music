@@ -1,13 +1,16 @@
 import { ArrowLeft, Guitar, Play, RotateCcw, Sparkles, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ChordHelp } from '../components/ChordHelp.tsx';
 import { ConstellationView, colorOf, motionLabel, textColorOf } from '../constellation/ConstellationView.tsx';
-import { type Motion, type Move, isAltered, centerName, chordKey, chordName, parseChord } from '../constellation/harmony.ts';
+import { type Motion, type Move, centerName, chordKey, chordName, groupOf, parseChord, RELATION_NAMES } from '../constellation/harmony.ts';
 import { type StartChoice, StartPicker, startChord } from '../constellation/StartPicker.tsx';
-import { type Web, focusOn, openFocus, orbit, resetWeb, startWeb, walk } from '../constellation/web.ts';
-import { SilentModeHint, chordEvents, useStudySynth } from '../study/widgets.tsx';
+import { type Web, adoptCenter, focusOn, openFocus, orbit, resetWeb, startWeb, walk } from '../constellation/web.ts';
+import { SilentModeHint, useStudySynth } from '../study/widgets.tsx';
 import { Button } from '../ui/Button.tsx';
+import { constellationEvents } from '../constellation/voicing.ts';
+import { InversionPicker } from '../constellation/InversionPicker.tsx';
+import { chordNotes } from '../lib/chordNotation.ts';
 
 /** `color`: the line and ring color of the step; `text`: the same color for words (darker on light themes). */
 type Step = { name: string; motion: Motion; label: string; why: string; color: string; text: string };
@@ -20,13 +23,21 @@ type Step = { name: string; motion: Motion; label: string; why: string; color: s
 export const ConstellationPage = () => {
   const [start, setStart] = useState<StartChoice>({ pc: 0, mode: 'major' });
   const [web, setWeb] = useState<Web | null>(null);
-  const [steps, setSteps] = useState<Step[]>([]);
+
   const [selected, setSelected] = useState<string | null>(null);
   const [chosen, setChosen] = useState<Move | null>(null);
   const [help, setHelp] = useState(false);
   const synth = useStudySynth();
+  const selectedPanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selected && window.matchMedia?.('(max-width: 767px)').matches) selectedPanel.current?.scrollIntoView?.({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+  }, [selected]);
 
-  const hear = (id: string, names: string[], beats = 4) => synth.play(id, chordEvents(names, 80, beats));
+  const hear = (id: string, names: string[], beats = 2) => synth.play(id, constellationEvents(names, 80, beats));
+  const steps: Step[] = web?.visits.slice(1).map((visit, index) => {
+    const move = web.steps[index + 1];
+    return { name: chordName(visit.chord, visit.center), motion: move?.motion ?? 'relaxa', label: move ? motionLabel(move) : 'Retomada', why: move?.why ?? 'Exploração retomada neste acorde, sem inferir uma resolução.', color: move ? colorOf(move) : 'var(--glow)', text: move ? textColorOf(move) : 'var(--motion-relax-text)' };
+  }) ?? [];
 
   // Escape closes the balloon wherever the focus is.
   useEffect(() => {
@@ -50,14 +61,13 @@ export const ConstellationPage = () => {
           <Sparkles className="size-7 text-primary" /> Constelação de acordes
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Escolha um acorde e veja, em volta dele, para onde a harmonia pode ir: relaxar, tensionar ou resolver. Ande pela constelação ouvindo cada passo, escolhendo o tipo de cada acorde e lendo por que ele funciona.
+          Escolha um acorde e veja, em volta dele, para onde a harmonia pode ir: manter notas em comum, transformar, preparar ou chegar a outro acorde. Ande pela constelação ouvindo cada passo, escolhendo o tipo de cada acorde e lendo por que ele funciona.
         </p>
         <StartPicker value={start} onChange={setStart} onStart={() => setWeb(startWeb(parseChord(startChord(start))!))} />
       </section>
     );
   }
 
-  const nameOf = (key: string) => chordName(web.nodes[key]!.chord, web.nodes[key]!.center);
   const focusName = chordName(web.nodes[web.focus]!.chord, web.center);
   const links = orbit(web);
   const picked = links.find((l) => l.to === selected) ?? null;
@@ -68,65 +78,75 @@ export const ConstellationPage = () => {
     if (!link || key === selected) return;
     setSelected(key);
     setChosen(link.move);
-    hear(`sel-${key}`, [chordName(link.move.to, link.move.nextCenter)]);
   };
   const choose = (move: Move) => {
-    setChosen(move);
-    hear(`opt-${chordKey(move.to)}-${move.to.quality}`, [chordName(move.to, move.nextCenter)]);
+    synth.stop();
+    const bass = chosen?.to.bass;
+    if (bass !== undefined && (chordNotes(chordName(move.to, move.nextCenter)) ?? []).includes(bass)) {
+      const to = { ...move.to, bass };
+      setChosen({ ...move, to, why: `${move.why} Posição: ${chordName(to, move.nextCenter)}.` });
+    } else setChosen(move);
   };
   const go = (move: Move) => {
     const next = walk(web, move);
     const name = chordName(move.to, move.nextCenter);
-    setSteps((s) => [...s, { name, motion: move.motion, label: motionLabel(move), why: move.why, color: colorOf(move), text: textColorOf(move) }]);
+
     setWeb(next);
     setSelected(null);
     setChosen(null);
-    hear(`go-${chordKey(move.to)}`, [name]);
+    setHelp(false);
+    hear(`go-${chordKey(move.to)}-${move.to.quality}`, [focusName, name]);
   };
   const walkTo = (key: string) => {
     const link = links.find((l) => l.to === key);
-    if (link) go(chosen && chordKey(chosen.to) === key ? chosen : link.move);
+    if (link) go(selected === key && chosen ? chosen : link.move);
   };
-  const refocus = (key: string) => {
-    const next = focusOn(web, key);
-    const at = web.trail.indexOf(key);
-    setSteps((s) => (at >= 0 ? s.slice(0, at) : [...s, { name: nameOf(key), motion: 'relaxa', label: 'relaxa', why: `Você voltou para ${nameOf(key)} e continua daqui.`, color: 'var(--glow)', text: 'var(--motion-relax-text)' }]));
-    setWeb(next);
-    setSelected(null);
-    setChosen(null);
+  const refocus = (key: string, index?: number) => {
+    synth.stop();
+    setWeb(focusOn(web, key, index));
+    setSelected(null); setChosen(null); setHelp(false);
   };
   const reset = () => {
-    setWeb(resetWeb(web));
-    setSteps([]);
-    setSelected(null);
-    setChosen(null);
+    synth.stop(); setWeb(resetWeb(web)); setSelected(null); setChosen(null); setHelp(false);
   };
-  const progression = web.trail.map(nameOf);
+  const progression = web.visits.map(visit => chordName(visit.chord, visit.center));
   const rootName = picked ? chordName({ root: picked.move.to.root, quality: '', ...(picked.move.to.flat ? { flat: true } : {}) }, picked.move.nextCenter) : '';
+  const focusChord = web.nodes[web.focus]!.chord;
+  const canAdopt = ['maj', 'min'].includes(groupOf(focusChord.quality)) && (web.center.root !== focusChord.root || web.center.minor !== (groupOf(focusChord.quality) === 'min'));
 
   return (
     <section className="-mx-4 md:mx-0">
       <div className="flex flex-wrap items-center gap-2 px-4 md:px-0">
-        <Button variant="ghost" className="min-h-9 px-2" onClick={() => setWeb(null)} aria-label="Escolher outro acorde">
+        <Button variant="ghost" className="min-h-9 px-2" onClick={() => { synth.stop(); setWeb(null); setSelected(null); setChosen(null); setHelp(false); }} aria-label="Escolher outro acorde">
           <ArrowLeft className="size-4" />
         </Button>
         <h1 className="text-xl font-bold tracking-tight">Constelação de acordes</h1>
-        <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">Centro tonal: {centerName(web.center)}</span>
+        <span className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">Centro de referência: {centerName(web.center)}</span>
+        {canAdopt && <Button variant="outline" className="min-h-9 text-xs" onClick={() => { synth.stop(); setWeb(adoptCenter(web, { root: focusChord.root, minor: groupOf(focusChord.quality) === 'min' })); setSelected(null); setChosen(null); }}>Adotar {chordName({ root: focusChord.root, quality: groupOf(focusChord.quality) === 'min' ? 'm' : '' }, web.center)} como centro</Button>}
       </div>
+      <p className="mt-2 px-4 text-xs text-muted-foreground md:px-0">As ligações são possibilidades de estudo. Uma chegada local não confirma modulação; adote outro centro quando essa for sua intenção. As cores não medem tensão absoluta.</p>
+      <div className="mt-4 px-4 md:px-0"><InversionPicker chord={focusChord} center={web.center} title={`Acorde atual: ${focusName} · inversões`} disableCurrent onChange={bass => {
+        const to = { ...focusChord, bass };
+        go({ to, motion: 'relaxa', relation: 'transformacao', nextCenter: web.center, options: [], why: `${chordName(to, web.center)}: mesmas notas de ${focusName}; ${bass === undefined ? 'fundamental' : chordName({ root: bass, quality: '' }, web.center)} no baixo. A inversão muda a disposição, sem confirmar outra tonalidade.`, ...(web.nodes[web.focus]!.resolvesTo ? { resolvesTo: web.nodes[web.focus]!.resolvesTo } : {}) });
+      }} /></div>
 
       <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="relative h-[62dvh] overflow-hidden border-y border-border bg-surface/40 md:h-[calc(100dvh-11rem)] md:rounded-2xl md:border">
           <ConstellationView web={web} selected={selected} onSelect={select} onWalk={walkTo} onFocusStar={refocus} onOpen={() => setWeb(openFocus(web))} />
           {!web.opened && <p className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-sm text-muted-foreground">Toque no acorde para abrir os caminhos.</p>}
 
+        </div>
+
+        <aside className="space-y-4 px-4 md:px-0">
           {picked && chosen && (
             <div
+              ref={selectedPanel}
               role="dialog"
               aria-label={`Tipos de ${rootName}`}
-              className="absolute inset-x-3 bottom-3 max-h-[70%] overflow-y-auto rounded-2xl border border-border bg-surface/95 p-4 shadow-[0_12px_40px_-12px_rgb(0_0_0/0.6)] backdrop-blur md:inset-x-auto md:right-3 md:w-96"
+              className="rounded-2xl border border-primary/40 bg-surface p-4 shadow-lg"
             >
               <div className="flex items-start gap-2">
-                <p className="min-w-0 flex-1 text-sm text-muted-foreground">Escolha o tipo do acorde: ele muda a intenção do próximo passo.</p>
+                <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">Próximo acorde</p><h2 className="text-2xl font-semibold text-chord">{chordName(chosen.to, chosen.nextCenter)}</h2><p className="mt-1 text-xs text-muted-foreground">Escolha primeiro o baixo e, se desejar, outra qualidade.</p></div>
                 <button
                   type="button"
                   aria-label="Fechar"
@@ -139,6 +159,13 @@ export const ConstellationPage = () => {
                   <X className="size-4" />
                 </button>
               </div>
+              <div className="mt-3"><InversionPicker chord={chosen.to} center={chosen.nextCenter} title="Inversões do próximo acorde" onChange={bass => {
+                synth.stop();
+                const to = { ...chosen.to, bass };
+                const baseWhy = picked.move.options.find(option => option.to.quality === chosen.to.quality)?.why ?? picked.move.why;
+                setChosen({ ...chosen, to, why: `${baseWhy} Posição: ${chordName(to, chosen.nextCenter)}.`, options: [] });
+              }} /></div>
+              <h3 className="mt-4 text-sm font-semibold">Qualidade e extensões</h3>
               <div role="radiogroup" aria-label={`Tipos de ${rootName}`} className="mt-2 flex flex-wrap gap-1.5">
                 {picked.move.options.map((o) => {
                   const name = chordName(o.to, o.nextCenter);
@@ -151,7 +178,7 @@ export const ConstellationPage = () => {
                       style={on ? { background: colorOf(o), borderColor: colorOf(o), color: 'var(--on-motion)' } : { borderColor: colorOf(o), color: textColorOf(o) }}
                       data-motion={motionLabel(o)}
                     >
-                      <input type="radio" name="tipo" className="sr-only" checked={on} onChange={() => choose(o)} aria-label={`${name}, ${o.motion}${o.motion === 'tensiona' && isAltered(o.to) ? ', alterado' : ''}`} />
+                      <input type="radio" name="tipo" className="sr-only" checked={on} onChange={() => choose(o)} aria-label={`${name}, ${motionLabel(o)}`} />
                       {name}
                     </label>
                   );
@@ -163,14 +190,15 @@ export const ConstellationPage = () => {
                 </span>
                 {chosen.why}
               </p>
+              {chosen.relation && <p className="mt-2 text-xs font-semibold text-chord">{RELATION_NAMES[chosen.relation]}</p>}
+              {chosen.localTarget && <p className="mt-1 text-xs text-muted-foreground">Destino / chegada local: {chordName(chosen.localTarget, web.center)} · referência: {centerName(web.center)}</p>}
+              <div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => hear('transicao', [focusName, chordName(chosen.to, chosen.nextCenter)])}>Ouvir transição</Button><Button variant="outline" onClick={() => hear('acorde', [chordName(chosen.to, chosen.nextCenter)])}>Ouvir acorde</Button></div>
               <Button className="mt-3 w-full" onClick={() => go(chosen)}>
                 Ir
               </Button>
             </div>
           )}
-        </div>
 
-        <aside className="space-y-4 px-4 md:px-0">
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" className="min-h-9 px-3" onClick={() => hear('trilha', progression, 2)}>
               <Play className="size-4" /> Ouvir o caminho
@@ -183,6 +211,7 @@ export const ConstellationPage = () => {
             </Button>
           </div>
           <SilentModeHint />
+          <p className="text-xs text-muted-foreground">Voicings de estudo: notas comuns e movimentos próximos são favorecidos. O baixo e todas as notas da fórmula são preservados; isso não substitui um arranjo completo.</p>
 
           <div>
             <h2 className="text-sm font-semibold">Seu caminho</h2>
@@ -208,7 +237,7 @@ export const ConstellationPage = () => {
             <ol aria-label="Caminho" className="mt-3 space-y-2 text-sm">
               {steps.map((s, i) => (
                 <li key={`${i}-${s.name}`} className="border-l-2 pl-3" style={{ borderColor: s.color }}>
-                  <button type="button" aria-label={`Voltar para ${s.name}`} title={`Voltar para ${s.name}`} onClick={() => refocus(web.trail[i + 1]!)} className="rounded font-semibold underline-offset-4 hover:underline" style={{ color: s.text }}>
+                  <button type="button" aria-label={`Voltar para ${s.name}`} title={`Voltar para ${s.name}`} onClick={() => refocus(web.trail[i + 1]!, i + 1)} className="rounded font-semibold underline-offset-4 hover:underline" style={{ color: s.text }}>
                     {s.name}
                   </button>{' '}
                   <span className="text-xs font-semibold" style={{ color: s.text }}>
@@ -221,7 +250,7 @@ export const ConstellationPage = () => {
           </div>
         </aside>
       </div>
-      {help && <ChordHelp chord={focusName} onClose={() => setHelp(false)} />}
+      {help && <ChordHelp chord={focusName} onClose={() => setHelp(false)} strict />}
     </section>
   );
 };
