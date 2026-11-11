@@ -2,11 +2,11 @@ import { Check, RotateCcw, Volume2, X } from 'lucide-react';
 import { useState } from 'react';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
-import { harmonicField } from '../lib/chordTheory.ts';
+import { harmonicField, pcOf, scaleNotes } from '../lib/chordTheory.ts';
 import { LessonBlocks, intervalName } from './blocks.tsx';
 import { SCALE_LIBRARY, type ScaleId } from './theory.ts';
 import type { Block } from './types.ts';
-import { SilentModeHint, useStudySynth } from './widgets.tsx';
+import { PlayButton, SilentModeHint, chordEvents, useStudySynth } from './widgets.tsx';
 import { SheetSelect } from '../ui/SheetSelect.tsx';
 
 const chip = (active: boolean) =>
@@ -130,16 +130,26 @@ export const signatureText = (n: number): string =>
   n === 0 ? 'Sem acidentes' : n > 0 ? `${n} sustenido${n > 1 ? 's' : ''}: ${SHARPS.slice(0, n).join(' ')}` : `${-n} bemo${-n > 1 ? 'is' : 'l'}: ${FLATS.slice(0, -n).join(' ')}`;
 
 export const CircleOfFifths = ({ onChord }: { onChord: (chord: string) => void }) => {
+  const synth = useStudySynth();
   const [sel, setSel] = useState(0);
   const key = CIRCLE[sel]!;
   const left = CIRCLE[(sel + 11) % 12]!;
   const right = CIRCLE[(sel + 1) % 12]!;
   const field = harmonicField(key.major, 'major');
+  const notes = scaleNotes(key.major, 'major');
+  const cadence = [field[1]!.tetrad, field[4]!.tetrad, field[0]!.tetrad];
+  const examples = [
+    { id: 'fifths', label: 'Quintas: sentido horário', chords: Array.from({ length: 4 }, (_, index) => CIRCLE[(sel + index) % 12]!.major), hint: 'Fundamentais avançando por quintas. Os acordes maiores aqui demonstram o caminho; não pertencem todos ao campo do tom inicial.' },
+    { id: 'fourths', label: 'Quartas: sentido anti-horário', chords: Array.from({ length: 4 }, (_, index) => CIRCLE[(sel - index + 12) % 12]!.major), hint: 'Fundamentais avançando por quartas. O mesmo sentido aparece em muitas resoluções de dominantes.' },
+    { id: 'cadence', label: 'ii–V–I: preparação e resolução', chords: cadence, hint: 'O ii prepara o V7, que resolve no I7M. As fundamentais seguem por quartas e as qualidades vêm do campo maior selecionado.' },
+  ];
+  const activeExample = examples.find(example => synth.playing === `circle-${example.id}`);
+  const highlighted = new Set(activeExample?.chords.map(chord => pcOf(/^[A-G][#b]*/u.exec(chord)![0])) ?? []);
   return (
     <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,22rem)_1fr]">
       <div>
         <h2 className="text-xl font-semibold">Ciclo de quintas e quartas</h2>
-        <p className="mt-1 text-sm text-muted-foreground">No sentido horário cada tom fica uma quinta acima (ganha um sustenido); no anti-horário, uma quarta acima (ganha um bemol). Dentro, o relativo menor.</p>
+        <p className="mt-1 text-sm text-muted-foreground">No sentido horário, cada centro fica uma quinta acima; no anti-horário, uma quarta acima. Os nomes menores mostram os relativos. A armadura muda um acidente por passo, com troca de grafia enarmônica na passagem entre sustenidos e bemóis.</p>
         <div role="radiogroup" aria-label="Tom no ciclo" className="relative mx-auto mt-4 aspect-square w-full max-w-[20rem]" onKeyDown={rovingKeys}>
           <div className="absolute inset-[12%] rounded-full border border-border" aria-hidden />
           {CIRCLE.map((k, i) => {
@@ -153,9 +163,9 @@ export const CircleOfFifths = ({ onChord }: { onChord: (chord: string) => void }
                 aria-checked={i === sel}
                 aria-label={`${k.major} maior (relativo ${k.minor})`}
                 tabIndex={i === sel ? 0 : -1}
-                onClick={() => setSel(i)}
+                onClick={() => { synth.stop(); setSel(i); }}
                 style={{ left: `${50 + 41 * Math.cos(a)}%`, top: `${50 + 41 * Math.sin(a)}%` }}
-                className={`absolute flex size-14 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border text-sm leading-tight ${
+                className={`absolute flex size-14 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border text-sm leading-tight ${highlighted.has(pcOf(k.major)) ? 'ring-2 ring-chord ring-offset-2 ring-offset-background' : ''} ${
                   i === sel ? 'border-primary bg-primary font-bold text-primary-foreground' : near ? 'border-primary/60 bg-surface' : 'border-border bg-surface hover:bg-muted'
                 }`}
               >
@@ -165,6 +175,7 @@ export const CircleOfFifths = ({ onChord }: { onChord: (chord: string) => void }
             );
           })}
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">Ao ouvir um exemplo, os centros usados ficam destacados no círculo. O destaque mostra o caminho completo, sem acompanhamento nota a nota.</p>
       </div>
       <div aria-live="polite">
         <h3 className="font-[family-name:var(--font-display)] text-2xl font-semibold">{key.major} maior</h3>
@@ -175,9 +186,15 @@ export const CircleOfFifths = ({ onChord }: { onChord: (chord: string) => void }
           <dd>{key.minor} (mesmas notas, começa no 6º grau)</dd>
           <dt className="text-muted-foreground">Tons vizinhos</dt>
           <dd>
-            {left.major} (IV) e {right.major} (V): diferem por uma nota, ótimos para modular
+            {left.major} (IV) e {right.major} (V): cada escala compartilha seis classes de altura com {key.major} maior
           </dd>
         </dl>
+        <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+          <h4 className="font-semibold">Entenda {key.major} maior</h4>
+          <p className="mt-2 text-sm text-muted-foreground">Notas: {notes.join(' · ')}. A tônica é {key.major}; {key.minor} é o relativo menor e usa a mesma armadura, mas organiza a escuta em outro centro.</p>
+          <p className="mt-2 text-sm text-muted-foreground">{right.major}7 pode preparar a chegada a {key.major}. Já {key.major}7 pode conduzir a {left.major}: a sétima menor transforma a qualidade do acorde e muda sua intenção harmônica.</p>
+          <p className="mt-2 text-sm text-muted-foreground">O círculo organiza relações entre notas e tonalidades, mas não determina sozinho uma progressão. Visitar um acorde vizinho também não significa, por si só, mudar de tom.</p>
+        </div>
         <p className="mt-4 text-sm font-semibold">Campo harmônico (toque para ver o acorde)</p>
         <ul aria-label={`Campo harmônico de ${key.major}`} className="mt-2 flex flex-wrap gap-2">
           {field.map((d) => (
@@ -186,12 +203,29 @@ export const CircleOfFifths = ({ onChord }: { onChord: (chord: string) => void }
                 <span className="block text-[11px] text-muted-foreground">{d.tetradRoman}</span>
                 <span className="font-bold text-chord">{d.tetrad}</span>
               </button>
+              <button type="button" aria-label={`Ouvir ${d.tetrad}`} aria-pressed={synth.playing === `circle-chord-${d.tetrad}`} onClick={() => synth.play(`circle-chord-${d.tetrad}`, chordEvents([d.tetrad], 90, 2))} className="mt-1 block min-h-10 w-full rounded-lg border border-border px-2 text-xs hover:bg-muted">Ouvir</button>
             </li>
           ))}
         </ul>
         <p className="mt-4 text-sm text-muted-foreground">
           Os acordes dominantes resolvem no sentido anti-horário: {right.major}7 → {key.major}, {key.major}7 → {left.major}. É por isso que o ciclo também é chamado de ciclo de quartas.
         </p>
+        <section className="mt-5 space-y-3">
+          <h4 className="font-semibold">Ouça os caminhos</h4>
+          {examples.map(example => <div key={example.id} className="rounded-xl border border-border p-3"><p className="text-sm font-semibold">{example.label}</p><p className="mt-1 font-semibold text-chord">{example.chords.join(' → ')}</p><p className="mt-1 text-sm text-muted-foreground">{example.hint}</p><div className="mt-3"><PlayButton active={synth.playing === `circle-${example.id}`} onClick={() => synth.play(`circle-${example.id}`, chordEvents(example.chords, 90, 2))} label={example.label} /></div></div>)}
+        </section>
+        <section className="mt-5">
+          <h4 className="font-semibold">O que muda nos tons vizinhos?</h4>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">{[left, right].map(neighbor => {
+            const nextNotes = scaleNotes(neighbor.major, 'major');
+            const currentPcs = new Set(notes.map(pcOf));
+            const nextPcs = new Set(nextNotes.map(pcOf));
+            const removed = notes.filter(note => !nextPcs.has(pcOf(note)));
+            const added = nextNotes.filter(note => !currentPcs.has(pcOf(note)));
+            return <div key={neighbor.major} className="rounded-xl border border-border p-3"><p className="font-semibold">{key.major} → {neighbor.major}</p><p className="mt-1 text-sm text-muted-foreground">Sai {removed.join(', ')}; entra <strong className="text-chord">{added.join(', ')}</strong>.</p><p className="mt-1 text-xs text-muted-foreground">{nextNotes.join(' · ')}</p><button type="button" onClick={() => { synth.stop(); setSel(CIRCLE.indexOf(neighbor)); }} className="mt-2 min-h-10 rounded-lg bg-muted px-3 text-sm">Explorar {neighbor.major}</button></div>;
+          })}</div>
+          <p className="mt-2 text-xs text-muted-foreground">A comparação usa classes de altura: na passagem entre sustenidos e bemóis, notas em comum podem aparecer com nomes enarmônicos diferentes, como F# e Gb.</p>
+        </section>
       </div>
     </div>
   );
