@@ -38,7 +38,7 @@ export const HARMONIA: Lesson[] = [
     title: 'Tríades: maior, menor, diminuta e aumentada',
     summary: 'O acorde de três notas e como a terça muda o seu caráter.',
     blocks: [
-      t('Uma **tríade** é a nota fundamental (tônica) mais a **terça** e a **quinta** acima dela. É a terça que decide o "sentimento": com **terça maior** (4 semitons) o acorde é maior; com **terça menor** (3 semitons), menor.'),
+      t('Uma **tríade** é formada pela **fundamental**, pela **terça** e pela **quinta**. Fundamental é a referência do acorde; tônica é a referência da tonalidade. Em Dm dentro de Dó maior, Ré é a fundamental de Dm, enquanto Dó pode continuar sendo a tônica. É a terça que decide o "sentimento": com **terça maior** (4 semitons) o acorde é maior; com **terça menor** (3 semitons), menor.'),
       { kind: 'list', items: ['**Maior (C):** 1 – 3M – 5J → Dó, Mi, Sol.', '**Menor (Cm):** 1 – 3m – 5J → Dó, Mi♭, Sol.', '**Diminuta (C°):** 1 – 3m – 5b → Dó, Mi♭, Sol♭. Tensa, instável.', '**Aumentada (C+):** 1 – 3M – 5# → Dó, Mi, Sol#. Som de suspense.'] },
       { kind: 'chords', chords: ['C', 'Cm', 'C°', 'C+'], caption: 'As quatro tríades de Dó' },
       { kind: 'exercise', steps: ['Toque C e depois Cm: só a terça muda (Mi → Mi♭). Faça o mesmo com G/Gm e D/Dm.', 'Cante a tônica, a terça e a quinta de cada acorde (arpejo) antes de tocar.'] },
@@ -51,8 +51,8 @@ export const HARMONIA: Lesson[] = [
     title: 'Campo harmônico maior',
     summary: 'Os sete acordes que pertencem a um tom e por que eles soam "em casa".',
     blocks: [
-      t('Empilhando terças só com as notas da escala, cada grau gera um acorde. Na escala maior o resultado é sempre o mesmo padrão: **I maior, ii menor, iii menor, IV maior, V maior, vi menor e viiø meio-diminuto** (em Dó, Bm(b5)). O vii grau é o **meio-diminuto**: menor com quinta bemol; com a sétima vira Bm7(b5). Não confunda com o **diminuto** (°7), que tem a sétima diminuta.'),
-      { kind: 'progression', name: 'Campo harmônico (tríades)', degrees: ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii(b5)'], key: 'C' },
+      t('Empilhando terças só com as notas da escala, cada grau gera um acorde. Na escala maior o resultado é sempre o mesmo padrão: **I maior, ii menor, iii menor, IV maior, V maior, vi menor e vii° diminuto** (em Dó, B° = Si–Ré–Fá). A tríade do VII grau é diminuta. Acrescentando a sétima menor, temos a tétrade **meio-diminuta**, Bm7(b5) = Si–Ré–Fá–Lá. Já B°7 tem sétima diminuta, Lá♭.'),
+      { kind: 'progression', name: 'Campo harmônico (tríades)', degrees: ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'], key: 'C' },
       t('Os numerais em maiúscula indicam acordes maiores; em minúscula, menores. O "°" indica diminuto. Em Sol, por exemplo: G, Am, Bm, C, D, Em, F#°.'),
       { kind: 'tip', text: 'Quando um acorde de uma música não está no campo harmônico, ele é um "visitante" (dominante secundário, empréstimo modal…). Isso aparece nos próximos níveis.' },
     ],
@@ -80,7 +80,7 @@ export const HARMONIA: Lesson[] = [
     blocks: [
       t('A **escala menor natural** começa no 6º grau da maior. Lá menor tem as mesmas notas de Dó maior; por isso Am é o **relativo menor** de C. A diferença está em onde a música "descansa".'),
       { kind: 'scale', scale: 'minor', root: 'A' },
-      { kind: 'progression', name: 'Campo harmônico menor natural', degrees: ['i', 'iiø', 'III', 'iv', 'v', 'VI', 'VII'], mode: 'minor', key: 'A' },
+      { kind: 'progression', name: 'Campo harmônico menor natural', degrees: ['i', 'ii°', 'III', 'iv', 'v', 'VI', 'VII'], mode: 'minor', key: 'A' },
       { kind: 'tip', text: 'No tom menor quase sempre se usa o **V maior** (E7 em Lá menor), emprestado da menor harmônica, para dar mais força de volta à tônica.' },
     ],
   },
@@ -111,7 +111,7 @@ export const HARMONIA: Lesson[] = [
       { kind: 'list', items: ['**Autêntica (V → I):** final forte, conclusivo.', '**Plagal (IV → I):** o "amém" dos hinos.', '**Deceptiva (V → vi):** promete o I e vai para o vi; surpresa.', '**Meia cadência (termina no V):** fica em suspenso, pede continuação.'] },
       { kind: 'progression', name: 'Cadência plagal (amém)', degrees: ['I', 'IV', 'I'], key: 'F' },
       { kind: 'progression', name: 'Cadência deceptiva', degrees: ['ii7', 'V7', 'vi7'], key: 'C' },
-      { kind: 'tip', text: 'Acordes da mesma função podem se substituir: troque o I pelo vi (ou pelo iii) e a música continua coerente, mas ganha cor.' },
+      { kind: 'tip', text: 'Acordes associados à mesma função podem oferecer alternativas, mas a substituição depende da melodia, do baixo e da frase. Compare I, vi e iii sem presumir que produzem a mesma chegada.' },
     ],
   },
   {
@@ -217,10 +217,10 @@ export const HARMONIA: Lesson[] = [
     title: 'Tensões e extensões: 9, 11 e 13',
     summary: 'Quais notas acrescentar a cada acorde sem "brigar" com ele.',
     blocks: [
-      t('Continuando a empilhar terças depois da sétima surgem as **extensões**: **9ª** (= 2ª), **11ª** (= 4ª) e **13ª** (= 6ª). Elas colorem o acorde sem mudar a função.'),
+      t('Continuando a empilhar terças depois da sétima surgem as **extensões**: **9ª** (= 2ª), **11ª** (= 4ª) e **13ª** (= 6ª). Elas acrescentam cor; sua adequação depende da melodia, do registro, da condução e do contexto harmônico.'),
       { kind: 'list', title: 'Tensões disponíveis (regra prática)', items: ['**7M:** 9 e #11 (evite a 11 justa sobre a terça maior). Ex.: C7M(9).', '**m7:** 9 e 11. Ex.: Dm7(9), Dm7(11).', '**7 (dominante):** 9, #11, 13 e as alteradas b9, #9, b13 quando resolve num acorde menor ou para dar mais tensão.', '**m7(b5):** 9 (em alguns contextos) e 11.'] },
       { kind: 'chords', chords: ['C7M(9)', 'Dm7(9)', 'G7(13)', 'G7(b9)', 'E7(#9)', 'F7M(#11)'], caption: 'Acordes com tensões' },
-      { kind: 'tip', text: 'Com tensões, você pode **omitir a quinta** (e até a tônica, se o baixista tocar). O que não pode faltar é a terça e a sétima.' },
+      { kind: 'tip', text: 'Em voicings com sétima, a terça e a sétima costumam definir a qualidade. A quinta justa pode ser omitida; com baixista, a fundamental também. Isso não é regra universal: tríades, power chords e acordes sus têm outra estrutura, e sus não exige terça.' },
     ],
   },
   {
@@ -302,8 +302,8 @@ export const HARMONIA: Lesson[] = [
     blocks: [
       t('Em vez de empilhar terças, empilhe **quartas**: Ré–Sol–Dó–Fá. O som é aberto, moderno e ambíguo (não diz se é maior ou menor). O voicing de "So What" (Miles Davis / Bill Evans) é **três quartas justas e uma terça maior** no topo.'),
       t('**Clusters** são notas vizinhas tocadas juntas (Dó–Ré–Mi, ou 2ªs). Em registro médio-agudo e com pouca intensidade criam pads densos e modernos, muito usados no worship e no neo-soul.'),
-      { kind: 'chords', chords: ['Dm7(11)', 'Am7(11)', 'Csus2', 'C7M(9)'], caption: 'Acordes que soam quartais ou com clusters de 2ª' },
-      { kind: 'tip', text: 'Clusters soam melhor espaçados no grave (tônica + quinta) e apertados só no agudo. No grave, notas vizinhas embolam.' },
+      { kind: 'chords', chords: ['Dm7(11)', 'Am7(11)', 'Csus2', 'C7M(9)'], caption: 'Cifras para explorar disposições quartais ou com segundas' },
+      { kind: 'tip', text: 'A cifra não determina o voicing. Para ouvir uma disposição quartal, toque Ré3–Sol3–Dó4–Fá4; para um cluster, Dó4–Ré4–Mi4. Compare os registros: notas próximas no grave podem reduzir a clareza.' },
     ],
   },
   {

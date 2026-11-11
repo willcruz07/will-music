@@ -24,7 +24,7 @@ export const CANTO: Lesson[] = [
     title: 'Afinação: ouvir antes de cantar',
     summary: 'Treinar o ouvido e usar uma referência.',
     blocks: [
-      t('Afinar é **cantar a altura certa**. Quem desafina quase sempre ouve bem, mas ainda não liga o que ouve ao que a voz faz. O treino é ouvir uma nota, imaginá-la e então cantá-la.'),
+      t('Afinar é **cantar a altura certa**. A afinação envolve percepção, memória auditiva e coordenação vocal; a dificuldade pode estar em mais de uma dessas etapas. O treino é ouvir uma nota, imaginá-la e então cantá-la.'),
       { kind: 'list', items: ['Cante junto de uma referência (teclado, violão ou o próprio app).', 'Use o **Microfone → Voz** do app para ver na tela se a nota está acima ou abaixo.', 'Grave-se e ouça: é o jeito mais rápido de perceber onde a afinação escapa.', 'Comece por notas confortáveis, no meio da sua extensão.'] },
       { kind: 'intervals', root: 'C', semitones: [2, 4, 5, 7], caption: 'Ouça, imagine e cante cada intervalo a partir do Dó' },
       CUIDADO,
@@ -87,7 +87,7 @@ export const CANTO: Lesson[] = [
     title: 'Extensão, tessitura e classificação vocal',
     summary: 'Até onde a voz vai e onde ela mora.',
     blocks: [
-      t('**Extensão** é do grave mais grave ao agudo mais agudo que você consegue emitir. **Tessitura** é a faixa onde você canta com conforto e qualidade por bastante tempo; é ela que define a classificação: **baixo, barítono e tenor** (vozes masculinas) e **contralto, mezzo-soprano e soprano** (femininas).'),
+      t('**Extensão** é do grave mais grave ao agudo mais agudo que você consegue emitir. **Tessitura** é a faixa onde você canta com conforto e qualidade por bastante tempo; é um dos fatores da classificação, junto do timbre, das passagens e da avaliação técnica: **baixo, barítono e tenor** (vozes masculinas) e **contralto, mezzo-soprano e soprano** (femininas).'),
       { kind: 'list', items: ['O **Microfone → Voz** do app mostra a extensão que você cantou e sugere a classificação.', 'A classificação também depende do timbre e de onde ficam as passagens: um professor confirma.', 'Escolha o **tom** das músicas pela sua tessitura, não pelo tom original.'] },
       CUIDADO,
     ],
@@ -137,8 +137,8 @@ export const CANTO: Lesson[] = [
     title: 'Drivers e distorção vocal com segurança',
     summary: 'Rouquidão controlada para rock, gospel e soul.',
     blocks: [
-      t('Os **drivers** (ou distorções) são ruídos controlados adicionados à voz, produzidos por estruturas **acima das pregas vocais** (como as falsas pregas e as aritenoides), e não por "raspar" a garganta. Bem feitos, não machucam; mal feitos, causam lesões.'),
-      { kind: 'list', items: ['Aprenda primeiro a cantar **limpo, com apoio e sem tensão** naquela região.', 'Comece com volume **baixo** e a sensação de um "rosnado" ou "gemido" leve, nunca de dor.', 'Use pouco: alguns segundos em pontos de clímax.', 'Hidrate-se e descanse a voz depois.', 'Pare imediatamente se houver dor, ardência ou rouquidão depois do estudo.'] },
+      t('Os **drivers** (ou distorções) são ruídos controlados adicionados à voz, produzidos por estruturas **acima das pregas vocais** (como as falsas pregas e as aritenoides), e não por "raspar" a garganta. A aparência de facilidade não garante execução segura; efeitos vocais exigem orientação individual, e esforço ou desconforto são motivos para interromper.'),
+      { kind: 'list', items: ['Aprenda primeiro a cantar **limpo, com apoio e sem tensão** naquela região.', 'Não tente produzir distorção a partir de uma descrição escrita; procure acompanhamento técnico antes de praticar o efeito.', 'Use pouco: alguns segundos em pontos de clímax.', 'Hidrate-se e descanse a voz depois.', 'Pare imediatamente se houver dor, ardência ou rouquidão depois do estudo.'] },
       { kind: 'tip', tone: 'warning', text: 'Drivers devem ser aprendidos **com acompanhamento de um professor** de canto que domine a técnica. Este texto só explica o conceito.' },
     ],
   },

@@ -6,6 +6,8 @@ import { SCALE_LIBRARY, boxTab, fretboardBox, firstBoxFret, rhythmEvents, romanT
 import type { Block } from './types.ts';
 import { Fretboard, PlayButton, ScaleKeyboard, chordEvents, useStudySynth } from './widgets.tsx';
 import { SheetSelect } from '../ui/SheetSelect.tsx';
+import { NotationBlock } from './NotationBlock.tsx';
+import type { Instrument } from '../components/ChordDiagram.tsx';
 
 /** **bold** and *italic* inside lesson text. */
 export const Rich = ({ text }: { text: string }) => (
@@ -99,9 +101,11 @@ const ScaleBlock = ({ block, id, synth }: { block: Extract<Block, { kind: 'scale
   const notes = spellScale(root, block.scale);
   const rootPc = pcOf(root);
   const pcs = info.steps.map((s) => (rootPc + s) % 12);
-  const start = firstBoxFret(rootPc);
-  const box = fretboardBox(rootPc, info.steps, [40, 45, 50, 55, 59, 64], start);
-  const tabText = boxTab(box);
+  const cavaquinho = block.instrument === 'cavaquinho';
+  const tuning = cavaquinho ? [62, 67, 71, 74] : [40, 45, 50, 55, 59, 64];
+  const start = firstBoxFret(rootPc, tuning[0]);
+  const box = fretboardBox(rootPc, info.steps, tuning, start);
+  const tabText = boxTab(box, cavaquinho ? { 1: 'd', 2: 'B', 3: 'G', 4: 'D' } : undefined);
   const asc = info.steps.map((s, i) => ({ time: i * 0.32, dur: 0.3, pitch: 60 + rootPc + s }));
   const up = [...asc, { time: asc.length * 0.32, dur: 0.6, pitch: 72 + rootPc }];
   return (
@@ -115,10 +119,10 @@ const ScaleBlock = ({ block, id, synth }: { block: Extract<Block, { kind: 'scale
       <div className="mt-3">
         <ScaleKeyboard pcs={pcs} />
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">No braço (a tônica em verde; o quadro mostra uma posição para começar):</p>
-      <Fretboard pcs={pcs} root={rootPc} box={start} />
+      {block.instrument !== 'teclado' && <><p className="mt-3 text-xs text-muted-foreground">No braço do {cavaquinho ? 'cavaquinho' : 'violão'} (a tônica em verde; o quadro mostra uma posição para começar):</p>
+      <Fretboard pcs={pcs} root={rootPc} box={start} tuning={tuning} label={`Notas da escala no braço do ${cavaquinho ? 'cavaquinho' : 'violão'}`} />
       <p className="mt-3 text-xs text-muted-foreground">Digitação da posição em tablatura, da corda mais grave para a mais aguda:</p>
-      <pre className="thin-scrollbar mt-1 overflow-x-auto rounded-lg bg-background p-3 font-mono text-xs leading-5">{tabText}</pre>
+      <pre className="thin-scrollbar mt-1 overflow-x-auto rounded-lg bg-background p-3 font-mono text-xs leading-5">{tabText}</pre></>}
       {block.caption && (
         <p className="mt-2 text-sm text-muted-foreground">
           <Rich text={block.caption} />
@@ -163,6 +167,15 @@ const IntervalsBlock = ({ block, id, synth }: { block: Extract<Block, { kind: 'i
 
 const SOUND_NAMES = { kick: 'Bumbo', snare: 'Caixa', hihat: 'Chimbal' } as const;
 
+const ReviewQuestion = ({ block }: { block: Extract<Block, { kind: 'quiz' }> }) => {
+  const [answer, setAnswer] = useState<number | null>(null);
+  return <section className="my-4 rounded-xl border border-primary/30 bg-primary/5 p-4" aria-label="Revisão da aula">
+    <h2 className="font-semibold">Confira o que entendeu</h2><p className="mt-2">{block.question}</p>
+    <div className="mt-3 grid gap-2">{block.options.map((option, i) => <button key={i} type="button" aria-pressed={answer === i} onClick={() => setAnswer(i)} className={`min-h-11 rounded-lg border p-3 text-left text-sm ${answer === i ? 'border-primary bg-primary/10' : 'border-border bg-surface'}`}>{option}</button>)}</div>
+    {answer !== null && <p role="status" className="mt-3 text-sm"><strong>{answer === block.answer ? 'Isso mesmo. ' : 'Vamos rever. '}</strong>{block.explanation}</p>}
+  </section>;
+};
+
 const RhythmBlock = ({ block, id, synth }: { block: Extract<Block, { kind: 'rhythm' }>; id: string; synth: Synth }) => {
   const p = block.pattern;
   const perBeat = p.perBeat ?? 4;
@@ -180,7 +193,7 @@ const RhythmBlock = ({ block, id, synth }: { block: Extract<Block, { kind: 'rhyt
                 <th className="pr-2 text-left font-normal text-muted-foreground">{t.label ?? SOUND_NAMES[t.sound]}</th>
                 {[...t.pattern].map((c, i) => (
                   <td key={i} className={`h-6 w-6 border border-border text-center ${i % perBeat === 0 ? 'border-l-2 border-l-muted-foreground' : ''}`}>
-                    {c === '.' ? '' : <span className="inline-block size-3 rounded-full bg-chord" />}
+                    {c === '.' ? '' : <span aria-label={c === 'X' ? 'Acento' : c === 'o' ? 'Nota fantasma' : 'Toque'} className={`inline-block rounded-full bg-chord ${c === 'o' ? 'size-2 opacity-40' : c === 'X' ? 'size-4' : 'size-3'}`} />}
                   </td>
                 ))}
               </tr>
@@ -198,12 +211,13 @@ const RhythmBlock = ({ block, id, synth }: { block: Extract<Block, { kind: 'rhyt
           </tbody>
         </table>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">Círculo grande: acento · pequeno: nota fantasma · vazio: silêncio. Os toques têm intensidades diferentes no áudio.</p>
     </Card>
   );
 };
 
 /** Renders the blocks of a lesson; chords open the "how to play" card, examples play with the synth. */
-export const LessonBlocks = ({ blocks, lessonId }: { blocks: Block[]; lessonId: string }) => {
+export const LessonBlocks = ({ blocks, lessonId, instrument }: { blocks: Block[]; lessonId: string; instrument?: Instrument }) => {
   const synth = useStudySynth();
   const [help, setHelp] = useState<{ chord: string; anchor: DOMRect } | null>(null);
   const onHelp = (chord: string, anchor: DOMRect) => setHelp({ chord, anchor });
@@ -250,7 +264,7 @@ export const LessonBlocks = ({ blocks, lessonId }: { blocks: Block[]; lessonId: 
           case 'progression':
             return <ProgressionBlock key={i} block={b} id={id} synth={synth} onHelp={onHelp} />;
           case 'scale':
-            return <ScaleBlock key={i} block={b} id={id} synth={synth} />;
+            return <ScaleBlock key={i} block={{ ...b, instrument: b.instrument ?? instrument }} id={id} synth={synth} />;
           case 'intervals':
             return <IntervalsBlock key={i} block={b} id={id} synth={synth} />;
           case 'rhythm':
@@ -258,10 +272,15 @@ export const LessonBlocks = ({ blocks, lessonId }: { blocks: Block[]; lessonId: 
           case 'tab':
             return (
               <Card key={i} title={b.caption}>
-                <PlayButton active={synth.playing === id} onClick={() => synth.play(id, tabEvents(b.tab, b.bpm ?? 90))} label={b.caption ?? 'frase'} />
+                <PlayButton active={synth.playing === id} onClick={() => synth.play(id, tabEvents(b.tab, b.bpm ?? 90, b.tuning))} label={b.caption ?? 'frase'} />
                 <pre className="thin-scrollbar mt-3 overflow-x-auto rounded-lg bg-background p-3 font-mono text-xs leading-5">{b.tab}</pre>
+                <p className="mt-2 text-xs text-muted-foreground">Áudio simplificado: cada posição escrita vale uma colcheia; espaços e técnicas como bend e slide não são interpretados.</p>
               </Card>
             );
+          case 'notation':
+            return <NotationBlock key={i} score={b.score} caption={b.caption} id={id} synth={synth} />;
+          case 'quiz':
+            return <ReviewQuestion key={i} block={b} />;
           case 'exercise':
             return (
               <div key={i} className="my-4 rounded-xl border border-border p-4">
@@ -279,7 +298,7 @@ export const LessonBlocks = ({ blocks, lessonId }: { blocks: Block[]; lessonId: 
             return null;
         }
       })}
-      {help && <ChordHelp chord={help.chord} anchor={help.anchor} onClose={() => setHelp(null)} strict />}
+      {help && <ChordHelp key={help.chord} chord={help.chord} anchor={help.anchor} onClose={() => setHelp(null)} initialInstrument={instrument} strict />}
     </div>
   );
 };

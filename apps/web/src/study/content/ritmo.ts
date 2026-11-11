@@ -48,7 +48,7 @@ export const RITMO: Lesson[] = [
     title: 'Tercinas, 6/8 e swing',
     summary: 'Dividir o tempo em três: shuffle, gospel e baladas.',
     blocks: [
-      t('Na **tercina** o tempo é dividido em três partes iguais. O **swing** e o **shuffle** tocam só a primeira e a terceira parte da tercina ("dum-da dum-da"). O 6/8 e o 12/8 das baladas gospel vivem dessa divisão.'),
+      t('Na **tercina** o tempo é dividido em três partes iguais. Como aproximação inicial de **shuffle**, toque a primeira e a terceira subdivisões de uma tercina; o **swing** tem proporção flexível conforme andamento, frase e estilo, não uma divisão fixa universal ("dum-da dum-da"). O 6/8 e o 12/8 das baladas gospel vivem dessa divisão.'),
       { kind: 'rhythm', caption: 'Shuffle (tercinas com o meio vazio)', pattern: { bpm: 85, steps: 12, perBeat: 3, tracks: [{ sound: 'hihat', pattern: 'x.xx.xx.xx.x' }, { sound: 'kick', pattern: 'x.....x.....' }, { sound: 'snare', pattern: '...x.....x..' }] } },
       { kind: 'rhythm', caption: '12/8 de balada gospel', pattern: { bpm: 60, steps: 12, perBeat: 3, tracks: [{ sound: 'hihat', pattern: 'xxxxxxxxxxxx' }, { sound: 'kick', pattern: 'x.....x.....' }, { sound: 'snare', pattern: '...x.....x..' }] } },
     ],
@@ -62,7 +62,7 @@ export const RITMO: Lesson[] = [
     blocks: [
       t('**Groove** não é tocar mais notas, é tocar no lugar certo. **Pocket** é a margem de tempo em que a banda toca junta: mais "em cima" (pra frente, ansioso), no centro ou "atrás" (relaxado, como no neo-soul e no R&B).'),
       { kind: 'list', items: ['**Dinâmica:** acentue os tempos que importam e toque baixo o resto.', '**Notas fantasma (ghost notes):** toques bem leves na caixa entre os acentos; dão textura sem poluir.', '**Espaço:** a pausa também é ritmo. Um baixo que deixa respirar faz o groove andar.'] },
-      { kind: 'rhythm', caption: 'Groove com ghost notes na caixa', pattern: { bpm: 92, steps: 16, tracks: [{ sound: 'hihat', pattern: 'x.x.x.x.x.x.x.x.' }, { sound: 'snare', pattern: '..x.x..x.x..x..x', label: 'Caixa (acentos e fantasmas)' }, { sound: 'kick', pattern: 'x.....x...x.....' }] } },
+      { kind: 'rhythm', caption: 'Groove com ghost notes na caixa', pattern: { bpm: 92, steps: 16, tracks: [{ sound: 'hihat', pattern: 'x.x.x.x.x.x.x.x.' }, { sound: 'snare', pattern: '..o.X..o.o..X..o', label: 'Caixa (acentos e fantasmas)' }, { sound: 'kick', pattern: 'x.....x...x.....' }] } },
     ],
   },
   {

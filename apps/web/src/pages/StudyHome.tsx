@@ -10,7 +10,7 @@ import { LEVELS, type Level, type Track } from '../study/types.ts';
 const GROUPS: { id: Track['group']; about: string }[] = [
   { id: 'Teoria e harmonia', about: 'O que vale para qualquer instrumento: harmonia, ritmo, escalas e improviso.' },
   { id: 'Voz', about: 'Técnica vocal, do aquecimento aos drivers.' },
-  { id: 'Instrumentos', about: 'A teoria aplicada no violão, no teclado e na bateria.' },
+  { id: 'Instrumentos', about: 'A teoria aplicada no violão, na guitarra, no teclado, no cavaquinho e na bateria.' },
   { id: 'Estilos', about: 'Como cada gênero usa a harmonia e o ritmo.' },
 ];
 
@@ -25,6 +25,19 @@ const TOOLS: { tab: string; label: string; about: string; icon: typeof Guitar }[
 ];
 
 const levelLabel = (l: Level) => LEVELS.find((x) => x.id === l)!.label;
+const PRACTICE: Partial<Record<Track['id'], { to: string; label: string }[]>> = {
+  harmonia: [{ to: '/estudo/constelacao', label: 'Explorar na Constelação' }, { to: '/estudo/ferramentas?aba=acordes', label: 'Consultar acordes' }],
+  ritmo: [{ to: '/estudo/trilha/partituras', label: 'Ler o ritmo na partitura' }],
+  escalas: [{ to: '/estudo/ferramentas?aba=braco', label: 'Explorar escalas' }],
+  improviso: [{ to: '/estudo/ferramentas?aba=progressoes', label: 'Praticar progressões' }, { to: '/estudo/ferramentas?aba=intervalos', label: 'Treinar o ouvido' }],
+  canto: [{ to: '/microfone', label: 'Afinador e microfone' }, { to: '/estudo/ferramentas?aba=intervalos', label: 'Treinar o ouvido' }],
+  violao: [{ to: '/estudo/ferramentas?aba=braco', label: 'Explorar o braço' }, { to: '/estudo/trilha/partituras', label: 'Estudar leitura' }],
+  cavaquinho: [{ to: '/microfone', label: 'Abrir afinador' }, { to: '/estudo/trilha/partituras', label: 'Estudar leitura' }],
+  teclado: [{ to: '/estudo/ferramentas?aba=acordes', label: 'Consultar formações' }, { to: '/estudo/trilha/partituras', label: 'Estudar leitura' }],
+  bateria: [{ to: '/estudo/aula/p-percussao', label: 'Ler percussão' }],
+  estilos: [{ to: '/estudo/ferramentas?aba=progressoes', label: 'Explorar progressões' }],
+  partituras: [{ to: '/estudo/ferramentas?aba=intervalos', label: 'Relacionar leitura e ouvido' }],
+};
 
 const ProgressBar = ({ done, total, label }: { done: number; total: number; label: string }) => (
   <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -49,7 +62,7 @@ export const StudyHome = () => {
           <Mic className="size-4" /> Afinador e microfone
         </Link>
       </div>
-      <p className="mt-2 max-w-2xl text-muted-foreground">Trilhas do iniciante ao pro, com exemplos para ouvir em qualquer tom, e ferramentas para praticar.</p>
+      <p className="mt-2 max-w-2xl text-muted-foreground">Trilhas do iniciante ao pro, leitura de partituras, exemplos para ouvir e exercícios para aplicar no seu instrumento.</p>
 
       {lastLesson && (
         <Link to={`/estudo/aula/${lastLesson.id}`} className="mt-5 flex items-center gap-3 rounded-2xl border border-primary/40 bg-primary/10 p-4 hover:bg-primary/15">
@@ -157,6 +170,7 @@ export const TrackPage = () => {
       <p className="mt-2 text-xs text-muted-foreground">{track.group}</p>
       <h1 className="text-3xl font-bold tracking-tight">{track.title}</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">{track.about}</p>
+      <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Estude a explicação, ouça os exemplos e pratique antes de avançar. A marcação “estudada” registra sua leitura; use os exercícios para avaliar o que já consegue executar.</p>
       <div className="mt-4 max-w-md">
         <p className="mb-1 text-sm tabular-nums">
           {n} de {lessons.length} aulas estudadas
@@ -226,6 +240,8 @@ export const LessonPage = () => {
   const i = lessons.findIndex((l) => l.id === lesson.id);
   const prev = lessons[i - 1];
   const next = lessons[i + 1];
+  const prerequisites = (lesson.prerequisites ?? []).map(lessonById).filter((l): l is NonNullable<typeof l> => !!l);
+  const instrument = track.id === 'cavaquinho' ? 'cavaquinho' : track.id === 'teclado' ? 'teclado' : track.id === 'violao' ? 'violao' : undefined;
   const toggle = () => {
     setDone(lesson.id, !studied);
     setStudied(!studied);
@@ -241,9 +257,15 @@ export const LessonPage = () => {
       <p className="mt-2 text-lg text-muted-foreground">
         <Rich text={lesson.summary} />
       </p>
+      {(lesson.objective || prerequisites.length > 0) && <section className="mt-5 rounded-2xl border border-primary/30 bg-primary/5 p-4" aria-label="Roteiro da aula">
+        {lesson.objective && <><h2 className="text-sm font-semibold">Ao final desta aula</h2><p className="mt-1 text-sm text-muted-foreground">{lesson.objective}</p></>}
+        {prerequisites.length > 0 && <><h3 className="mt-3 text-sm font-semibold">Vale revisar antes</h3><ul className="mt-2 flex flex-wrap gap-2">{prerequisites.map(p => <li key={p.id}><Link className="inline-flex min-h-10 items-center rounded-lg border border-border bg-surface px-3 text-sm text-chord hover:border-primary" to={`/estudo/aula/${p.id}`}>{p.title}</Link></li>)}</ul></>}
+      </section>}
       <div className="mt-4 leading-relaxed">
-        <LessonBlocks key={lesson.id} blocks={lesson.blocks} lessonId={lesson.id} />
+        <LessonBlocks key={lesson.id} blocks={lesson.blocks} lessonId={lesson.id} instrument={instrument} />
       </div>
+      {!!lesson.checkpoints?.length && <section className="mt-5 rounded-xl border border-border bg-surface p-4" aria-label="Autoavaliação"><h2 className="font-semibold">Antes de avançar</h2><p className="mt-1 text-xs text-muted-foreground">Use estes critérios no seu estudo. Não é necessário marcar ou desbloquear aulas.</p><ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-muted-foreground">{lesson.checkpoints.map(check => <li key={check}>{check}</li>)}</ul></section>}
+      <nav aria-label="Pratique também" className="mt-5 flex flex-wrap gap-2">{PRACTICE[track.id]?.map(link => <Link key={link.to} to={link.to} className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 text-sm font-semibold text-chord hover:bg-muted">{link.label}</Link>)}</nav>
       <div className="mt-8 border-t border-border pt-5">
         <button
           type="button"

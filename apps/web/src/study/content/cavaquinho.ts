@@ -1,0 +1,57 @@
+import type { Block, Lesson, Level } from '../types.ts';
+
+const text = (text: string): Block => ({ kind: 'text', text });
+const chords = (chords: string[], caption: string): Block => ({ kind: 'chords', chords, caption });
+const progression = (degrees: string[], caption: string): Block => ({ kind: 'progression', key: 'C', degrees, name: caption });
+const lesson = (id: string, level: Level, title: string, summary: string, objective: string, blocks: Block[], steps: string[], checkpoints: string[], prerequisites: string[] = []): Lesson => ({ id, track: 'cavaquinho', level, title, summary, objective, prerequisites, checkpoints, blocks: [...blocks, { kind: 'exercise', title: 'Prática no cavaquinho', steps }] });
+
+export const CAVAQUINHO: Lesson[] = [
+  lesson('cv-afinacao', 'iniciante', 'Conheça e afine o cavaquinho', 'Quatro cordas, referência de altura e primeiras notas.', 'Identificar as quatro cordas e conferir a afinação brasileira.', [
+    text('Na afinação brasileira mais comum, do grave para o agudo, as cordas são **Ré4–Sol4–Si4–Ré5 (D4–G4–B4–D5)**. A 1ª é a mais aguda; a 4ª, a mais grave. Aqui Dó central é C4. Outras afinações existem: confirme a utilizada antes de seguir um desenho. A pestana do braço, os trastes e as casas ajudam a localizar cada nota; uma casa corresponde a um semitom.'),
+    text('Use o afinador do app com ataques leves. Afine uma corda de cada vez; tocar todas juntas confunde a referência. A postura deve permitir ombros soltos e acesso ao braço sem sustentar todo o instrumento apertando o polegar.'),
+    { kind: 'tab', caption: 'Cordas soltas: grave para agudo', tuning: [74, 71, 67, 62], bpm: 60, tab: 'd|----------0-|\nB|-------0----|\nG|----0-------|\nD|-0----------|' },
+    { kind: 'quiz', question: 'Qual é a 1ª corda nesta afinação?', options: ['Ré5, a mais aguda', 'Ré4, a mais grave', 'Sol4'], answer: 0, explanation: 'A numeração começa na corda aguda. A ordem grave–agudo é D4–G4–B4–D5.' },
+  ], ['Localize e diga o nome de cada corda.', 'Confira D4, G4, B4 e D5 no afinador.', 'Toque a tablatura sem encostar a palheta nas outras cordas.'], ['Reconheço cordas e oitavas antes de escolher um diagrama.']),
+  lesson('cv-primeiros-acordes', 'iniciante', 'Primeiros acordes e trocas limpas', 'Formas de maior e menor sem perder o pulso.', 'Trocar entre C, G7 e Am mantendo cada corda limpa.', [
+    text('Posicione o dedo perto do traste, sem ficar sobre ele, e use apenas a pressão necessária. Toque cada corda separadamente para localizar abafamentos involuntários. Ao trocar, procure dedos e notas comuns. O diagrama desta trilha começa no **cavaquinho**, e as variações mostram outras posições quando disponíveis.'),
+    chords(['C', 'G7', 'Am', 'Dm', 'F'], 'Primeiras formas no cavaco'),
+    progression(['I', 'V7', 'I', 'vi', 'ii', 'V7', 'I'], 'Trocas em Dó'),
+  ], ['Toque cada forma corda por corda.', 'Troque C–G7 a cada quatro pulsos em andamento confortável.', 'Repita dez trocas limpas antes de acelerar.'], ['Troco sem parar a contagem e sem apertar excessivamente.'], ['cv-afinacao']),
+  lesson('cv-palheta', 'iniciante', 'Palhetada contínua e primeiros abafamentos', 'Movimento regular com ataques selecionados.', 'Manter descidas e subidas mesmo nos silêncios.', [
+    text('Comece com **colcheias**: uma descida e uma subida por pulso. Depois subdivida em semicolcheias. O movimento pode continuar quando a palheta não encosta nas cordas. Diferencie **pausa**, em que não há ataque, de **abafado**, em que há ataque percussivo. Os sons de percussão deste exemplo são referência rítmica; não simulam o timbre do cavaquinho.'),
+    { kind: 'rhythm', caption: 'Colcheias com acento no início do grupo', sticking: '↓ ↑ ↓ ↑ ↓ ↑ ↓ ↑', pattern: { bpm: 65, steps: 8, perBeat: 2, tracks: [{ sound: 'snare', pattern: 'XxxxXxxx', label: 'Palheta' }] } },
+  ], ['Faça o movimento sem instrumento e conte 1-e, 2-e.', 'Use um acorde e toque oito colcheias.', 'Retire alguns ataques mantendo o gesto e depois experimente abafados suaves.'], ['O pulso continua quando retiro um ataque.'], ['cv-primeiros-acordes']),
+  lesson('cv-levadas', 'intermediario', 'Samba e pagode: levada e espaço', 'Dois tempos com semicolcheias e acentos.', 'Separar referência do surdo e desenho da palheta.', [
+    text('Um estudo em **2/4** contém dois pulsos de semínima, cada um dividido em quatro semicolcheias. A marcação do segundo tempo ajuda a referência do samba; a palheta constrói a síncope ao redor dela. Não existe uma única levada para todo samba ou pagode: ouça a relação com pandeiro, tantã e surdo e deixe espaço para o canto.'),
+    { kind: 'rhythm', caption: 'Estudo de dois compassos em 2/4', pattern: { bpm: 75, steps: 16, perBeat: 4, tracks: [{ sound: 'snare', pattern: 'x.xx.x.xx.xx.x.x', label: 'Palheta (referência)' }, { sound: 'kick', pattern: '....X.......X...', label: 'Marcação do segundo tempo' }] } },
+    progression(['I', 'vi7', 'ii7', 'V7'], 'Harmonia simples para manter a levada'),
+  ], ['Marque dois pulsos e conte as quatro subdivisões.', 'Pratique a palheta sem trocar de acorde.', 'Acrescente as trocas a cada dois compassos e grave sua estabilidade.'], ['Mantenho o balanço durante as trocas e diferencio acentos.'], ['cv-palheta', 'r-sincope']),
+  lesson('cv-braco', 'intermediario', 'Intervalos e escalas nas quatro cordas', 'Encontre as notas além dos desenhos.', 'Localizar tônicas e terças em mais de uma região.', [
+    text('Decorar uma forma é um começo; compreender o braço exige saber **quais notas** estão nela. Localize primeiro os Ré das cordas externas, depois as terças e quintas dos acordes. A mesma classe de nota aparece em oitavas diferentes: ouça o registro e não só o nome. O quadro abaixo usa a afinação de quatro cordas desta trilha.'),
+    { kind: 'scale', scale: 'major', root: 'C', instrument: 'cavaquinho', caption: 'Notas de Dó maior no cavaquinho' },
+  ], ['Localize todos os Dós até a 12ª casa.', 'Toque C–E–G e diga fundamental, terça e quinta.', 'Faça uma frase curta e repita em outra região.'], ['Relaciono casa, nome e intervalo.'], ['cv-primeiros-acordes', 'h-triades']),
+  lesson('cv-inversoes', 'intermediario', 'Tríades, tétrades e inversões', 'Outra nota no baixo sem trocar a identidade do acorde.', 'Distinguir inversão, posição no braço e baixo do conjunto.', [
+    text('Uma tríade tem estado fundamental e **duas inversões**. C/E coloca Mi no baixo; C/G, Sol. Uma tétrade admite mais uma inversão. Mudar de posição no braço não garante mudar a inversão. Tocando com baixista, o baixo do conjunto pode continuar na fundamental enquanto o cavaquinho muda sua disposição interna.'),
+    chords(['C', 'C/E', 'C/G', 'C7M', 'Dm7', 'G7'], 'Compare baixos e posições'),
+    progression(['ii7', 'V7', 'I7M'], 'ii–V–I com vozes próximas'),
+  ], ['Abra as formas e localize a nota mais grave de cada uma.', 'Escolha Dm7, G7 e C7M próximos no braço.', 'Mantenha uma nota comum quando possível e ouça as demais caminharem.'], ['Explico a diferença entre uma inversão e outra forma do mesmo baixo.'], ['cv-braco', 'h-inversoes']),
+  lesson('cv-tensoes', 'avancado', 'Tensões e omissões em quatro cordas', '9, 11, 13 e notas essenciais com clareza.', 'Escolher um voicing viável sem exigir cinco ou seis notas simultâneas.', [
+    text('Quatro cordas limitam a quantidade de notas simultâneas. Em acordes extensos, uma posição pode omitir a quinta justa; com baixo no conjunto, também pode omitir a fundamental. Preserve as notas que definem a qualidade e a cor pretendidas, considerando a melodia. **Sus** substitui a terça por uma suspensão; não acrescente a terça automaticamente. Se não houver forma compatível, o app informa: não transforme uma fórmula impossível numa forma incorreta.'),
+    chords(['Dm7(9)', 'G7(13)', 'G7(b9)', 'C7M(9)', 'G7sus4'], 'Explore formas disponíveis e suas notas'),
+    { kind: 'quiz', question: 'Um acorde com cinco notas cabe sempre em quatro cordas?', options: ['Sim, sem omissões', 'Não; é preciso escolher a disposição e possíveis omissões'], answer: 1, explanation: 'Uma corda produz uma nota por vez. A escolha depende da função, da melodia e dos outros instrumentos.' },
+  ], ['Compare a fórmula completa e a forma disponível.', 'Diga qual nota foi omitida, se houver.', 'Toque a extensão em volume moderado e confira sua relação com a melodia.'], ['Justifico a escolha de notas em vez de apenas decorar o desenho.'], ['cv-inversoes', 'h-tensoes']),
+  lesson('cv-passagens', 'avancado', 'Dominantes, diminutos e encadeamentos', 'Prepare o próximo acorde sem perder o ritmo.', 'Inserir uma passagem com destino explícito.', [
+    text('Antes de inserir uma passagem, escolha **onde quer chegar** e quanto tempo existe. A7 prepara Dm; C#°7 pode aproximar Dm por semitom no baixo; Db7 pode substituir G7 ao preparar C. As possibilidades dependem da melodia e do arranjo. Um acorde de passagem curto não deve deslocar o primeiro tempo da chegada.'),
+    progression(['I', 'V7/ii', 'ii7', 'V7', 'I'], 'Dominante secundário até o ii'),
+    progression(['I', '#i°7', 'ii7', 'subV7', 'I'], 'Diminuto e substituto de trítono'),
+  ], ['Toque a sequência sem as passagens.', 'Acrescente uma passagem por vez e nomeie seu destino.', 'Preserve a chegada no primeiro tempo e cante a melodia sobre a troca.'], ['A passagem conduz ao alvo sem atrapalhar pulso ou melodia.'], ['cv-tensoes', 'h-dominantes-secundarios']),
+  lesson('cv-choro', 'pro', 'Choro: melodia, articulação e acompanhamento', 'Frases claras com harmonia consciente.', 'Trabalhar uma frase curta antes de buscar velocidade.', [
+    text('No choro, articulação, direção melódica e interação são centrais. Estude pequenas frases, identifique notas do acorde e aproxime os alvos com passos diatônicos ou cromáticos. Na roda, diferencie o papel de acompanhamento do papel de solista; não é necessário preencher todos os espaços. Este é um estudo autoral de leitura no braço, não uma transcrição de repertório.'),
+    { kind: 'tab', caption: 'Frase curta em Dó nas cordas Sol e Si', bpm: 65, tuning: [74, 71, 67, 62], tab: 'd|-------------------|\nB|-------1--3--1-----|\nG|-0--2-----------2--|\nD|-------------------|' },
+    progression(['I6', 'V7/ii', 'ii7', 'V7', 'I6'], 'Base para variar a frase'),
+  ], ['Nomeie as notas e as relações com cada acorde.', 'Toque lentamente e crie uma resposta com pausas.', 'Transponha a ideia para Sol usando intervalos, não apenas deslocando dedos.'], ['Crio uma resposta musical e preservo os alvos ao transpor.'], ['cv-passagens', 'i-notas-alvo']),
+  lesson('cv-arranjo', 'pro', 'Arranjo e melodia na voz superior', 'Escolha posições a serviço da frase.', 'Montar um pequeno arranjo de acompanhamento com direção melódica.', [
+    text('A nota mais aguda de cada forma pode construir uma **melodia interna**. Escolha primeiro a linha que quer ouvir, depois encontre posições compatíveis com a harmonia. Ter notas comuns não torna qualquer sequência uma cadência: compare estabilidade, baixo, ritmo e destino. Essa exploração se conecta à Constelação, mas a escolha final deve servir à música.'),
+    chords(['C7M', 'Am7', 'Dm7', 'G7', 'C6'], 'Escolha formas com a voz superior próxima'),
+  ], ['Escreva quatro acordes e uma linha superior de quatro notas.', 'Procure formas que contenham cada nota da linha.', 'Grave uma versão simples e outra com uma única passagem; compare clareza e espaço.'], ['Consigo explicar baixo, melodia superior e omissões do meu arranjo.'], ['cv-choro', 'h-rearmonizacao']),
+];

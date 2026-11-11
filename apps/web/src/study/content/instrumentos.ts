@@ -37,7 +37,7 @@ export const VIOLAO: Lesson[] = [
     blocks: [
       t('O **CAGED** parte de que os acordes abertos C, A, G, E e D podem ser "carregados" pelo braço com a pestana fazendo o papel da pestana do violão. Cada forma tem a tônica numa corda diferente, e as cinco se encaixam como peças, cobrindo todo o braço.'),
       { kind: 'chords', chords: ['F', 'Bb', 'Bm', 'F#m', 'C#m'], caption: 'Acordes com pestana (forma de E e de A)' },
-      { kind: 'tip', text: 'Na pestana, use a **lateral do indicador** (mais ossuda) e puxe o braço levemente para trás em vez de apertar com o polegar.' },
+      { kind: 'tip', text: 'Na pestana, ajuste o apoio e a posição do indicador para usar apenas a pressão necessária. Evite puxar o braço ou contrair o polegar; se houver dor, pare e reveja a técnica com orientação.' },
     ],
   },
   {
@@ -84,8 +84,8 @@ export const VIOLAO: Lesson[] = [
     title: 'Tríades no braço e arpejos',
     summary: 'Tocar acordes em cordas agudas para arranjos e base de guitarra.',
     blocks: [
-      t('As **tríades em grupos de 3 cordas** (1-2-3, 2-3-4…) são a ferramenta do guitarrista de banda: ocupam pouco espaço sonoro, não brigam com o teclado e soam claras. Aprenda as três inversões de cada tríade em cada grupo de cordas.'),
-      { kind: 'tab', caption: 'Tríade de Sol maior nas cordas 1-2-3 (três inversões)', tab: tab('e|-3---7---10-|', 'B|-3---8---12-|', 'G|-4---7---12-|', 'D|------------|', 'A|------------|', 'E|------------|') },
+      t('As **tríades em grupos de 3 cordas** (1-2-3, 2-3-4…) são a ferramenta do guitarrista de banda: ocupam pouco espaço sonoro, não brigam com o teclado e soam claras. Aprenda as três posições de cada tríade: estado fundamental, primeira e segunda inversões em cada grupo de cordas.'),
+      { kind: 'tab', caption: 'Tríade de Sol maior nas cordas 1-2-3 (estado fundamental e duas inversões)', tab: tab('e|-3---7---10-|', 'B|-3---8---12-|', 'G|-4---7---12-|', 'D|------------|', 'A|------------|', 'E|------------|') },
     ],
   },
 ];
@@ -110,7 +110,7 @@ export const TECLADO: Lesson[] = [
     title: 'Inversões para trocar suave',
     summary: 'Mover a mão direita o mínimo possível.',
     blocks: [
-      t('Em vez de saltar com a mão direita de um acorde para outro na mesma forma, use **inversões** para que as notas comuns fiquem paradas e as outras andem um ou dois semitons. O som fica mais "profissional" e a mão cansa menos.'),
+      t('Use disposições próximas na mão direita para manter notas comuns e reduzir saltos. A **inversão do acorde completo** depende da nota mais grave que soa: Mi–Sol–Dó na direita com Dó na esquerda ainda é Dó em estado fundamental. Para C/E, o baixo do conjunto precisa ser Mi. Nem toda troca pode ser feita com movimentos de apenas um ou dois semitons.'),
       { kind: 'chords', chords: ['C', 'G/B', 'Am', 'F/A'], caption: 'Veja no diagrama de teclado e toque nas inversões' },
     ],
   },
@@ -198,7 +198,7 @@ export const BATERIA: Lesson[] = [
     summary: 'Caixa fantasma e bumbo livre sob o chimbal.',
     blocks: [
       t('**Independência** é cada membro fazer uma coisa diferente sem que um atrapalhe o outro. Comece com o chimbal fixo em colcheias e varie só o bumbo; depois acrescente notas fantasma bem leves na caixa entre os acentos do 2 e do 4.'),
-      { kind: 'rhythm', caption: 'Funk com ghost notes', pattern: { bpm: 94, steps: 16, tracks: [{ sound: 'hihat', pattern: 'x.x.x.x.x.x.x.x.' }, { sound: 'snare', pattern: '..x.x.xx.x..x.x.', label: 'Caixa (2 e 4 + fantasmas)' }, { sound: 'kick', pattern: 'x..x......x..x..' }] } },
+      { kind: 'rhythm', caption: 'Funk com ghost notes', pattern: { bpm: 94, steps: 16, tracks: [{ sound: 'hihat', pattern: 'x.x.x.x.x.x.x.x.' }, { sound: 'snare', pattern: '..o.X.oo.o..X.o.', label: 'Caixa (2 e 4 + fantasmas)' }, { sound: 'kick', pattern: 'x..x......x..x..' }] } },
     ],
   },
   {

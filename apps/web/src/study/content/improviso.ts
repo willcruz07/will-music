@@ -10,7 +10,7 @@ export const IMPROVISO: Lesson[] = [
     title: 'Primeiro solo com a pentatônica',
     summary: 'Cinco notas que funcionam sobre quase tudo num tom.',
     blocks: [
-      t('A **pentatônica** tira da escala maior as duas notas que mais "brigam" com os acordes (o 4º e o 7º grau). Sobre uma música em Lá menor (ou Dó maior), a pentatônica de Lá menor quase nunca erra.'),
+      t('A **pentatônica** tira da escala maior as duas notas que mais "brigam" com os acordes (o 4º e o 7º grau). Sobre uma música em Lá menor (ou Dó maior), a pentatônica de Lá menor é um ponto de partida; as notas sustentadas ainda precisam ser comparadas com cada acorde e com a melodia.'),
       { kind: 'scale', scale: 'minorPentatonic', root: 'A', caption: 'O desenho clássico da 5ª casa: decore esta posição primeiro.' },
       { kind: 'list', title: 'Dicas para soar musical desde o começo', items: ['**Toque pouco:** frases curtas com pausas soam melhor que notas sem parar.', '**Termine na tônica** ou numa nota do acorde que está tocando.', '**Repita a ideia:** uma frase repetida com um final diferente já é uma melodia.'] },
     ],
@@ -76,7 +76,7 @@ export const IMPROVISO: Lesson[] = [
       { kind: 'scale', scale: 'altered', root: 'G', caption: 'Alterada: b9, #9, #11 e b13 juntas.' },
       { kind: 'scale', scale: 'diminishedHW', root: 'G', caption: 'Diminuta semitom-tom: b9, #9, #11 e 13.' },
       { kind: 'scale', scale: 'wholeTone', root: 'G', caption: 'Tons inteiros: 9, #11 e b13.' },
-      { kind: 'tip', text: 'A tensão só funciona se **resolver**: termine a frase numa nota do acorde de chegada (a terça do C, por exemplo).' },
+      { kind: 'tip', text: 'Neste estudo de cadência tonal, procure **resolver** a tensão: termine a frase numa nota do acorde de chegada (a terça do C, por exemplo).' },
     ],
   },
   {

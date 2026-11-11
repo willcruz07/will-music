@@ -31,7 +31,7 @@ export const ScaleKeyboard = ({ pcs, label = 'Notas no teclado' }: { pcs: number
 const STANDARD_LOW_FIRST = [40, 45, 50, 55, 59, 64];
 
 /** Guitar neck (frets 0–15) with every note of the pitch-class set; the root is filled, the box (if any) framed. */
-export const Fretboard = ({ pcs, root, box, tuning = STANDARD_LOW_FIRST, labels }: { pcs: number[]; root: number; box?: number; tuning?: readonly number[]; labels?: Readonly<Record<number, string>> }) => {
+export const Fretboard = ({ pcs, root, box, tuning = STANDARD_LOW_FIRST, labels, label = 'Notas da escala no braço do violão' }: { pcs: number[]; root: number; box?: number; tuning?: readonly number[]; labels?: Readonly<Record<number, string>>; label?: string }) => {
   const frets = 15;
   const fw = 34;
   const sh = 18;
@@ -41,7 +41,7 @@ export const Fretboard = ({ pcs, root, box, tuning = STANDARD_LOW_FIRST, labels 
   const strings = [...tuning].reverse(); // high string on top, like the tab
   return (
     <div className="thin-scrollbar overflow-x-auto pb-1">
-      <svg viewBox={`0 0 ${left + frets * fw + 10} ${top + (strings.length - 1) * sh + 26}`} className="min-w-[34rem]" role="img" aria-label="Notas da escala no braço do violão">
+      <svg viewBox={`0 0 ${left + frets * fw + 10} ${top + (strings.length - 1) * sh + 26}`} className="min-w-[34rem]" role="img" aria-label={label}>
         {box !== undefined && <rect x={box <= 1 ? left - 18 : left + (box - 2) * fw} y={top - 9} width={left + (Math.max(0, box - 1) + 4) * fw - (box <= 1 ? left - 18 : left + (box - 2) * fw)} height={(strings.length - 1) * sh + 18} rx={8} fill="color-mix(in oklab, var(--glow) 12%, transparent)" />}
         {Array.from({ length: frets + 1 }, (_, f) => (
           <line key={f} x1={left + f * fw} y1={top} x2={left + f * fw} y2={top + (strings.length - 1) * sh} stroke="var(--border)" strokeWidth={f === 0 ? 4 : 1.5} />
@@ -104,7 +104,7 @@ export const useStudySynth = () => {
     synth.current?.stop();
     setPlaying(null);
   };
-  const play = (id: string, events: SynthEvent[], repeatSeconds = 0) => {
+  const play = (id: string, events: SynthEvent[], repeatSeconds = 0, durationSeconds = 0) => {
     if (playing === id) return stop();
     synth.current ??= createScoreSynth();
     synth.current.unlock();
@@ -112,7 +112,7 @@ export const useStudySynth = () => {
     synth.current.setEvents(events);
     synth.current.play(0, 1, repeatSeconds);
     setPlaying(id);
-    const end = Math.max(0, ...events.map((e) => e.time + e.dur));
+    const end = Math.max(0, durationSeconds, ...events.map((e) => e.time + e.dur));
     clearTimeout(timer.current);
     if (!(repeatSeconds > 0)) timer.current = window.setTimeout(() => {
       synth.current?.stop();

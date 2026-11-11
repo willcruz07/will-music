@@ -117,20 +117,17 @@ describe('study tools', () => {
 
   it('shows any scale on the fretboard', async () => {
     open('/estudo/ferramentas?aba=braco');
-    await choose('Escala', /Hirajoshi/u);
+    await userEvent.click(screen.getByRole('radio', { name: 'Orientais e árabes' }));
+    await userEvent.click(screen.getByRole('radio', { name: /Hirajoshi/u }));
     expect(screen.getByText('C · D · Eb · G · Ab')).toBeInTheDocument();
   });
 
-  it('scores the interval ear training', async () => {
+  it('opens the current ear-training arena and its free note practice', async () => {
     render(<IntervalTrainer random={() => 0} />);
-    // random 0 → first interval of the basic set: minor third
-    await userEvent.click(screen.getByRole('button', { name: 'Terça menor' }));
-    expect(screen.getByRole('status')).toHaveTextContent(/Certo/);
-    expect(screen.getByText('1 de 1')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Próximo/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Oitava' }));
-    expect(screen.getByRole('status')).toHaveTextContent(/Era terça menor/);
-    expect(screen.getByText('1 de 2')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Arena de Ouvido' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: /Laboratório de notas/ }));
+    expect(screen.getByRole('radiogroup', { name: 'Referência de notas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Começar treino livre' })).toBeInTheDocument();
   });
 });
 

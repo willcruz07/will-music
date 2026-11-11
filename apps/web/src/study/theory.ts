@@ -115,7 +115,7 @@ export const rhythmEvents = (r: RhythmPattern, repeats = 1): SynthEvent[] => {
   for (let rep = 0; rep < repeats; rep++) {
     for (const t of r.tracks) {
       [...t.pattern].forEach((c, i) => {
-        if (c === 'x' || c === 'X' || c === 'o') out.push({ time: (rep * r.steps + i) * step, dur: 0.15, drum: t.sound });
+        if (c === 'x' || c === 'X' || c === 'o') out.push({ time: (rep * r.steps + i) * step, dur: 0.15, drum: t.sound, ...(c === 'X' ? { velocity: 1 } : c === 'o' ? { velocity: 0.25 } : { velocity: 0.65 }) });
       });
     }
   }
@@ -141,8 +141,8 @@ export const parseTab = (tab: string, tuning: readonly number[] = STANDARD): { s
   return notes.sort((a, z) => a.column - z.column || z.string - a.string);
 };
 
-export const tabEvents = (tab: string, bpm = 90): SynthEvent[] => {
-  const notes = parseTab(tab);
+export const tabEvents = (tab: string, bpm = 90, tuning?: readonly number[]): SynthEvent[] => {
+  const notes = parseTab(tab, tuning);
   const columns = [...new Set(notes.map((n) => n.column))];
   const step = 60 / bpm / 2; // each written note an eighth
   return notes.map((n) => ({ time: columns.indexOf(n.column) * step, dur: step * 1.6, pitch: n.midi }));
@@ -153,10 +153,10 @@ export const pcOfNote = pcOf;
 const STRING_NAMES: Record<number, string> = { 1: 'e', 2: 'B', 3: 'G', 4: 'D', 5: 'A', 6: 'E' };
 
 /** A hand-position box as tab, one note per column from the lowest string up (high e on top). */
-export const boxTab = (box: { string: number; frets: number[] }[]): string => {
+export const boxTab = (box: { string: number; frets: number[] }[], names: Record<number, string> = STRING_NAMES): string => {
   const seq = [...box].sort((a, z) => z.string - a.string).flatMap((s) => s.frets.map((fret) => ({ string: s.string, fret })));
   return [1, 2, 3, 4, 5, 6]
     .filter((st) => box.some((b) => b.string === st))
-    .map((st) => `${STRING_NAMES[st]}|-${seq.map((n) => (n.string === st ? String(n.fret).padEnd(3, '-') : '---')).join('')}|`)
+    .map((st) => `${names[st]}|-${seq.map((n) => (n.string === st ? String(n.fret).padEnd(3, '-') : '---')).join('')}|`)
     .join('\n');
 };

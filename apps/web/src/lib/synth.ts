@@ -2,7 +2,7 @@ import { preferPlayback } from './ios.ts';
 import type { DrumKind } from '@will-music/engine';
 
 /** One sound of the score, in song seconds. */
-export type SynthEvent = { time: number; dur: number; pitch?: number; drum?: DrumKind };
+export type SynthEvent = { time: number; dur: number; pitch?: number; drum?: DrumKind; velocity?: number };
 
 export const midiToHz = (midi: number): number => 440 * 2 ** ((midi - 69) / 12);
 
@@ -69,11 +69,12 @@ export const createScoreSynth = () => {
     const out = ctx.createGain();
     out.connect(master!);
     const dur = e.dur / rate;
+    const intensity = Math.max(0.01, Math.min(1, e.velocity ?? 1));
     if (e.pitch !== undefined) {
       // Piano-like: a bright attack that fades on its own (two partials, the upper one dying faster).
       const hz = midiToHz(e.pitch);
       const end = at + dur + 0.25;
-      const peak = 0.32;
+      const peak = 0.32 * intensity;
       out.gain.setValueAtTime(0, at);
       out.gain.linearRampToValueAtTime(peak, at + 0.004);
       out.gain.exponentialRampToValueAtTime(peak * 0.35, at + Math.min(0.9, dur + 0.05));
@@ -101,7 +102,7 @@ export const createScoreSynth = () => {
       const osc = ctx.createOscillator();
       osc.frequency.setValueAtTime(150, at);
       osc.frequency.exponentialRampToValueAtTime(45, at + 0.12);
-      out.gain.setValueAtTime(0.9, at);
+      out.gain.setValueAtTime(0.9 * intensity, at);
       out.gain.exponentialRampToValueAtTime(0.001, at + 0.18);
       osc.connect(out);
       osc.start(at);
@@ -115,7 +116,7 @@ export const createScoreSynth = () => {
     filter.type = 'highpass';
     filter.frequency.value = e.drum === 'hihat' ? 7000 : 1200;
     const length = e.drum === 'hihat' ? 0.05 : 0.15;
-    out.gain.setValueAtTime(e.drum === 'hihat' ? 0.25 : 0.5, at);
+    out.gain.setValueAtTime((e.drum === 'hihat' ? 0.25 : 0.5) * intensity, at);
     out.gain.exponentialRampToValueAtTime(0.001, at + length);
     src.connect(filter).connect(out);
     src.start(at);

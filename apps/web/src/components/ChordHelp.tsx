@@ -24,8 +24,8 @@ const FORM_LABEL: Record<Instrument, string> = { violao: 'Forma', teclado: 'Inve
  * How to play a chord, opened by tapping it in the chart: its notes, a diagram for the chosen
  * instrument and the other ways to play it.
  */
-export const ChordHelp = ({ chord, anchor, onClose, strict = false, showStudyLink = true }: { chord: string; anchor?: DOMRect; onClose: () => void; strict?: boolean; showStudyLink?: boolean }) => {
-  const [instrument, setInstrument] = useState<Instrument>(readInstrument);
+export const ChordHelp = ({ chord, anchor, onClose, strict = false, showStudyLink = true, initialInstrument }: { chord: string; anchor?: DOMRect; onClose: () => void; strict?: boolean; showStudyLink?: boolean; initialInstrument?: Instrument }) => {
+  const [instrument, setInstrument] = useState<Instrument>(() => initialInstrument ?? readInstrument());
   const [variant, setVariant] = useState(0);
   const [count, setCount] = useState(0);
   const card = useRef<HTMLDivElement>(null);
