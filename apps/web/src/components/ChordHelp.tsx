@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, GraduationCap, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { chordNotes } from '../lib/chordNotation.ts';
-import { pcOf, spellChordTones } from '../lib/chordTheory.ts';
+import { CHORD_TYPES, chordFormation, pcOf, spellChordTones } from '../lib/chordTheory.ts';
 import { ChordDiagram, type Instrument } from './ChordDiagram.tsx';
 import { InstrumentToggle, readInstrument } from './ChordPanel.tsx';
 
@@ -14,7 +14,8 @@ export const chordNoteNames = (chord: string): string[] => {
   const root = m[1]!;
   const rootPc = pcOf(root);
   const dim7 = /°7|º7|dim7/u.test(m[2]!);
-  return pcs.map((pc, i) => (m[3] && i === 0 && pc !== rootPc ? m[3] : spellChordTones(root, [(pc - rootPc + 12) % 12], dim7)[0]!));
+  const spelled = CHORD_TYPES.some(type => type.suffix === m[2]) ? chordFormation(root, m[2]!).notes : [];
+  return pcs.map((pc, i) => (m[3] && i === 0 && pc !== rootPc ? m[3] : spelled.find(note => pcOf(note) === pc) ?? spellChordTones(root, [(pc - rootPc + 12) % 12], dim7)[0]!));
 };
 
 const FORM_LABEL: Record<Instrument, string> = { violao: 'Forma', teclado: 'Inversão', cavaquinho: 'Forma' };
@@ -23,7 +24,7 @@ const FORM_LABEL: Record<Instrument, string> = { violao: 'Forma', teclado: 'Inve
  * How to play a chord, opened by tapping it in the chart: its notes, a diagram for the chosen
  * instrument and the other ways to play it.
  */
-export const ChordHelp = ({ chord, anchor, onClose, strict = false }: { chord: string; anchor?: DOMRect; onClose: () => void; strict?: boolean }) => {
+export const ChordHelp = ({ chord, anchor, onClose, strict = false, showStudyLink = true }: { chord: string; anchor?: DOMRect; onClose: () => void; strict?: boolean; showStudyLink?: boolean }) => {
   const [instrument, setInstrument] = useState<Instrument>(readInstrument);
   const [variant, setVariant] = useState(0);
   const [count, setCount] = useState(0);
@@ -57,7 +58,7 @@ export const ChordHelp = ({ chord, anchor, onClose, strict = false }: { chord: s
       role="dialog"
       aria-label={`Como tocar ${chord}`}
       style={style}
-      className={`z-40 w-72 rounded-2xl border border-border bg-surface p-4 shadow-[0_16px_48px_-12px_rgb(0_0_0/0.55)] ${style ? 'fixed' : 'fixed inset-x-0 mx-auto bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+6rem)]'}`}
+      className={`z-40 max-h-[70dvh] w-72 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-2xl border border-border bg-surface p-4 shadow-[0_16px_48px_-12px_rgb(0_0_0/0.55)] ${style ? 'fixed' : 'fixed inset-x-0 mx-auto bottom-[calc(var(--nav-height)+env(safe-area-inset-bottom)+6rem)]'}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -87,9 +88,9 @@ export const ChordHelp = ({ chord, anchor, onClose, strict = false }: { chord: s
           </button>
         </div>
       )}
-      <Link to={`/estudo/ferramentas?acorde=${encodeURIComponent(chord)}`} className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-chord underline-offset-2 hover:underline">
+      {showStudyLink && <Link to={`/estudo/ferramentas?acorde=${encodeURIComponent(chord)}`} className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-chord underline-offset-2 hover:underline">
         <GraduationCap className="size-4" /> Entender este acorde
-      </Link>
+      </Link>}
     </div>
   );
 };

@@ -279,7 +279,7 @@ export const LessonBlocks = ({ blocks, lessonId }: { blocks: Block[]; lessonId: 
             return null;
         }
       })}
-      {help && <ChordHelp chord={help.chord} anchor={help.anchor} onClose={() => setHelp(null)} />}
+      {help && <ChordHelp chord={help.chord} anchor={help.anchor} onClose={() => setHelp(null)} strict />}
     </div>
   );
 };

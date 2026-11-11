@@ -11,6 +11,7 @@ import { SheetSelect } from '../ui/SheetSelect.tsx';
 import { chordNotes } from '../lib/chordNotation.ts';
 import { PlayButton, chordEvents, useStudySynth } from '../study/widgets.tsx';
 import { SCALE_CONTEXT } from '../study/scaleContext.ts';
+import { StudyChordButton, StudyChordProvider, useStudyChord } from '../study/StudyChordHelp.tsx';
 
 type Tab = 'chords' | 'theory' | 'scales' | 'circle' | 'progressions' | 'fretboard' | 'ear';
 /** The tabs, with the name each one has in links (?aba=). */
@@ -20,7 +21,7 @@ const TABS: { id: Tab; aba: string; label: string }[] = [
   { id: 'scales', aba: 'escalas', label: 'Escalas e campo harmônico' },
   { id: 'circle', aba: 'ciclo', label: 'Ciclo de quintas e quartas' },
   { id: 'progressions', aba: 'progressoes', label: 'Progressões' },
-  { id: 'fretboard', aba: 'braco', label: 'Escalas no braço' },
+  { id: 'fretboard', aba: 'braco', label: 'Explorador de escalas' },
   { id: 'ear', aba: 'intervalos', label: 'Treino de ouvido' },
 ];
 
@@ -265,6 +266,7 @@ const FormationExample = ({ title, suffixes, synth }: { title: string; suffixes:
     <div className="mt-4 grid items-start gap-4 sm:grid-cols-[auto_1fr]">
       <ChordDiagram chord={formation.name} instrument="teclado" />
       <div aria-live="polite">
+        <StudyChordButton chord={formation.name} className="mb-1 min-h-10 text-xl font-semibold text-chord hover:underline" />
         <p className="font-semibold">{info.name}</p>
         <p className="mt-1 text-sm text-muted-foreground">{info.about}</p>
         <p className="mt-2 text-sm">Fórmula: {formation.intervals.join(' – ')}</p>
@@ -272,7 +274,7 @@ const FormationExample = ({ title, suffixes, synth }: { title: string; suffixes:
         {(added.length > 0 || removed.length > 0) && <p className="mt-2 text-xs text-muted-foreground">Em relação a {base.name}: {removed.length > 0 ? `retira ${removed.join(', ')}. ` : ''}{added.length > 0 ? `acrescenta ${added.join(', ')}.` : ''}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <PlayButton active={synth.playing === id} onClick={() => synth.play(id, chordEvents([formation.name], 90, 2))} label={formation.name} />
-          <Link className="inline-flex min-h-10 items-center text-sm font-semibold text-chord hover:underline" to={`/estudo/ferramentas?acorde=${encodeURIComponent(formation.name)}`}>Ver formas e inversões</Link>
+          <StudyChordButton chord={formation.name} className="inline-flex min-h-10 items-center text-sm font-semibold text-chord hover:underline">Ver formas e inversões</StudyChordButton>
         </div>
       </div>
     </div>
@@ -386,7 +388,7 @@ const TheoryTab = () => {
         ))}
       </div>
       <p className="mt-3 text-sm text-muted-foreground">Em F/G, Sol não pertence à tríade F–A–C: é um baixo externo, não uma inversão simples de F. Em uma tétrade, colocar a sétima no baixo produz a terceira inversão.</p>
-      <div className="mt-3 flex flex-wrap gap-3">{['C', 'C/E', 'C/G', 'C7/Bb', 'F/G'].map(chord => <div key={chord} className="rounded-xl border border-border p-3"><p className="mb-2 font-semibold text-chord">{chord}</p><PlayButton active={synth.playing === `formation-bass-${chord}`} onClick={() => synth.play(`formation-bass-${chord}`, chordEvents([chord], 90, 2))} label={chord} /></div>)}</div>
+      <div className="mt-3 flex flex-wrap gap-3">{['C', 'C/E', 'C/G', 'C7/Bb', 'F/G'].map(chord => <div key={chord} className="rounded-xl border border-border p-3"><StudyChordButton chord={chord} className="mb-2 block min-h-10 font-semibold text-chord hover:underline" /><PlayButton active={synth.playing === `formation-bass-${chord}`} onClick={() => synth.play(`formation-bass-${chord}`, chordEvents([chord], 90, 2))} label={chord} /></div>)}</div>
       <p className="mt-2 text-xs text-muted-foreground">Ouça cada exemplo na ordem: C, C/E, C/G, C7/Bb e F/G.</p>
     </section>
     <section className="rounded-2xl border border-border bg-surface p-4">
@@ -526,7 +528,7 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
 };
 
 /** Study: chord dictionary and grids for guitar, keyboard and cavaquinho, chord theory, scales and harmonic fields. */
-export const StudyPage = () => {
+const StudyToolsContent = () => {
   const [params, setParams] = useSearchParams();
   const asked = parseChord(params.get('acorde'));
   const [tab, setTabState] = useState<Tab>(() => TABS.find((t) => t.aba === params.get('aba'))?.id ?? 'chords');
@@ -538,13 +540,7 @@ export const StudyPage = () => {
   const [chordKey, setChordKey] = useState(0);
   const [initial, setInitial] = useState(asked);
 
-  const openChord = (chord: string) => {
-    setInitial(parseChord(chord));
-    setChordKey((k) => k + 1);
-    setTabState('chords');
-    setParams({ acorde: chord }, { replace: true });
-    window.scrollTo?.({ top: 0 });
-  };
+  const openChord = useStudyChord();
 
   // A link that changes ?acorde= or ?aba= while this page is open (e.g. "Entender este acorde" from a
   // progression) must take effect, not only change the address.
@@ -603,3 +599,5 @@ export const StudyPage = () => {
     </section>
   );
 };
+
+export const StudyPage = () => <StudyChordProvider><StudyToolsContent /></StudyChordProvider>;

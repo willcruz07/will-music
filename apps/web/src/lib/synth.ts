@@ -43,6 +43,7 @@ export const createScoreSynth = () => {
   let scheduledUntil = 0;
   let volume = 0.7;
   let playing = false;
+  let loopDuration = 0;
   const live = new Set<AudioScheduledSourceNode>();
 
   const ensure = () => {
@@ -126,7 +127,15 @@ export const createScoreSynth = () => {
     if (!context) return;
     const songNow = anchor.song + (context.currentTime - anchor.clock) * anchor.rate;
     const until = songNow + LOOKAHEAD * anchor.rate;
-    for (const e of eventsInWindow(events, Math.max(scheduledUntil, songNow - 0.01), until)) {
+    const from = Math.max(scheduledUntil, songNow - 0.01);
+    if (loopDuration > 0) {
+      for (let cycle = Math.floor(from / loopDuration); cycle <= Math.floor(until / loopDuration); cycle++) {
+        const offset = cycle * loopDuration;
+        for (const e of eventsInWindow(events, Math.max(0, from - offset), Math.min(loopDuration, until - offset))) {
+          voice(e, anchor.clock + (e.time + offset - anchor.song) / anchor.rate, anchor.rate);
+        }
+      }
+    } else for (const e of eventsInWindow(events, from, until)) {
       voice(e, anchor.clock + (e.time - anchor.song) / anchor.rate, anchor.rate);
     }
     scheduledUntil = until;
@@ -156,12 +165,13 @@ export const createScoreSynth = () => {
       if (master) master.gain.value = v;
     },
     /** Starts (or re-anchors) playback at a song time and speed. */
-    play(songTime: number, rate: number) {
+    play(songTime: number, rate: number, repeatSeconds = 0) {
       const ctx = ensure();
       void ctx.resume();
       silence();
       anchor = { song: songTime, clock: ctx.currentTime + 0.03, rate };
       playing = true;
+      loopDuration = Number.isFinite(repeatSeconds) && repeatSeconds > 0 ? repeatSeconds : 0;
       scheduledUntil = songTime;
       clearInterval(timer);
       timer = window.setInterval(pump, TICK_MS);
@@ -175,7 +185,8 @@ export const createScoreSynth = () => {
     /** Song time being heard now, or null when stopped. */
     position(): number | null {
       if (!playing || !context) return null;
-      return Math.max(anchor.song, anchor.song + (context.currentTime - anchor.clock) * anchor.rate);
+      const time = Math.max(anchor.song, anchor.song + (context.currentTime - anchor.clock) * anchor.rate);
+      return loopDuration ? time % loopDuration : time;
     },
     dispose() {
       playing = false;

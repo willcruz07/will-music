@@ -3,11 +3,10 @@ import { useState } from 'react';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
 import { harmonicField, pcOf, scaleNotes } from '../lib/chordTheory.ts';
-import { LessonBlocks, intervalName } from './blocks.tsx';
-import { SCALE_LIBRARY, type ScaleId } from './theory.ts';
+import { intervalName } from './blocks.tsx';
 import type { Block } from './types.ts';
 import { PlayButton, SilentModeHint, chordEvents, useStudySynth } from './widgets.tsx';
-import { SheetSelect } from '../ui/SheetSelect.tsx';
+import { ProgressionPractice } from './ProgressionPractice.tsx';
 
 const chip = (active: boolean) =>
   `min-h-10 scroll-mx-4 whitespace-nowrap rounded-lg px-3 text-sm ${active ? 'bg-primary font-semibold text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`;
@@ -247,51 +246,33 @@ export const PROGRESSION_CATALOG: Block[] = [
   P('iii – vi – ii – V – I', ['iii7', 'vi7', 'ii7', 'V7', 'I7M'], 'Encadeamento por quintas (ciclo).'),
   P('ii – subV – I', ['ii7', 'subV7', 'I7M'], 'Com substituto de trítono: o baixo desce em semitons.'),
   P('I – V7/ii – ii – V', ['I7M', 'V7/ii', 'ii7', 'V7'], 'Dominante secundário preparando o ii.'),
+  P('Jazz: ii9 – V13 – Imaj9', ['ii7(9)', 'V7(13)', 'I7M(9)'], 'Compare com ii–V–I básico: a nona colore o ii e o I, enquanto a 13ª maior amplia o dominante sem substituir sua terça e sétima.'),
+  P('Jazz: dominante com #5', ['ii7(9)', 'V7(#5)', 'I7M(9)'], 'A quinta aumentada altera o V7. Em Dó, Ré# de G7(#5) pode subir para Mi de C7M(9). Ouça a condução por semitom; a resolução não depende apenas da escala.'),
+  P('Jazz: subV com #11', ['ii7(9)', 'subV7(#11)', 'I7M(9)'], 'O subV substitui o dominante por outro a um trítono de distância. Sua #11 acrescenta a cor lídia dominante; o baixo pode descer cromaticamente até a tônica.'),
+  P('Bossa e MPB: turnaround com b9 e 13', ['I6(9)', 'V7(b9)/ii', 'ii7(9)', 'V7(13)'], 'A tônica 6/9 passa ao dominante secundário com b9, preparando o ii menor. O V com 13ª conduz de volta ao I; são cores de acompanhamento, não uma batida de bossa sintetizada.'),
+  P('MPB: subdominante menor com nona', ['IV7M(9)', 'iv6(9)', 'I7M(9)'], 'O iv menor é emprestado do modo menor paralelo. Sexta e nona ampliam a sonoridade sem apagar a mudança da terça do IV para o iv.'),
   { kind: 'text', text: '**Blues e rock.**' },
   P('Blues de 12 compassos', ['I7', 'I7', 'I7', 'I7', 'IV7', 'IV7', 'I7', 'I7', 'V7', 'IV7', 'I7', 'V7'], 'Cada acorde é um compasso.'),
   P('I – bVII – IV', ['I', 'bVII', 'IV', 'I'], 'Empréstimo do mixolídio: som de rock clássico.'),
   { kind: 'text', text: '**Gospel e soul.**' },
   P('IV – iv – I', ['IV7M', 'iv6', 'I7M'], 'O "amém" com subdominante menor.'),
   P('Gospel com diminuto de passagem', ['I', 'iii7', 'IV', '#iv°7', 'V7sus4', 'V7', 'I'], 'Baixo subindo por graus com o diminuto entre o IV e o V.'),
+  P('Soul: menor com 11ª e dominante com 13ª', ['ii7(9,11)', 'V7(9,13)', 'I7M(9)', 'vi7(9)'], 'A 11ª sobre o ii menor cria uma cor aberta; nona e 13ª ampliam o V. A passagem ao vi mantém a continuidade. O groove e a disposição das vozes mudam bastante o resultado.'),
+  P('Gospel: suspensão, alteração e chegada', ['IV7M(9)', 'V7sus4(9)', 'V7(b9,b13)', 'I7M(9)'], 'A quarta suspensa prepara a entrada da terça do dominante. Depois, b9 e b13 intensificam a tensão antes do I. Nem todas as notas cabem em instrumentos com poucas cordas.'),
   { kind: 'text', text: '**Tons menores.**' },
   P('i – iv – V', ['i', 'iv', 'V7', 'i'], 'Cadência menor com o V da menor harmônica.', 'minor'),
   P('i – VII – VI – V (andaluza)', ['i', 'VII', 'VI', 'V7'], 'Descida típica do flamenco e do rock.', 'minor'),
   P('iiø – V – i (menor)', ['iiø', 'V7', 'i'], 'O 2-5-1 menor: meio-diminuto, dominante, tônica menor.', 'minor'),
+  P('Menor: iiø – V(b9) – i6/9', ['iiø', 'V7(b9)', 'i6(9)'], 'O ii meio-diminuto prepara o V com nona menor. A chegada em menor com sexta e nona acrescenta uma cor de tônica menor; a sexta maior vai além da menor natural.', 'minor'),
+  P('Menor: 11ª, b9 e b13', ['iv7(9,11)', 'V7(b9,b13)', 'i7(9)'], 'O iv menor estendido prepara o dominante alterado. A b13 do V antecipa a terça menor do i; compare esta tensão com o V7 simples no mesmo tom.', 'minor'),
 ];
 
 export const ProgressionCatalog = () => (
   <div className="mt-6 max-w-3xl">
     <h2 className="text-xl font-semibold">Progressões</h2>
     <p className="mt-1 text-muted-foreground">As progressões que mais aparecem em cada estilo, em graus. Mude o tom, ouça e toque nos acordes para ver como montar.</p>
-    <LessonBlocks blocks={PROGRESSION_CATALOG} lessonId="catalogo-progressoes" />
+    <ProgressionPractice blocks={PROGRESSION_CATALOG} />
   </div>
 );
 
-/* ---------- Scales on the fretboard ---------- */
-
-const FAMILIES = [...new Set(Object.values(SCALE_LIBRARY).map((s) => s.family))];
-
-export const ScaleExplorer = () => {
-  const [scale, setScale] = useState<ScaleId>('major');
-  return (
-    <div className="mt-6 max-w-3xl">
-      <h2 className="text-xl font-semibold">Escalas no braço e no teclado</h2>
-      <p className="mt-1 text-muted-foreground">Escolha uma das {Object.keys(SCALE_LIBRARY).length} escalas e uma tônica: veja as notas, o desenho no teclado, no braço e a digitação em tablatura.</p>
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-        <span aria-hidden>Escala</span>
-        <SheetSelect
-          label="Escala"
-          value={scale}
-          onChange={(v) => setScale(v as ScaleId)}
-          className="w-full max-w-xs font-semibold"
-          options={FAMILIES.flatMap((f) =>
-            (Object.keys(SCALE_LIBRARY) as ScaleId[])
-              .filter((id) => SCALE_LIBRARY[id].family === f)
-              .map((id) => ({ value: id, label: SCALE_LIBRARY[id].name, group: f })),
-          )}
-        />
-      </div>
-      <LessonBlocks key={scale} blocks={[{ kind: 'scale', scale, root: 'C' }]} lessonId="explorar-escalas" />
-    </div>
-  );
-};
+export { ScaleExplorer } from './ScaleExplorer.tsx';

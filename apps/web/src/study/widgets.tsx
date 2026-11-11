@@ -31,7 +31,7 @@ export const ScaleKeyboard = ({ pcs, label = 'Notas no teclado' }: { pcs: number
 const STANDARD_LOW_FIRST = [40, 45, 50, 55, 59, 64];
 
 /** Guitar neck (frets 0–15) with every note of the pitch-class set; the root is filled, the box (if any) framed. */
-export const Fretboard = ({ pcs, root, box, tuning = STANDARD_LOW_FIRST }: { pcs: number[]; root: number; box?: number; tuning?: readonly number[] }) => {
+export const Fretboard = ({ pcs, root, box, tuning = STANDARD_LOW_FIRST, labels }: { pcs: number[]; root: number; box?: number; tuning?: readonly number[]; labels?: Readonly<Record<number, string>> }) => {
   const frets = 15;
   const fw = 34;
   const sh = 18;
@@ -59,7 +59,9 @@ export const Fretboard = ({ pcs, root, box, tuning = STANDARD_LOW_FIRST }: { pcs
             const pc = (open + f) % 12;
             if (!set.has(pc)) return null;
             const x = f === 0 ? left - 10 : left + (f - 0.5) * fw;
-            return <circle key={`${s}-${f}`} cx={x} cy={top + s * sh} r={6.5} fill={pc === root ? 'var(--primary)' : 'var(--surface)'} stroke="var(--chord)" strokeWidth={2} />;
+            const low = box === undefined ? 0 : Math.max(0, box - 1);
+            const inPosition = box === undefined || (f >= low && f <= low + 4);
+            return <g key={`${s}-${f}`} opacity={labels && !inPosition ? 0.25 : 1}><circle cx={x} cy={top + s * sh} r={labels ? 9 : 6.5} fill={pc === root ? 'var(--primary)' : 'var(--surface)'} stroke="var(--chord)" strokeWidth={2} />{labels && <text x={x} y={top + s * sh} dy="0.35em" textAnchor="middle" fontSize="7" fontWeight="600" fill={pc === root ? 'var(--primary-foreground)' : 'var(--foreground)'}>{labels[pc]}</text>}</g>;
           }),
         )}
       </svg>
@@ -102,22 +104,22 @@ export const useStudySynth = () => {
     synth.current?.stop();
     setPlaying(null);
   };
-  const play = (id: string, events: SynthEvent[]) => {
+  const play = (id: string, events: SynthEvent[], repeatSeconds = 0) => {
     if (playing === id) return stop();
     synth.current ??= createScoreSynth();
     synth.current.unlock();
     synth.current.setVolume(0.8);
     synth.current.setEvents(events);
-    synth.current.play(0, 1);
+    synth.current.play(0, 1, repeatSeconds);
     setPlaying(id);
     const end = Math.max(0, ...events.map((e) => e.time + e.dur));
     clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
+    if (!(repeatSeconds > 0)) timer.current = window.setTimeout(() => {
       synth.current?.stop();
       setPlaying(null);
     }, (end + 0.4) * 1000);
   };
-  return { play, stop, playing };
+  return { play, stop, playing, position: () => synth.current?.position() ?? null };
 };
 
 /** iPhone only: Web Audio is muted by the silent switch, so say so under every button that plays a sound. */

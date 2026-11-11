@@ -20,7 +20,7 @@ const TOOLS: { tab: string; label: string; about: string; icon: typeof Guitar }[
   { tab: 'escalas', label: 'Campo harmônico', about: 'Escalas e acordes de cada tom', icon: Music2 },
   { tab: 'ciclo', label: 'Ciclo de quintas e quartas', about: 'Armaduras, relativos e vizinhos', icon: CircleDot },
   { tab: 'progressoes', label: 'Progressões', about: 'Em qualquer tom, para ouvir e tocar', icon: ListMusic },
-  { tab: 'braco', label: 'Escalas no braço', about: 'Desenho, teclado e tablatura', icon: Piano },
+  { tab: 'braco', label: 'Explorador de escalas', about: 'Famílias, posições, teclado e tablatura', icon: Piano },
   { tab: 'intervalos', label: 'Treino de ouvido', about: 'Reconheça intervalos', icon: Ear },
 ];
 
