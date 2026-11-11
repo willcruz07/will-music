@@ -1,8 +1,8 @@
 /** Chord types offered in the chord library and the study section (Brazilian names). */
 export const CHORD_TYPES: { suffix: string; name: string; intervals: number[]; about: string }[] = [
   { suffix: '', name: 'Maior', intervals: [0, 4, 7], about: 'Tônica, terça maior e quinta justa. Som claro e estável.' },
-  { suffix: 'm', name: 'Menor', intervals: [0, 3, 7], about: 'Tônica, terça menor e quinta justa. Som mais escuro ou triste.' },
-  { suffix: '7', name: 'Sétima (dominante)', intervals: [0, 4, 7, 10], about: 'Acorde maior com sétima menor. Pede resolução: é o V grau do tom.' },
+  { suffix: 'm', name: 'Menor', intervals: [0, 3, 7], about: 'Fundamental, terça menor e quinta justa. A terça menor define sua qualidade; o caráter expressivo depende do ritmo, do timbre e do contexto.' },
+  { suffix: '7', name: 'Sétima (dominante)', intervals: [0, 4, 7, 10], about: 'Acorde maior com sétima menor. Pode atuar como V grau, preparando a resolução uma quinta abaixo, mas também aparece em blues e em contextos não funcionais.' },
   { suffix: '7M', name: 'Sétima maior', intervals: [0, 4, 7, 11], about: 'Acorde maior com sétima maior. Som suave, comum na MPB e no louvor.' },
   { suffix: 'm7', name: 'Menor com sétima', intervals: [0, 3, 7, 10], about: 'Acorde menor com sétima menor. Os graus ii, iii e vi do campo maior.' },
   { suffix: '6', name: 'Sexta', intervals: [0, 4, 7, 9], about: 'Acorde maior com a sexta maior somada.' },
@@ -15,10 +15,35 @@ export const CHORD_TYPES: { suffix: string; name: string; intervals: number[]; a
   { suffix: 'sus4', name: 'Suspenso de quarta', intervals: [0, 5, 7], about: 'A terça vira quarta. Costuma resolver no acorde maior.' },
   { suffix: '°', name: 'Diminuto', intervals: [0, 3, 6], about: 'Terça menor e quinta diminuta. Tenso, liga um acorde a outro.' },
   { suffix: '°7', name: 'Diminuto com sétima', intervals: [0, 3, 6, 9], about: 'Empilha terças menores: muito usado como passagem.' },
-  { suffix: 'm(b5)', name: 'Menor com quinta bemol', intervals: [0, 3, 6], about: 'A tríade meio-diminuta: o vii grau do campo maior e o ii do campo menor (Bm(b5) em Dó). Com a sétima menor vira m7(b5).' },
+  { suffix: 'm(b5)', name: 'Tríade diminuta', intervals: [0, 3, 6], about: 'Tônica, terça menor e quinta diminuta: as mesmas notas da tríade °. Com a sétima menor vira m7(b5), o acorde meio-diminuto.' },
   { suffix: 'm7(b5)', name: 'Meio-diminuto', intervals: [0, 3, 6, 10], about: 'Menor com quinta diminuta e sétima menor. O vii grau do campo maior.' },
   { suffix: '+', name: 'Aumentado', intervals: [0, 4, 8], about: 'Terça maior e quinta aumentada. Som de suspense.' },
   { suffix: 'm(7M)', name: 'Menor com sétima maior', intervals: [0, 3, 7, 11], about: 'Menor com sétima maior: cor de mistério.' },
+  { suffix: '5', name: 'Power chord', intervals: [0, 7], about: 'Fundamental e quinta, sem terça. Não define maior ou menor; comum em riffs de rock e guitarra com distorção.' },
+  { suffix: '11', name: 'Décima primeira adicionada', intervals: [0, 4, 7, 17], about: 'Neste app, 11 isolado adiciona a 11ª justa à tríade, sem sétima implícita. Para a estrutura dominante estendida, escolha 7(9,11). A 11ª pode criar atrito com a terça maior.' },
+  { suffix: '13', name: 'Décima terceira adicionada', intervals: [0, 4, 7, 21], about: 'Neste app, 13 isolado adiciona a 13ª maior à tríade, sem sétima implícita. Para dominante, escolha 7(13) ou 7(9,11,13). Tem as mesmas classes de altura do acorde 6.' },
+  { suffix: 'm(9)', name: 'Menor com nona adicionada', intervals: [0, 3, 7, 14], about: 'Tríade menor com nona maior, sem sétima. A nona acrescenta uma cor aberta sem mudar a terça menor.' },
+  { suffix: '6(9)', name: 'Sexta e nona', intervals: [0, 4, 7, 9, 14], about: 'Tríade maior com sexta e nona, sem sétima. Usado como repouso na bossa nova, no jazz e na MPB.' },
+  { suffix: 'm6(9)', name: 'Menor com sexta e nona', intervals: [0, 3, 7, 9, 14], about: 'Tríade menor com sexta maior e nona maior. Uma cor de tônica menor frequente no jazz e na bossa nova.' },
+  { suffix: '7sus4', name: 'Sétima com quarta suspensa', intervals: [0, 5, 7, 10], about: 'A quarta substitui a terça e a sétima é menor. Pode preparar o acorde 7 ao descer a quarta para a terça, ou permanecer suspenso.' },
+  { suffix: '7sus2', name: 'Sétima com segunda suspensa', intervals: [0, 2, 7, 10], about: 'Segunda maior no lugar da terça, com sétima menor. Diferente do 7(9), não inclui a terça maior.' },
+  { suffix: '7(13)', name: 'Dominante com décima terceira', intervals: [0, 4, 7, 10, 21], about: 'Dominante com 13ª maior. Nesta fórmula a nona e a décima primeira não são acrescentadas automaticamente. A terça e a sétima sustentam a função dominante.' },
+  { suffix: '7(b9)', name: 'Dominante com nona menor', intervals: [0, 4, 7, 10, 13], about: 'A nona menor fica meio tom acima da fundamental e intensifica a tensão. Frequente na preparação de acordes menores.' },
+  { suffix: '7(#9)', name: 'Dominante com nona aumentada', intervals: [0, 4, 7, 10, 15], about: 'Combina terça maior e nona aumentada, com a altura da terça menor. Cor frequente no blues, no rock e no jazz; a grafia #9 indica sua função de extensão.' },
+  { suffix: '7(b5)', name: 'Dominante com quinta diminuta', intervals: [0, 4, 6, 10], about: 'A quinta justa é substituída pela quinta diminuta. Mantém terça maior e sétima menor, com uma tensão alterada.' },
+  { suffix: '7(#5)', name: 'Dominante com quinta aumentada', intervals: [0, 4, 8, 10], about: 'A quinta é elevada meio tom. Pode conduzir por semitom a uma nota do acorde seguinte; também é escrito +7 ou aug7.' },
+  { suffix: '7(b13)', name: 'Dominante com décima terceira menor', intervals: [0, 4, 7, 10, 20], about: 'Acrescenta 13ª menor ao dominante. Tem a mesma altura da quinta aumentada, mas representa outra extensão e pode coexistir com a quinta justa.' },
+  { suffix: '7(#11)', name: 'Dominante com décima primeira aumentada', intervals: [0, 4, 7, 10, 18], about: 'A #11 fica um trítono acima da fundamental. É uma cor do lídio dominante e dos substitutos de trítono; não substitui automaticamente a quinta.' },
+  { suffix: '7(9,13)', name: 'Dominante com nona e décima terceira', intervals: [0, 4, 7, 10, 14, 21], about: 'Nona e 13ª maiores sobre um dominante. Em formações práticas a quinta pode ser omitida para acomodar as extensões.' },
+  { suffix: '7(b9,b13)', name: 'Dominante com nona e décima terceira menores', intervals: [0, 4, 7, 10, 13, 20], about: 'Duas extensões alteradas sobre a estrutura dominante. Produz forte tensão e aparece com frequência em resoluções para o modo menor.' },
+  { suffix: '7(9,11)', name: 'Dominante com nona e décima primeira', intervals: [0, 4, 7, 10, 14, 17], about: 'Inclui sétima menor, nona e 11ª justa. A terça e a 11ª podem produzir atrito; isso o diferencia do suspenso, que substitui a terça.' },
+  { suffix: '7(9,11,13)', name: 'Dominante com nona, décima primeira e décima terceira', intervals: [0, 4, 7, 10, 14, 17, 21], about: 'Estrutura estendida completa do dominante. Reúne sete notas; instrumentos com poucas cordas podem não comportar a fórmula integral.' },
+  { suffix: 'm7(11)', name: 'Menor com sétima e décima primeira', intervals: [0, 3, 7, 10, 17], about: 'A 11ª justa amplia o acorde menor com sétima. Cor comum em acompanhamentos modais e no jazz.' },
+  { suffix: 'm7(9,11)', name: 'Menor com nona e décima primeira', intervals: [0, 3, 7, 10, 14, 17], about: 'Tétrade menor com nona maior e 11ª justa. Também aparece como m11 em notação internacional.' },
+  { suffix: 'm7(9,11,13)', name: 'Menor com nona, décima primeira e décima terceira', intervals: [0, 3, 7, 10, 14, 17, 21], about: 'Estrutura menor estendida com 13ª maior, associada à cor dórica. A execução completa exige sete notas distintas.' },
+  { suffix: '7M(#5)', name: 'Sétima maior com quinta aumentada', intervals: [0, 4, 8, 11], about: 'Tríade aumentada com sétima maior. Uma sonoridade de harmonia não funcional e da menor melódica.' },
+  { suffix: '7M(#11)', name: 'Sétima maior com décima primeira aumentada', intervals: [0, 4, 7, 11, 18], about: 'A #11 dá a cor lídia ao acorde maior com sétima maior, evitando a 11ª justa junto à terça.' },
+  { suffix: '7M(9,11,13)', name: 'Sétima maior com nona, décima primeira e décima terceira', intervals: [0, 4, 7, 11, 14, 17, 21], about: 'Estrutura maior estendida completa, incluindo 11ª justa. Pode apresentar atrito entre terça e 11ª; não é a mesma fórmula de um acorde com #11.' },
 ];
 
 export const ROOTS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -35,9 +60,9 @@ export const pcOf = (note: string): number => {
   return (((NATURAL[m[1]!]! + shift) % 12) + 12) % 12;
 };
 
-const INTERVAL: Record<number, string> = { 0: '1', 2: '2M', 3: '3m', 4: '3M', 5: '4J', 6: '5b', 7: '5J', 8: '5#', 9: '6M', 10: '7m', 11: '7M', 14: '9M' };
+const INTERVAL: Record<number, string> = { 0: '1', 2: '2M', 3: '3m', 4: '3M', 5: '4J', 6: '5b', 7: '5J', 8: '5#', 9: '6M', 10: '7m', 11: '7M', 13: '9m', 14: '9M', 15: '9#', 17: '11J', 18: '11#', 20: '13m', 21: '13M' };
 /** Letter steps from the root for each interval: a third is always two letters up, a seventh six, and so on. */
-const STEPS: Record<number, number> = { 0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 4, 8: 4, 9: 5, 10: 6, 11: 6, 13: 1, 14: 1, 15: 1, 17: 3, 18: 3, 21: 5 };
+const STEPS: Record<number, number> = { 0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 4, 7: 4, 8: 4, 9: 5, 10: 6, 11: 6, 13: 1, 14: 1, 15: 1, 17: 3, 18: 3, 20: 5, 21: 5 };
 
 /** The note some semitones above the root, a given number of letters away (a minor third of G is Bb, not A#). */
 export const spellNote = (root: string, semitones: number, steps: number): string => {
@@ -65,6 +90,12 @@ export const INTERVAL_NAMES: Record<string, string> = {
   '7m': 'sétima menor',
   '7M': 'sétima maior',
   '9M': 'nona maior',
+  '9m': 'nona menor',
+  '9#': 'nona aumentada',
+  '11J': 'décima primeira justa',
+  '11#': 'décima primeira aumentada',
+  '13m': 'décima terceira menor',
+  '13M': 'décima terceira maior',
 };
 
 /** Major keys written with flats; a minor key is spelled like its relative major. */

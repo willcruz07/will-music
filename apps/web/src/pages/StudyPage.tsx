@@ -8,6 +8,7 @@ import { CHORD_TYPES, INTERVAL_NAMES, KEYS, ROOTS, SCALES, type ScaleKind, SOLFE
 import { rovingKeys } from '../lib/a11y.ts';
 import { CircleOfFifths, IntervalTrainer, ProgressionCatalog, ScaleExplorer } from '../study/tools.tsx';
 import { SheetSelect } from '../ui/SheetSelect.tsx';
+import { chordNotes } from '../lib/chordNotation.ts';
 
 type Tab = 'chords' | 'theory' | 'scales' | 'circle' | 'progressions' | 'fretboard' | 'ear';
 /** The tabs, with the name each one has in links (?aba=). */
@@ -34,19 +35,17 @@ const SYNONYMS: [RegExp, string][] = [
 ];
 
 /**
- * The chord a link asks for, as root + one of the study types: the bass is dropped, synonyms are
- * understood (m7b5, dim, maj7…) and an unknown kind falls back to the closest known one, never to C.
+ * Preserve the full chord, including its bass. Unsupported formulas are never silently simplified.
  */
-export const parseStudyChord = (chord: string | null): { root: string; suffix: string } | null => {
-  const m = chord ? /^([A-G][#b]*)([^/]*)/u.exec(chord.trim()) : null;
+export const parseStudyChord = (chord: string | null): { root: string; suffix: string; bass?: string } | null => {
+  const m = chord ? /^([A-G][#b]?)([^/]*)(?:\/([A-G][#b]?))?$/u.exec(chord.trim()) : null;
   if (!m) return null;
-  const root = ROOTS.includes(m[1]!) ? m[1]! : ROOTS[pcOf(m[1]!)]!;
+  const root = m[1]!;
   let rest = m[2]!;
   for (const [re, to] of SYNONYMS) if (re.test(rest)) rest = rest.replace(re, to);
-  const exact = CHORD_TYPES.find((t) => t.suffix === rest);
-  if (exact) return { root, suffix: exact.suffix };
-  const prefix = CHORD_TYPES.filter((t) => t.suffix && rest.startsWith(t.suffix)).sort((a, z) => z.suffix.length - a.suffix.length)[0];
-  return { root, suffix: prefix?.suffix ?? '' };
+  const aliases: Record<string, string> = { m9: 'm7(9)', maj9: '7M(9)', m11: 'm7(9,11)', m13: 'm7(9,11,13)', maj13: '7M(9,11,13)', '7(4)': '7sus4', '74': '7sus4', '+7': '7(#5)', '69': '6(9)' };
+  rest = aliases[rest] ?? rest;
+  return { root, suffix: rest, ...(m[3] ? { bass: m[3] } : {}) };
 };
 const parseChord = parseStudyChord;
 
@@ -88,19 +87,30 @@ const Chip = ({ active, onClick, children, label }: { active: boolean; onClick: 
 );
 
 /** Dictionary: a chord on the chosen instrument, its other shapes, how it is built, and the grid of related chords. */
-const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | null }) => {
+const ChordsTab = ({ initial }: { initial: ReturnType<typeof parseStudyChord> }) => {
   const [root, setRoot] = useState(initial?.root ?? 'C');
   const [suffix, setSuffix] = useState(initial?.suffix ?? '');
+  const [bass, setBass] = useState(initial?.bass ?? '');
   const [instrument, setInstrument] = useState<Instrument>(readInstrument);
   const [variant, setVariant] = useState(0);
   const [count, setCount] = useState(0);
   const [grid, setGrid] = useState<'roots' | 'types'>('types');
-  const formation = chordFormation(root, suffix);
-  const type = CHORD_TYPES.find((t) => t.suffix === suffix)!;
+  const [gridLimit, setGridLimit] = useState(12);
+  const type = CHORD_TYPES.find((t) => t.suffix === suffix);
+  const chord = `${root}${suffix}${bass ? `/${bass}` : ''}`;
+  const known = type ? chordFormation(root, suffix) : undefined;
+  const formation = { name: chord, notes: known?.notes ?? [], intervals: known?.intervals ?? [] };
+  const bassIndex = bass ? formation.notes.findIndex(note => pcOf(note) === pcOf(bass)) : 0;
+  const keyboardBass = !bass && instrument === 'teclado' && variant > 0 && known ? formation.notes[variant % formation.notes.length] : undefined;
+  const bassExplanation = keyboardBass ? `Nesta inversão do teclado, ${keyboardBass} é a nota mais grave. A fórmula permanece a mesma; apenas a disposição das notas muda.` : !bass || pcOf(bass) === pcOf(root) ? 'Estado fundamental de referência: a fundamental é a nota mais grave. Sem baixo indicado, as posições no instrumento podem usar outras disposições.' : bassIndex > 0
+    ? `${bass} é a nota mais grave e pertence ao acorde (${formation.intervals[bassIndex]}). É uma inversão; as notas do acorde permanecem as mesmas.`
+    : `${bass} é um baixo externo à fórmula do acorde. É um acorde sobre baixo indicado, não uma inversão simples; essa nota se soma à harmonia.`;
   const pick = (r: string, s: string) => {
     setRoot(r);
     setSuffix(s);
+    setBass('');
     setVariant(0);
+    setCount(0);
   };
 
   return (
@@ -117,7 +127,7 @@ const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | nu
       <div>
         <p className="text-xs text-muted-foreground">Nota</p>
         <div className="mt-1 grid grid-cols-6 gap-1 sm:grid-cols-12" role="radiogroup" onKeyDown={rovingKeys} aria-label="Nota">
-          {ROOTS.map((r) => (
+          {KEYS.map((r) => (
             <Chip key={r} active={root === r} onClick={() => pick(r, suffix)} label={`${r} (${solfege(r).replace('♭', 'b').replace('♯', '#')})`}>
               <span className="block font-semibold">{r}</span>
               <span className="block text-[10px] leading-none text-muted-foreground">{solfege(r)}</span>
@@ -125,6 +135,7 @@ const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | nu
           ))}
         </div>
       </div>
+
       <div>
         <p className="text-xs text-muted-foreground">Tipo</p>
         <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" onKeyDown={rovingKeys} aria-label="Tipo">
@@ -136,16 +147,43 @@ const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | nu
         </div>
       </div>
 
+      <div>
+        <p className="text-xs text-muted-foreground">Inversões</p>
+        <div className="mt-1 flex flex-wrap gap-2" role="radiogroup" onKeyDown={rovingKeys} aria-label="Inversões do acorde">
+          {formation.notes.map((note, index) => {
+            // The diagram engine accepts single accidentals; keep the theoretical spelling in the label.
+            const value = /^[A-G][#b]?$/u.test(note) ? note : ROOTS[pcOf(note)]!;
+            const label = index === 0 ? 'Estado fundamental' : index <= 3 ? `${index}ª inversão` : `Baixo na ${formation.intervals[index]}`;
+            return <Chip key={`${index}-${note}`} active={pcOf(keyboardBass ?? (bass || root)) === pcOf(note)} onClick={() => { setBass(value); setVariant(0); setCount(0); }} label={`${label}: ${root}${suffix}${index ? `/${value}` : ''}`}>
+              <span className="block font-semibold">{root}{suffix}{index ? `/${value}` : ''}</span>
+              <span className="block text-xs text-muted-foreground">{label} · {note}</span>
+            </Chip>;
+          })}
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">Selecione a nota mais grave. A fórmula do acorde permanece a mesma; o desenho e as variações respeitam o baixo escolhido.</p>
+        <div className="mt-3">
+          <p className="text-xs text-muted-foreground">Outro baixo</p>
+          <div className="mt-1 flex flex-wrap gap-1" role="radiogroup" onKeyDown={rovingKeys} aria-label="Outro baixo">
+            <Chip active={!bass} onClick={() => { setBass(''); setVariant(0); setCount(0); }} label="Sem baixo indicado">Sem baixo indicado</Chip>
+            {KEYS.map(note => <Chip key={note} active={bass === note} onClick={() => { setBass(note); setVariant(0); setCount(0); }} label={`Baixo ${note} (${solfege(note)})`}>
+              <span className="block font-semibold">{note}</span>
+              <span className="block text-[10px] leading-none text-muted-foreground">{solfege(note)}</span>
+            </Chip>)}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">Para escolher também um baixo externo à fórmula, como F/G.</p>
+        </div>
+      </div>
+
       <div className="grid gap-6 rounded-2xl border border-border bg-surface p-5 md:grid-cols-[auto_1fr]">
         <div className="flex flex-col items-center">
-          <ChordDiagram chord={formation.name} instrument={instrument} variant={variant} onVariants={setCount} size="lg" />
+          {chordNotes(chord) ? <ChordDiagram chord={formation.name} instrument={instrument} variant={variant} onVariants={setCount} size="lg" strict /> : <p className="text-sm text-muted-foreground">Fórmula ainda não suportada: {chord}</p>}
           {count > 1 && (
             <div className="mt-2 flex items-center gap-2 text-sm">
               <button type="button" aria-label="Forma anterior" onClick={() => setVariant((v) => (v - 1 + count) % count)} className="inline-flex size-9 items-center justify-center rounded-lg hover:bg-muted">
                 <ChevronLeft className="size-5" />
               </button>
               <span className="tabular-nums text-muted-foreground">
-                {instrument === 'teclado' ? 'Inversão' : 'Forma'} {variant + 1} de {count}
+                {instrument === 'teclado' && !bass ? 'Inversão' : 'Forma'} {variant + 1} de {count}
               </span>
               <button type="button" aria-label="Próxima forma" onClick={() => setVariant((v) => (v + 1) % count)} className="inline-flex size-9 items-center justify-center rounded-lg hover:bg-muted">
                 <ChevronRight className="size-5" />
@@ -155,9 +193,11 @@ const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | nu
         </div>
         <section aria-label={`Formação de ${formation.name}`}>
           <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold">
-            {formation.name} <span className="text-base font-normal text-muted-foreground">· {type.name}</span>
+            {formation.name} <span className="text-base font-normal text-muted-foreground">· {type?.name ?? 'Fórmula fora do catálogo'}</span>
           </h2>
-          <p className="mt-2 text-muted-foreground">{type.about}</p>
+          <p className="mt-2 text-muted-foreground">{type?.about ?? 'A cifra original foi preservada. Escolha um tipo do catálogo para consultar sua fórmula e explicação detalhada.'}</p>
+          {known && <p className="mt-3 text-sm text-muted-foreground">{bassExplanation}</p>}
+          {known && bass && bassIndex < 0 && <p className="mt-2 text-sm">Nota adicional no baixo: <strong className="text-chord">{bass}</strong>.</p>}
           <ol className="mt-4 flex flex-wrap gap-2">
             {formation.notes.map((note, i) => (
               <li key={i} className="min-w-24 rounded-xl border border-border px-3 py-2">
@@ -169,8 +209,9 @@ const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | nu
             ))}
           </ol>
           <p className="mt-3 text-sm text-muted-foreground">
-            Fórmula: {formation.intervals.join(' – ')}. {instrument === 'teclado' ? 'As inversões mudam qual nota fica embaixo.' : 'As outras formas tocam as mesmas notas em outra região do braço.'}
+            {known && <>Fórmula: {formation.intervals.join(' – ')}. </>}{instrument === 'teclado' ? 'Com baixo indicado, as variações mantêm essa nota como a mais grave.' : 'As formas respeitam as notas e o baixo solicitado; em acordes extensos a quinta justa pode ser omitida.'}
           </p>
+          <p className="mt-2 text-xs text-muted-foreground">Nem toda fórmula cabe em todas as cordas. Quando não houver uma posição compatível, o app informa a ausência de diagrama. A função do acorde depende do contexto da progressão.</p>
         </section>
       </div>
 
@@ -191,14 +232,15 @@ const ChordsTab = ({ initial }: { initial: { root: string; suffix: string } | nu
           </div>
         </div>
         <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-3" aria-label="Grade de acordes">
-          {(grid === 'roots' ? ROOTS.map((r) => [r, suffix] as const) : CHORD_TYPES.map((t) => [root, t.suffix] as const)).map(([r, s]) => (
+          {(grid === 'roots' ? ROOTS.map((r) => [r, suffix] as const) : CHORD_TYPES.map((t) => [root, t.suffix] as const).slice(0, gridLimit)).map(([r, s]) => (
             <li key={`${r}${s}`}>
-              <button type="button" onClick={() => pick(r, s)} className={`flex w-full justify-center rounded-xl border p-2 transition-colors hover:border-primary ${r === root && s === suffix ? 'border-primary bg-primary/10' : 'border-border'}`} aria-label={`Ver ${r}${s}`}>
-                <ChordDiagram chord={`${r}${s}`} instrument={instrument} />
+              <button type="button" onClick={() => pick(r, s)} className={`flex w-full justify-center rounded-xl border p-2 transition-colors hover:border-primary ${r === root && s === suffix ? 'border-primary bg-primary/10' : 'border-border'}`} aria-label={`Ver ${r}${s}${bass ? `/${bass}` : ''}`}>
+                <ChordDiagram chord={`${r}${s}${bass ? `/${bass}` : ''}`} instrument={instrument} strict />
               </button>
             </li>
           ))}
         </ul>
+        {grid === 'types' && gridLimit < CHORD_TYPES.length && <button type="button" className="mt-3 min-h-11 rounded-lg border border-border px-4 text-sm hover:bg-muted" onClick={() => setGridLimit(limit => limit + 12)}>Mostrar mais acordes ({Math.min(gridLimit, CHORD_TYPES.length)} de {CHORD_TYPES.length})</button>}
       </div>
     </div>
   );
