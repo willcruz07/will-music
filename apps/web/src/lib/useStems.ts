@@ -3,12 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PlayerSource } from '../components/Player.tsx';
 import type { StemsRecord } from './db.ts';
 import { exportMixMp3 } from './exportMix.ts';
-import { isRunning, subscribeAnalysisFinished } from './jobs.ts';
+import { isRunning } from './jobs.ts';
 import { getSessionStems, retainSessionStems, setSessionStems } from './sessionStems.ts';
 import { isIOS } from './ios.ts';
 import { confirmDialog } from '../ui/Dialog.tsx';
 import { type MixTrack, mixVolumes } from './mixer.ts';
-import { type SeparationProgress, deleteStemSet, hasUsableWebGpu, listStemSets, selectStemSet, separateSong } from './stems.ts';
+import { type SeparationProgress, deleteStemSet, listStemSets, selectStemSet, separateSong } from './stems.ts';
 
 const DEFAULT_MIX = (names: string[]): MixTrack[] => names.map((name) => ({ name, volume: 1, muted: false, solo: false }));
 
@@ -96,22 +96,6 @@ export const useStems = (songId: string, originalUrl?: string, autoMix = false) 
     },
     [songId, load],
   );
-
-  useEffect(() => {
-    let mounted = true;
-    const unsubscribe = subscribeAnalysisFinished((finishedId, succeeded) => {
-      if (finishedId !== songId || !succeeded || !originalUrl) return;
-      void (async () => {
-        const sets = await listStemSets(songId);
-        if (getSessionStems(songId)?.mode === 'six' || sets.some((set) => set.mode === 'six')) return;
-        const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
-        if (await hasUsableWebGpu(gpu) && mounted) await separate('six');
-      })().catch((error: unknown) => {
-        if (mounted) setError(error instanceof Error ? error.message : 'Não foi possível preparar a separação automática.');
-      });
-    });
-    return () => { mounted = false; unsubscribe(); };
-  }, [songId, originalUrl, separate]);
 
   const cancel = useCallback(() => abort.current?.abort(), []);
 

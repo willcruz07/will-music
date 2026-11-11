@@ -18,7 +18,7 @@ export const AnalysisProgress = ({ progress }: { progress: PipelineProgress }) =
     <p className="text-lg font-semibold">{progress.label}</p>
     {progress.tasks ? <div className="mt-3 space-y-3" aria-label="Progresso das tarefas">
       {progress.tasks.map((task) => <div key={task.id} className="rounded-lg border border-border p-3">
-        <p className="text-sm font-semibold">{task.id === 'chords' ? 'Acordes e tom' : 'Letra'}</p>
+        <p className="text-sm font-semibold">{task.id === 'tracks' ? 'Tracks' : task.id === 'chords' ? 'Acordes e tom' : 'Letra'}</p>
         <p className="mt-1 text-sm text-muted-foreground">{task.label}</p>
         {task.status === 'running' && <ProgressBar fraction={task.fraction} className="mt-2 h-1.5" />}
         {task.detail && <p className="mt-1 text-xs text-muted-foreground">{task.detail}</p>}

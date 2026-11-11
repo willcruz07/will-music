@@ -34,12 +34,12 @@ type Props = {
   onScoreBusyChange?: (busy: boolean) => void;
 };
 const clock = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
-const TABS = [{ id: 'lyrics', label: 'Letras', icon: FileText }, { id: 'chords', label: 'Acordes', icon: Grid2X2 }, { id: 'tracks', label: 'Tracks', icon: SlidersHorizontal }, { id: 'scores', label: 'Partituras', icon: Music4 }] as const;
+const TABS = [{ id: 'tracks', label: 'Tracks', icon: SlidersHorizontal }, { id: 'chords', label: 'Acordes', icon: Grid2X2 }, { id: 'lyrics', label: 'Letras', icon: FileText }, { id: 'scores', label: 'Partituras', icon: Music4 }] as const;
 
 export const Studio = (props: Props) => {
   useEffect(enterStudioLayout, []);
   const { song, chart, analysis, progress, stems } = props;
-  const [tab, setTab] = useState<'lyrics' | 'chords' | 'tracks' | 'scores'>('lyrics');
+  const [tab, setTab] = useState<'lyrics' | 'chords' | 'tracks' | 'scores'>('tracks');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,6 +65,8 @@ export const Studio = (props: Props) => {
   const chords = useMemo(() => (analysis?.chords ?? []).filter(c => c.raw !== 'N' && c.raw !== 'X'), [analysis]);
   const name = (raw: string) => transposeChord(toDisplayLabel(raw), chart?.transpose ?? 0, props.shownKey ?? false);
   const current = chords[props.currentIndex];
+  const tracksTask = progress?.tasks?.find(t => t.id === 'tracks');
+  const tracksLoading = !!progress && (!tracksTask || tracksTask.status === 'running' || tracksTask.status === 'waiting');
   const lyricsTask = progress?.tasks?.find(t => t.id === 'lyrics');
   const chordTask = progress?.tasks?.find(t => t.id === 'chords');
   const lyricsLoading = !!progress && lyricsTask?.status !== 'done' && lyricsTask?.status !== 'skipped' && lyricsTask?.status !== 'error';
@@ -110,6 +112,7 @@ export const Studio = (props: Props) => {
       </div>}
     </div>
     {props.recovery}
+    {analysis?.warnings?.map(warning => <p key={warning} className="mt-3 text-sm text-muted-foreground" role="status">{warning}</p>)}
     {notice && <p className="mt-4 text-sm" role="status">{notice}</p>}
     {props.error && <div className="mt-4 rounded-xl border border-danger/40 p-4" role="alert"><p>{props.error}</p><Button disabled={!!progress || !!stems.progress} className="mt-2" onClick={props.onRetry}>Tentar análise novamente</Button></div>}
     <div className="studio-body">
@@ -127,13 +130,13 @@ export const Studio = (props: Props) => {
       </section>
       <section id="studio-tracks" role="tabpanel" aria-labelledby="studio-tab-tracks" hidden={tab !== 'tracks'}>
         <h2 className="mb-5 text-lg font-semibold">Tracks</h2>
-        {progress ? <><p className="text-sm text-muted-foreground">Aguardando letra e acordes para iniciar a separação.</p><TracksSkeleton /></> : <StemsPanel stems={stems} title={song.title} hasAudio automaticMix mixer={tab === 'tracks' ? <StudioMixer stems={stems} onSeek={props.onSeek} getTime={props.getTime} /> : undefined} />}
+        {tracksLoading ? <><p className="text-sm text-muted-foreground" role="status">{tracksTask?.label ?? 'Preparando faixas…'}</p><ProgressBar fraction={tracksTask?.fraction} /><p className="text-xs text-muted-foreground">{tracksTask?.detail}</p><TracksSkeleton /></> : <StemsPanel stems={stems} title={song.title} hasAudio automaticMix mixer={tab === 'tracks' && !progress ? <StudioMixer stems={stems} onSeek={props.onSeek} getTime={props.getTime} /> : undefined} />}
       </section>
       <section id="studio-scores" role="tabpanel" aria-labelledby="studio-tab-scores" hidden={tab !== 'scores'}>
         <StudioScores song={song} chart={chart} analysis={analysis} tracks={stems.tracks} active={tab === 'scores'} waiting={!!progress || !!stems.progress} onBusyChange={props.onScoreBusyChange} />
       </section>
     </div>
-    <nav className="studio-tabs" aria-label="Estúdio"><div role="tablist" aria-label="Abas do Estúdio" onKeyDown={rovingKeys} className="glass-strong flex w-full max-w-lg gap-1 rounded-2xl border border-border p-2 shadow-lg">{TABS.map(({ id, label, icon: Icon }) => <button key={id} id={`studio-tab-${id}`} type="button" role="tab" aria-selected={tab === id} aria-controls={`studio-${id}`} onClick={() => setTab(id)} className={`relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs sm:flex-row sm:gap-2 sm:px-2 sm:text-sm ${tab === id ? 'bg-primary/20 font-semibold text-chord' : 'text-muted-foreground hover:bg-muted'}`}><Icon className="size-4 shrink-0" />{label}{((id === 'lyrics' && lyricsLoading) || (id === 'chords' && chordsLoading) || (id === 'tracks' && !!stems.progress)) && <span aria-label="Processando" className="absolute right-1 top-1 size-1.5 animate-pulse rounded-full bg-primary" />}</button>)}</div></nav>
+    <nav className="studio-tabs" aria-label="Estúdio"><div role="tablist" aria-label="Abas do Estúdio" onKeyDown={rovingKeys} className="glass-strong flex w-full max-w-lg gap-1 rounded-2xl border border-border p-2 shadow-lg">{TABS.map(({ id, label, icon: Icon }) => <button key={id} id={`studio-tab-${id}`} type="button" role="tab" aria-selected={tab === id} aria-controls={`studio-${id}`} onClick={() => setTab(id)} className={`relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs sm:flex-row sm:gap-2 sm:px-2 sm:text-sm ${tab === id ? 'bg-primary/20 font-semibold text-chord' : 'text-muted-foreground hover:bg-muted'}`}><Icon className="size-4 shrink-0" />{label}{((id === 'lyrics' && lyricsLoading) || (id === 'chords' && chordsLoading) || (id === 'tracks' && (tracksLoading || !!stems.progress))) && <span aria-label="Processando" className="absolute right-1 top-1 size-1.5 animate-pulse rounded-full bg-primary" />}</button>)}</div></nav>
     {editing && <BottomSheet title="Editar letra e cifra" onClose={closeEditor} size="wide" initialFocus={panel => panel.querySelector('textarea')}>{() => <div className="overflow-auto px-4 pb-5">
       <p className="mb-3 text-sm text-muted-foreground">Escreva os acordes entre colchetes: [G]letra da música [D].</p>
       <textarea aria-label="Cifra em ChordPro" value={draft} onChange={e => setDraft(e.target.value)} disabled={busy} spellCheck={false} className="h-[42dvh] w-full resize-y rounded-xl border border-border bg-background p-4 font-mono text-base focus:border-primary" />

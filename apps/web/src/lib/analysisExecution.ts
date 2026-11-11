@@ -15,6 +15,8 @@ export const saveExecutionPreference = (value: ExecutionPreference): void => {
   try { localStorage.setItem(KEY, value); } catch { /* Session behavior can still be tested. */ }
 };
 export const resolveAnalysisExecution = async (requested: ExecutionPreference = readExecutionPreference()): Promise<AnalysisExecution> => {
+  // Mobile always runs one analysis model at a time, even with a saved desktop preference.
+  if (isIOS() || /android|mobile/i.test(navigator.userAgent)) return 'sequential';
   if (requested !== 'auto') return requested;
   // This is a conservative scheduling policy, not a proof of sufficient device memory.
   if (isIOS() || (navigator.hardwareConcurrency ?? 1) < 4) return 'sequential';
