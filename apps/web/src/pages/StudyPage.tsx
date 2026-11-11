@@ -9,6 +9,8 @@ import { rovingKeys } from '../lib/a11y.ts';
 import { CircleOfFifths, IntervalTrainer, ProgressionCatalog, ScaleExplorer } from '../study/tools.tsx';
 import { SheetSelect } from '../ui/SheetSelect.tsx';
 import { chordNotes } from '../lib/chordNotation.ts';
+import { PlayButton, chordEvents, useStudySynth } from '../study/widgets.tsx';
+import { SCALE_CONTEXT } from '../study/scaleContext.ts';
 
 type Tab = 'chords' | 'theory' | 'scales' | 'circle' | 'progressions' | 'fretboard' | 'ear';
 /** The tabs, with the name each one has in links (?aba=). */
@@ -246,20 +248,55 @@ const ChordsTab = ({ initial }: { initial: ReturnType<typeof parseStudyChord> })
   );
 };
 
-const TheoryTab = () => (
+/** Short, explicit comparisons; one shared synth prevents overlapping examples. */
+const FormationExample = ({ title, suffixes, synth }: { title: string; suffixes: string[]; synth: ReturnType<typeof useStudySynth> }) => {
+  const [suffix, setSuffix] = useState(suffixes[0]!);
+  const formation = chordFormation('C', suffix);
+  const info = CHORD_TYPES.find(type => type.suffix === suffix)!;
+  const base = chordFormation('C', suffixes[0]!);
+  const added = formation.notes.filter(note => !base.notes.includes(note));
+  const removed = base.notes.filter(note => !formation.notes.includes(note));
+  const id = `formation-${title}-${suffix}`;
+  return <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+    <p className="text-sm font-semibold">{title}</p>
+    <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label={title} onKeyDown={rovingKeys}>
+      {suffixes.map(value => <Chip key={value} active={suffix === value} onClick={() => { synth.stop(); setSuffix(value); }} label={`Comparar C${value}`}>C{value}</Chip>)}
+    </div>
+    <div className="mt-4 grid items-start gap-4 sm:grid-cols-[auto_1fr]">
+      <ChordDiagram chord={formation.name} instrument="teclado" />
+      <div aria-live="polite">
+        <p className="font-semibold">{info.name}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{info.about}</p>
+        <p className="mt-2 text-sm">Fórmula: {formation.intervals.join(' – ')}</p>
+        <p className="mt-1 text-sm">Notas: {formation.notes.map((note, index) => <span key={index} className={added.includes(note) ? 'font-bold text-chord' : ''}>{index > 0 ? ' · ' : ''}{note}</span>)}</p>
+        {(added.length > 0 || removed.length > 0) && <p className="mt-2 text-xs text-muted-foreground">Em relação a {base.name}: {removed.length > 0 ? `retira ${removed.join(', ')}. ` : ''}{added.length > 0 ? `acrescenta ${added.join(', ')}.` : ''}</p>}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <PlayButton active={synth.playing === id} onClick={() => synth.play(id, chordEvents([formation.name], 90, 2))} label={formation.name} />
+          <Link className="inline-flex min-h-10 items-center text-sm font-semibold text-chord hover:underline" to={`/estudo/ferramentas?acorde=${encodeURIComponent(formation.name)}`}>Ver formas e inversões</Link>
+        </div>
+      </div>
+    </div>
+  </div>;
+};
+
+const TheoryTab = () => {
+  const synth = useStudySynth();
+  return (
   <div className="mt-6 max-w-3xl space-y-8 leading-relaxed">
     <section>
       <h2 className="text-xl font-semibold">Intervalos: a régua da música</h2>
       <p className="mt-2 text-muted-foreground">
         Intervalo é a distância entre duas notas, contada em semitons (cada casa do violão ou cada tecla vizinha do teclado, contando as pretas). Todo acorde é uma pilha de intervalos a
-        partir da nota que dá nome a ele, a <em>tônica</em>.
+        partir da nota que dá nome a ele, a <em>fundamental</em>.
       </p>
-      <table className="mt-3 w-full max-w-lg text-sm">
+      <p className="mt-2 text-sm text-muted-foreground"><strong className="text-foreground">Fundamental não é sinônimo de tônica:</strong> em Dm dentro do tom de Dó maior, Ré é a fundamental do acorde e Dó é a tônica da tonalidade. O baixo é a nota mais grave da formação e também pode ser diferente da fundamental.</p>
+      <div className="mt-3 overflow-x-auto"><table className="w-full text-sm">
         <thead className="text-left text-muted-foreground">
           <tr>
             <th className="py-1 pr-3 font-normal">Intervalo</th>
             <th className="py-1 pr-3 font-normal">Semitons</th>
             <th className="py-1 font-normal">A partir de Dó</th>
+            <th className="py-1 pl-2 font-normal">Ouvir</th>
           </tr>
         </thead>
         <tbody>
@@ -275,37 +312,50 @@ const TheoryTab = () => (
               ['6M', 9, 'Lá'],
               ['7m', 10, 'Si♭'],
               ['7M', 11, 'Si'],
+              ['8J', 12, 'Dó (uma oitava acima)'],
+              ['9m', 13, 'Ré♭ (uma oitava acima)'],
               ['9M', 14, 'Ré (uma oitava acima)'],
+              ['9#', 15, 'Ré♯ (uma oitava acima)'],
+              ['11J', 17, 'Fá (uma oitava acima)'],
+              ['11#', 18, 'Fá♯ (uma oitava acima)'],
+              ['13m', 20, 'Lá♭ (uma oitava acima)'],
+              ['13M', 21, 'Lá (uma oitava acima)'],
             ] as const
           ).map(([name, semis, example]) => (
             <tr key={name} className="border-t border-border">
               <td className="py-1.5 pr-3">
-                <span className="font-semibold">{name}</span> <span className="text-muted-foreground">({INTERVAL_NAMES[name]})</span>
+                <span className="font-semibold">{name}</span> <span className="text-muted-foreground">({INTERVAL_NAMES[name] ?? 'oitava justa'})</span>
               </td>
               <td className="py-1.5 pr-3 tabular-nums">{semis}</td>
               <td className="py-1.5">{example}</td>
+              <td className="py-1.5 pl-2"><div className="flex flex-wrap gap-2">{(['sequencia', 'juntas'] as const).map(mode => {
+                const id = `formation-interval-${semis}-${mode}`;
+                return <button key={mode} type="button" aria-pressed={synth.playing === id} aria-label={`Ouvir ${name} ${mode === 'juntas' ? 'juntas' : 'em sequência'}`} className={`min-h-10 rounded-lg border border-border px-3 text-xs ${synth.playing === id ? 'bg-primary/20 text-chord' : 'hover:bg-muted'}`} onClick={() => synth.play(id, [{ time: 0, dur: 0.7, pitch: 60 }, { time: mode === 'juntas' ? 0 : 0.8, dur: 0.9, pitch: 60 + semis }])}>{mode === 'juntas' ? 'Juntas' : 'Sequência'}</button>;
+              })}</div></td>
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
+      <p className="mt-2 text-sm text-muted-foreground">9ª, 11ª e 13ª correspondem a 2ª, 4ª e 6ª uma oitava acima. Notas com a mesma altura podem ter funções diferentes: Ré♯ (#9) e Mi♭ (3ª menor), por exemplo.</p>
     </section>
     <section>
       <h2 className="text-xl font-semibold">Tríades: acordes de três notas</h2>
       <ul className="mt-2 space-y-1 text-muted-foreground">
         <li>
-          <span className="font-semibold text-foreground">Maior (C):</span> tônica + terça maior (4 semitons) + quinta justa (7). Dó, Mi, Sol.
+          <span className="font-semibold text-foreground">Maior (C):</span> fundamental + terça maior (4 semitons) + quinta justa (7). Dó, Mi, Sol.
         </li>
         <li>
-          <span className="font-semibold text-foreground">Menor (Cm):</span> tônica + terça menor (3) + quinta justa (7). Dó, Mi♭, Sol.
+          <span className="font-semibold text-foreground">Menor (Cm):</span> fundamental + terça menor (3) + quinta justa (7). Dó, Mi♭, Sol.
         </li>
         <li>
-          <span className="font-semibold text-foreground">Diminuto (C°):</span> tônica + terça menor (3) + quinta diminuta (6). Dó, Mi♭, Sol♭.
+          <span className="font-semibold text-foreground">Diminuto (C°):</span> fundamental + terça menor (3) + quinta diminuta (6). Dó, Mi♭, Sol♭.
         </li>
         <li>
-          <span className="font-semibold text-foreground">Aumentado (C+):</span> tônica + terça maior (4) + quinta aumentada (8). Dó, Mi, Sol♯.
+          <span className="font-semibold text-foreground">Aumentado (C+):</span> fundamental + terça maior (4) + quinta aumentada (8). Dó, Mi, Sol♯.
         </li>
       </ul>
       <p className="mt-2 text-muted-foreground">É a terça que decide se o acorde é maior ou menor; a quinta dá a estabilidade.</p>
+      <FormationExample title="Compare as quatro tríades" suffixes={['', 'm', '°', '+']} synth={synth} />
     </section>
     <section>
       <h2 className="text-xl font-semibold">Tétrades e extensões</h2>
@@ -314,6 +364,12 @@ const TheoryTab = () => (
         (meio-diminuto) e <strong>°7</strong>. Acima da sétima vêm as extensões: a <strong>9</strong>, a <strong>11</strong> e a <strong>13</strong>, que dão cor ao acorde. Na cifra brasileira,
         C9 costuma significar Dó com nona somada (sem sétima) e C7(9) o dominante com nona.
       </p>
+      <FormationExample title="Compare as tétrades" suffixes={['7M', '7', 'm7', 'm7(b5)', '°7']} synth={synth} />
+      <p className="mt-3 text-sm text-muted-foreground">Cm7(b5) tem Si♭ (sétima menor); C°7 tem Si♭♭ (sétima diminuta, com a altura de Lá). A grafia explica por que são acordes diferentes.</p>
+      <FormationExample title="Da tríade às extensões" suffixes={['', '9', '7', '7(9)', '7(13)', '7(b9)', '7(#9)', '7(#11)', '7(b13)']} synth={synth} />
+      <p className="mt-3 text-sm text-muted-foreground"><strong className="text-foreground">Convenção do app:</strong> C9/add9 acrescenta Ré a Dó–Mi–Sol, sem sétima. C7(9) inclui também Si♭. Em outras convenções, C9 pode indicar o dominante com nona; confira sempre a fórmula.</p>
+      <p className="mt-2 text-sm text-muted-foreground"><strong className="text-foreground">Suspensão não é extensão:</strong> Csus4 troca Mi por Fá; C7(9,11) mantém Mi e acrescenta Fá, podendo criar atrito. Da mesma forma, b5 altera a quinta, enquanto #11 é uma extensão e pode coexistir com a quinta justa.</p>
+      <FormationExample title="Compare suspensão e décima primeira" suffixes={['', 'sus4', '7sus4', '7(9,11)']} synth={synth} />
     </section>
     <section>
       <h2 className="text-xl font-semibold">Inversões e baixo</h2>
@@ -329,22 +385,41 @@ const TheoryTab = () => (
           </div>
         ))}
       </div>
+      <p className="mt-3 text-sm text-muted-foreground">Em F/G, Sol não pertence à tríade F–A–C: é um baixo externo, não uma inversão simples de F. Em uma tétrade, colocar a sétima no baixo produz a terceira inversão.</p>
+      <div className="mt-3 flex flex-wrap gap-3">{['C', 'C/E', 'C/G', 'C7/Bb', 'F/G'].map(chord => <div key={chord} className="rounded-xl border border-border p-3"><p className="mb-2 font-semibold text-chord">{chord}</p><PlayButton active={synth.playing === `formation-bass-${chord}`} onClick={() => synth.play(`formation-bass-${chord}`, chordEvents([chord], 90, 2))} label={chord} /></div>)}</div>
+      <p className="mt-2 text-xs text-muted-foreground">Ouça cada exemplo na ordem: C, C/E, C/G, C7/Bb e F/G.</p>
+    </section>
+    <section className="rounded-2xl border border-border bg-surface p-4">
+      <h2 className="text-lg font-semibold">Pratique a formação</h2>
+      <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-muted-foreground"><li>Compare C e Cm: ouça e identifique a mudança de Mi para Mi♭.</li><li>Compare C7M e C7: a mudança está na sétima, não na terça.</li><li>Compare C9 e C7(9): procure a nota Si♭ no segundo acorde.</li><li>Ouça C/E e C/G: as notas do acorde permanecem, mas o baixo muda.</li></ol>
     </section>
   </div>
-);
+  );
+};
 
 const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
+  const synth = useStudySynth();
   const [key, setKey] = useState('C');
   const [kind, setKind] = useState<ScaleKind>('major');
   const notes = scaleNotes(key, kind);
   const pcs = notes.map(pcOf);
-  const mode = kind === 'major' || kind === 'majorPentatonic' ? 'major' : kind === 'harmonicMinor' ? 'harmonicMinor' : 'minor';
+  const referenceOnly = kind === 'majorPentatonic' || kind === 'minorPentatonic' || kind === 'blues';
+  const mode = kind === 'majorPentatonic' ? 'major' : kind === 'minorPentatonic' || kind === 'blues' ? 'minor' : kind;
   const field = harmonicField(key, mode);
-  const relative = mode === 'major' ? `${scaleNotes(key, 'major')[5]} menor` : `${scaleNotes(key, 'minor')[2]} maior`;
+  const parallelMajor = harmonicField(key, 'major');
+  const borrowedMode = mode === 'major' ? 'minor' : mode;
+  const borrowed = harmonicField(key, borrowedMode).filter((chord, index) => chord.triad !== parallelMajor[index]!.triad);
   const steps = SCALES[kind].steps;
   const pattern = steps.map((s, i) => ((steps[i + 1] ?? 12) - s === 1 ? 'S' : (steps[i + 1] ?? 12) - s === 2 ? 'T' : `${(steps[i + 1] ?? 12) - s}st`)).join(' ');
   const degree = (i: number) => field[i]!.triad;
-  const progressions =
+  const modal = !['major', 'minor', 'harmonicMinor'].includes(mode);
+  const progressions: [string, number[]][] = modal
+    ? mode === 'dorian' ? [['i – IV – i', [0, 3, 0]]]
+    : mode === 'phrygian' ? [['i – bII – i', [0, 1, 0]]]
+    : mode === 'lydian' ? [['I – II – I', [0, 1, 0]]]
+    : mode === 'mixolydian' ? [['I – bVII – IV – I', [0, 6, 3, 0]]]
+    : [['i° – bII – i° (exploração)', [0, 1, 0]]]
+    :
     mode === 'harmonicMinor'
       ? [
           ['i – iv – V', [0, 3, 4]],
@@ -366,36 +441,40 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
 
   return (
     <div className="mt-6 space-y-6">
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="flex items-center gap-2">
-          <span aria-hidden>Tom</span>
-          <SheetSelect label="Tom" value={key} onChange={setKey} className="font-semibold" options={KEYS.map((r) => ({ value: r, label: r, hint: solfege(r) }))} renderValue={(o) => (o ? `${o.label} (${o.hint})` : '')} />
-        </span>
-        <span className="flex items-center gap-2">
-          <span aria-hidden>Escala</span>
-          <SheetSelect label="Escala" value={kind} onChange={(v) => setKind(v as ScaleKind)} className="font-semibold" options={(Object.keys(SCALES) as ScaleKind[]).map((k) => ({ value: k, label: SCALES[k].name }))} />
-        </span>
-      </div>
+      <div><p className="text-xs text-muted-foreground">Tônica</p><div className="mt-1 flex flex-wrap gap-1" role="radiogroup" aria-label="Tom" onKeyDown={rovingKeys}>{KEYS.map(note => <Chip key={note} active={key === note} onClick={() => { synth.stop(); setKey(note); }} label={`${note} (${solfege(note)})`}><span className="block font-semibold">{note}</span><span className="block text-[10px] text-muted-foreground">{solfege(note)}</span></Chip>)}</div></div>
+      <div><p className="text-xs text-muted-foreground">Escala e modo</p><div className="mt-1 flex flex-wrap gap-2" role="radiogroup" aria-label="Escala" onKeyDown={rovingKeys}>{(Object.keys(SCALES) as ScaleKind[]).map(scale => <Chip key={scale} active={kind === scale} onClick={() => { synth.stop(); setKind(scale); }}>{scale === 'major' ? 'Maior / Jônio' : scale === 'minor' ? 'Menor natural / Eólio' : SCALES[scale].name}</Chip>)}</div></div>
 
       <section className="rounded-2xl border border-border bg-surface p-5">
         <h2 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
           {key} {SCALES[kind].name.toLowerCase()}
         </h2>
         <p className="mt-1 text-lg tracking-wide">{notes.join(' · ')}</p>
+        {steps.length === 7 && <div className="mt-3 flex flex-wrap gap-2" aria-label="Graus da escala">{notes.map((note, index) => {
+          const difference = steps[index]! - SCALES.major.steps[index]!;
+          return <div key={index} className={`rounded-lg border px-3 py-2 text-sm ${difference ? 'border-primary/50 bg-primary/10' : 'border-border'}`}><strong className="block text-chord">{note}</strong><span className="text-xs text-muted-foreground">{difference < 0 ? 'b' : difference > 0 ? '#' : ''}{index + 1} · {index + 1}º grau{difference ? ' alterado em relação ao maior' : ''}</span></div>;
+        })}</div>}
         <p className="mt-1 text-sm text-muted-foreground">
           Passos: {pattern} (T = tom, S = semitom). {SCALES[kind].about}
         </p>
         <div className="mt-3">
           <ScaleKeyboard pcs={pcs} />
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">Tom relativo: {relative} (as mesmas notas, outro centro).</p>
+        <div className="mt-3"><PlayButton active={synth.playing === 'scale-run'} onClick={() => { const pitches = [...steps, 12, ...steps.slice(1).reverse(), 0]; synth.play('scale-run', pitches.map((step, index) => ({ time: index * 0.35, dur: 0.32, pitch: 60 + pcOf(key) + step }))); }} label={`escala de ${key} ${SCALES[kind].name}`} /></div>
+        <div className="mt-4 space-y-3 border-t border-border pt-4">
+          <h3 className="font-semibold">Entenda {key} {SCALES[kind].name.toLowerCase()}</h3>
+          <p className="text-sm text-muted-foreground">{SCALE_CONTEXT[kind].character}</p>
+          <p className="text-sm text-muted-foreground"><strong className="text-foreground">Contexto musical: </strong>{SCALE_CONTEXT[kind].use}</p>
+          <p className="text-sm text-muted-foreground"><strong className="text-foreground">Experimente: </strong>{SCALE_CONTEXT[kind].practice}</p>
+        </div>
+        {(mode === 'major' || mode === 'minor') && !referenceOnly && <p className="mt-2 text-sm text-muted-foreground">Relativo: {mode === 'major' ? `${scaleNotes(key, 'major')[5]} menor` : `${scaleNotes(key, 'minor')[2]} maior`} (mesmas notas, outro centro).</p>}
+        <p className="mt-2 text-sm text-muted-foreground">Jônio corresponde à escala maior e eólio à menor natural. Comparar modos com a mesma tônica ajuda a ouvir as notas características; usar as mesmas notas com outro centro é uma relação diferente.</p>
       </section>
 
       <section>
         <h2 className="text-lg font-semibold">
-          Campo harmônico de {key} {mode === 'major' ? 'maior' : mode === 'minor' ? 'menor' : 'menor harmônico'}
+          Campo harmônico {referenceOnly ? 'de referência: ' : 'de '}{key} {SCALES[mode].name.toLowerCase()}
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">Os acordes que nascem de cada nota da escala, empilhando terças só com as notas dela. Toque num acorde para ver como tocar.</p>
+        <p className="mt-1 text-sm text-muted-foreground">{referenceOnly ? 'Pentatônicas e blues não geram este campo de sete graus por empilhamento de terças. Abaixo está o campo maior ou menor natural de referência, que pode conter notas ausentes na escala selecionada.' : 'Acordes construídos por terças usando apenas as notas da escala selecionada. Nos modos, as funções tonais tradicionais não se aplicam automaticamente.'} Toque no nome para ver a formação.</p>
         <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2" aria-label="Campo harmônico">
           {field.map((d) => (
             <li key={d.roman} className="rounded-xl border border-border p-3 text-center">
@@ -407,6 +486,7 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
               <button type="button" aria-label={`Tétrade ${d.tetrad}`} onClick={() => onChord(d.tetrad)} className="text-sm font-semibold text-chord hover:underline">
                 {d.tetrad}
               </button>
+              <div className="mt-2 flex flex-wrap justify-center gap-1">{[d.triad, d.tetrad].map((chord, index) => <button key={index} type="button" aria-label={`Ouvir ${chord}`} aria-pressed={synth.playing === `field-${index}-${chord}`} className="min-h-10 rounded-lg bg-muted px-2 text-xs" onClick={() => synth.play(`field-${index}-${chord}`, chordEvents([chord], 90, 2))}>Ouvir {index ? 'tétrade' : 'tríade'}</button>)}</div>
             </li>
           ))}
         </ul>
@@ -419,7 +499,7 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold">Progressões comuns neste tom</h2>
+        <h2 className="text-lg font-semibold">{modal ? 'Explore a cor do modo' : 'Progressões comuns neste tom'}</h2>
         <ul className="mt-2 space-y-2">
           {progressions.map(([name, degrees]) => (
             <li key={name as string} className="flex flex-wrap items-center gap-2 text-sm">
@@ -429,9 +509,17 @@ const ScalesTab = ({ onChord }: { onChord: (chord: string) => void }) => {
                   {degree(i)}
                 </button>
               ))}
+              <PlayButton active={synth.playing === `scale-progression-${name}`} onClick={() => synth.play(`scale-progression-${name}`, chordEvents(degrees.map(degree), 90, 2))} label={name} />
             </li>
           ))}
         </ul>
+      </section>
+      <section className="rounded-2xl border border-border bg-surface p-4">
+        <h2 className="text-lg font-semibold">Empréstimo modal: compare centros iguais</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Em uma música em {key} maior, podemos buscar cores em {key} {SCALES[borrowedMode].name.toLowerCase()}. Isso é diferente de mudar para o relativo: a tônica de referência permanece {key}. Um acorde isolado não prova empréstimo; a função depende da frase e da resolução.</p>
+        <div className="mt-3 flex flex-wrap gap-2">{borrowed.map(chord => <button key={chord.roman} type="button" onClick={() => onChord(chord.triad)} className="min-h-11 rounded-lg border border-border px-3 text-left"><span className="block text-xs text-muted-foreground">{chord.roman}</span><strong className="text-chord">{chord.triad}</strong></button>)}</div>
+        <p className="mt-3 text-sm text-muted-foreground">Exemplo: I – iv – I empresta o iv do menor paralelo para o maior. Ouça o contraste do IV maior com o iv menor.</p>
+        <div className="mt-3 flex flex-wrap gap-3">{(['major', 'minor'] as const).map(source => { const chords = [parallelMajor[0]!.triad, harmonicField(key, source)[3]!.triad, parallelMajor[0]!.triad]; return <div key={source}><p className="mb-2 text-sm font-semibold text-chord">{source === 'major' ? 'I – IV – I' : 'I – iv – I'} · {chords.join(' – ')}</p><PlayButton active={synth.playing === `borrow-${source}`} onClick={() => synth.play(`borrow-${source}`, chordEvents(chords, 90, 2))} label={source === 'major' ? 'I – IV – I' : 'I – iv – I'} /></div>; })}</div>
       </section>
     </div>
   );

@@ -123,11 +123,17 @@ export const chordFormation = (root: string, suffix: string): { name: string; no
   };
 };
 
-export type ScaleKind = 'major' | 'minor' | 'harmonicMinor' | 'majorPentatonic' | 'minorPentatonic' | 'blues';
+export type ModalKind = 'dorian' | 'phrygian' | 'lydian' | 'mixolydian' | 'locrian';
+export type ScaleKind = 'major' | 'minor' | 'harmonicMinor' | ModalKind | 'majorPentatonic' | 'minorPentatonic' | 'blues';
 export const SCALES: Record<ScaleKind, { name: string; steps: number[]; about: string }> = {
   major: { name: 'Maior', steps: [0, 2, 4, 5, 7, 9, 11], about: 'Tom, tom, semitom, tom, tom, tom, semitom. A base do campo harmônico maior.' },
   minor: { name: 'Menor natural', steps: [0, 2, 3, 5, 7, 8, 10], about: 'As mesmas notas da relativa maior, começando no sexto grau dela.' },
   harmonicMinor: { name: 'Menor harmônica', steps: [0, 2, 3, 5, 7, 8, 11], about: 'Menor com a sétima elevada: dá o acorde dominante (V7) no tom menor.' },
+  dorian: { name: 'Dórico', steps: [0, 2, 3, 5, 7, 9, 10], about: 'Modo menor com sexta maior (1 2 b3 4 5 6 b7). O IV maior destaca sua cor; exemplo em Dó: Cm e F.' },
+  phrygian: { name: 'Frígio', steps: [0, 1, 3, 5, 7, 8, 10], about: 'Modo menor com segunda menor (1 b2 b3 4 5 b6 b7). O bII maior e seu movimento para o i ressaltam essa sonoridade.' },
+  lydian: { name: 'Lídio', steps: [0, 2, 4, 6, 7, 9, 11], about: 'Modo maior com quarta aumentada (1 2 3 #4 5 6 7). O II maior e a #11 sobre o acorde de centro evidenciam sua cor.' },
+  mixolydian: { name: 'Mixolídio', steps: [0, 2, 4, 5, 7, 9, 10], about: 'Modo maior com sétima menor (1 2 3 4 5 6 b7). O bVII maior é característico; o I7 pode ser centro modal, sem obrigação de resolver como dominante.' },
+  locrian: { name: 'Lócrio', steps: [0, 1, 3, 5, 6, 8, 10], about: 'Modo com segunda menor e quinta diminuta (1 b2 b3 4 b5 b6 b7). Sua tétrade inicial é meio-diminuta; sustentar esse centro exige cuidado, pois ele tem pouca estabilidade tonal.' },
   majorPentatonic: { name: 'Pentatônica maior', steps: [0, 2, 4, 7, 9], about: 'Cinco notas, sem semitons: a mais usada para improvisar e fazer solos.' },
   minorPentatonic: { name: 'Pentatônica menor', steps: [0, 3, 5, 7, 10], about: 'Cinco notas da escala menor. Base de muitos solos.' },
   blues: { name: 'Blues', steps: [0, 3, 5, 6, 7, 10], about: 'Pentatônica menor com a "blue note" (quinta diminuta).' },
@@ -182,7 +188,7 @@ const HARMONIC_MINOR_FIELD = [
   ['vii°', '°', '°7'],
 ] as const;
 
-export type FieldMode = 'major' | 'minor' | 'harmonicMinor';
+export type FieldMode = 'major' | 'minor' | 'harmonicMinor' | ModalKind;
 
 /**
  * Roman numeral of the four-note chord: the triad's numeral plus its seventh. The vii of the major key (and
@@ -200,6 +206,21 @@ const tetradNumeral = (roman: string, t4: string): string => {
 /** The seven chords built on each degree of the key (triads and four-note chords, each with its numeral). */
 export const harmonicField = (root: string, mode: FieldMode): { roman: string; tetradRoman: string; triad: string; tetrad: string; note: string }[] => {
   const notes = scaleNotes(root, mode);
+  if (mode !== 'major' && mode !== 'minor' && mode !== 'harmonicMinor') {
+    const steps = SCALES[mode].steps;
+    const major = SCALES.major.steps;
+    const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+    return steps.map((step, index) => {
+      const interval = (offset: number) => (steps[(index + offset) % 7]! - step + 12) % 12;
+      const third = interval(2), fifth = interval(4), seventh = interval(6);
+      const t3 = fifth === 6 ? 'm(b5)' : fifth === 8 ? '+' : third === 3 ? 'm' : '';
+      const t4 = fifth === 6 ? seventh === 9 ? '°7' : 'm7(b5)' : third === 3 ? seventh === 11 ? 'm(7M)' : 'm7' : seventh === 11 ? '7M' : '7';
+      const numeral = third === 3 ? numerals[index]!.toLowerCase() : numerals[index]!;
+      const alteration = step - major[index]!;
+      const roman = `${alteration < 0 ? 'b' : alteration > 0 ? '#' : ''}${numeral}${fifth === 6 ? '°' : fifth === 8 ? '+' : ''}`;
+      return { roman, tetradRoman: tetradNumeral(roman, t4), note: notes[index]!, triad: `${notes[index]}${t3}`, tetrad: `${notes[index]}${t4}` };
+    });
+  }
   const field = mode === 'major' ? MAJOR_FIELD : mode === 'minor' ? MINOR_FIELD : HARMONIC_MINOR_FIELD;
   return field.map(([roman, t3, t4], i) => ({ roman, tetradRoman: tetradNumeral(roman, t4), note: notes[i]!, triad: `${notes[i]}${t3}`, tetrad: `${notes[i]}${t4}` }));
 };
