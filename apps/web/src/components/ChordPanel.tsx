@@ -3,6 +3,7 @@ import { parseChordPro } from '../lib/chart.ts';
 import { transposeChord } from '../lib/transpose.ts';
 import { ChordDiagram, INSTRUMENT_NAMES, type Instrument } from './ChordDiagram.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
+import { splitChordLabels } from '../lib/chordToken.ts';
 
 const KEY = 'wm-instrument';
 
@@ -20,7 +21,7 @@ export const chartChords = (chordPro: string, transpose: number, spellKey?: stri
   const seen: string[] = [];
   for (const line of parseChordPro(chordPro).lines) {
     const chords = line.kind === 'chords' ? line.chords : line.kind === 'lyric' ? line.parts.flatMap((p) => (p.chord ? [p.chord] : [])) : [];
-    for (const c of chords) {
+    for (const c of chords.flatMap(splitChordLabels)) {
       const shown = transposeChord(c, transpose, spellKey ?? false);
       if (!seen.includes(shown)) seen.push(shown);
     }

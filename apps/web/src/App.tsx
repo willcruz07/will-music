@@ -12,6 +12,8 @@ import { APP_VERSION, versionLabel } from './version.ts';
 import { useWakeLock } from './lib/wakeLock.ts';
 import { IconButton } from './ui/Button.tsx';
 import { useStudioLayout } from './lib/studioLayout.ts';
+import { AccountLink } from './components/AccountLink.tsx';
+import { RequireAccount } from './components/RequireAccount.tsx';
 
 // The library opens first; every other screen (and its heavy libraries) loads on demand.
 const named = <K extends string>(load: () => Promise<Record<K, React.ComponentType<any>>>, name: K) =>
@@ -33,6 +35,11 @@ const LessonPage = named(() => import('./pages/StudyHome.tsx'), 'LessonPage');
 const MicPage = named(() => import('./pages/MicPage.tsx'), 'MicPage');
 const ConstellationPage = named(() => import('./pages/ConstellationPage.tsx'), 'ConstellationPage');
 const Stage = named(() => import('./pages/Stage.tsx'), 'Stage');
+const Login = named(() => import('./pages/Login.tsx'), 'Login');
+const CatalogChart = named(() => import('./pages/CatalogChart.tsx'), 'CatalogChart');
+const CatalogChartRoute = () => { const { id } = useParams(); return <CatalogChart key={id} />; };
+const CatalogArtist = named(() => import('./pages/CatalogArtist.tsx'), 'CatalogArtist');
+const CatalogArtistRoute = () => { const { artistId } = useParams(); return <CatalogArtist key={artistId} />; };
 
 // Reads the saved preference, never the <html> class (the stage forces dark while it is open).
 export const ThemeToggle = () => {
@@ -56,15 +63,22 @@ const KeepAwake = () => {
 
 export const App = () => (
   <Suspense fallback={<Loading />}>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="*" element={<RequireAccount><AuthenticatedApp /></RequireAccount>} />
+    </Routes>
+    <DialogHost />
+  </Suspense>
+);
+
+const AuthenticatedApp = () => <>
     <KeepAwake />
     <Routes>
       <Route path="/palco/lista/:id" element={<Stage mode="list" />} />
       <Route path="/palco/musica/:id" element={<Stage mode="song" />} />
       <Route path="*" element={<Layout />} />
     </Routes>
-    <DialogHost />
-  </Suspense>
-);
+  </>;
 
 const Layout = () => {
   useAutoHideBars();
@@ -86,6 +100,7 @@ const Layout = () => {
         <div className="flex items-center gap-2">
           <TopNav />
           <SettingsLink />
+          <AccountLink />
           <ThemeToggle />
         </div>
       </div>
@@ -111,6 +126,10 @@ const Layout = () => {
           <Route path="/listas" element={<Setlists />} />
           <Route path="/listas/:id" element={<SetlistEdit />} />
           <Route path="/ajustes" element={<Settings />} />
+          <Route path="/conta" element={<Login account />} />
+          <Route path="/catalogo" element={<Navigate to="/?aba=catalogo" replace />} />
+          <Route path="/catalogo/:id" element={<CatalogChartRoute />} />
+          <Route path="/catalogo/artista/:artistId" element={<CatalogArtistRoute />} />
         </Routes>
       </Suspense>
     </main>

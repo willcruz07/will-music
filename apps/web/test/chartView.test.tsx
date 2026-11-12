@@ -2,6 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ChartView } from '../src/components/ChartView.tsx';
 import { Player, activeIndexAt } from '../src/components/Player.tsx';
+import { lyricWords } from '../src/lib/chartWords.ts';
+import { chordNotes } from '../src/lib/chordNotation.ts';
 
 describe('ChartView', () => {
   it('renders chords above lyrics and highlights the active lyric line', () => {
@@ -16,6 +18,26 @@ describe('ChartView', () => {
     render(<ChartView chordPro={'[G]Ninguém [D/F#]Deus'} transpose={2} preferFlats={false} fontSize={16} />);
     expect(screen.getByText('A')).toBeInTheDocument();
     expect(screen.getByText('E/G#')).toBeInTheDocument();
+  });
+
+  it('wraps at words without breaking the syllables of a word at a chord change', () => {
+    const parts = [{ chord: 'C', text: 'Ama' }, { chord: 'G', text: 'nhã será ' }, { chord: 'F', text: 'outro dia' }];
+    const words = lyricWords(parts);
+    expect(words.map(word => word.kind === 'space' ? word.text : word.pieces.map(p => p.text).join('')).join('')).toBe('Amanhã será outro dia');
+    expect(words[0]).toMatchObject({ kind: 'word', pieces: [{ text: 'Ama', offset: 0, chord: 'C' }, { text: 'nhã', offset: 3, chord: 'G' }] });
+    render(<ChartView chordPro="[C]Ama[G]nhã será [F]outro dia" transpose={0} preferFlats={false} fontSize={16} />);
+    expect(screen.getByText('Ama').closest('[data-chart-word]')).toBe(screen.getByText('nhã').closest('[data-chart-word]'));
+    expect(screen.getByText('outro').closest('[data-chart-word]')).not.toBe(screen.getByText('dia').closest('[data-chart-word]'));
+  });
+
+  it('transposes grouped labels separately and recognizes numeric slash extensions for diagrams', () => {
+    render(<ChartView chordPro="[C G/B]Texto [C6/9]aqui" transpose={2} preferFlats={false} fontSize={16} onChordTap={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Como tocar D' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Como tocar A/C#' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Como tocar D6/9' })).toBeInTheDocument();
+    expect(chordNotes('C6/9')).toEqual(chordNotes('C6(9)'));
+    expect(chordNotes('G7/9/B')).toEqual(chordNotes('G7(9)/B'));
+    expect(chordNotes('B♭m7')).toEqual(chordNotes('Bbm7'));
   });
 });
 

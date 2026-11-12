@@ -1,7 +1,7 @@
 import { detectPitch, midiName, voiceType } from '@will-music/engine';
 import { Mic, MicOff, RotateCcw } from 'lucide-react';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
 import { readInstrument } from '../components/ChordPanel.tsx';
 import { openMic, tapSamples } from '../lib/mic.ts';
@@ -10,6 +10,7 @@ import type { LiveChordsRequest, LiveChordsResponse } from '../worker/liveChords
 import { Button } from '../ui/Button.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
 import { SheetSelect } from '../ui/SheetSelect.tsx';
+import { PlayButton, useStudySynth } from '../study/widgets.tsx';
 
 type Tab = 'tuner' | 'voice' | 'chords';
 const TABS: { id: Tab; label: string }[] = [
@@ -50,8 +51,8 @@ const Trace = ({ points, now }: { points: { t: number; midi: number }[]; now: nu
     const dpr = window.devicePixelRatio || 1;
     const w = el.clientWidth;
     const h = el.clientHeight;
-    el.width = w * dpr;
-    el.height = h * dpr;
+    if (el.width !== Math.round(w * dpr) || el.height !== Math.round(h * dpr)) { el.width = Math.round(w * dpr); el.height = Math.round(h * dpr); }
+    ctx.clearRect(0, 0, el.width, el.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const recent = points.filter((p) => now - p.t < TRACE_SEC);
     const mids = recent.map((p) => p.midi);
@@ -92,7 +93,7 @@ const Trace = ({ points, now }: { points: { t: number; midi: number }[]; now: nu
       last = p.t;
     }
     ctx.stroke();
-  });
+  }, [points, now]);
   return <canvas ref={canvas} className="h-64 w-full rounded-xl bg-surface-2" aria-label="Desenho da altura cantada nos últimos segundos" />;
 };
 
@@ -106,47 +107,68 @@ export const MicPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [presetId, setPresetId] = useState('guitar');
   const [a4, setA4] = useState(440);
+  const [selectedString, setSelectedString] = useState<number | undefined>();
+  const [notice, setNotice] = useState<string | null>(null);
+  const [target, setTarget] = useState(60);
+  const [voicePitch, setVoicePitch] = useState<number | null>(null);
+  const synth = useStudySynth();
   const [reading, setReading] = useState<(TunerReading & { hz: number }) | null>(null);
   const [voiceNow, setVoiceNow] = useState<string | null>(null);
-  const [, setFrame] = useState(0);
+  const [frameTick, setFrame] = useState(0);
   const [chord, setChord] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [chordStatus, setChordStatus] = useState<string | null>(null);
   const mic = useRef<Awaited<ReturnType<typeof openMic>> | null>(null);
   const trace = useRef<{ t: number; midi: number }[]>([]);
   const sung = useRef<number[]>([]);
-  const settings = useRef({ presetId, a4 });
-  settings.current = { presetId, a4 };
+  const settings = useRef({ presetId, a4, selectedString });
+  settings.current = { presetId, a4, selectedString };
+  const generation = useRef(0);
+  const referenceUntil = useRef(0);
 
   const mounted = useRef(true);
   const opening = useRef(false);
   const [starting, setStarting] = useState(false);
 
   const stop = () => {
-    mic.current?.close();
+    generation.current++;
+    const active = mic.current;
     mic.current = null;
+    active?.close();
+    synth.stop();
     if (mounted.current) {
       setRunning(false);
+      setStarting(false);
       setReading(null);
+      setVoiceNow(null);
+      setVoicePitch(null);
+      setChord(null);
+      setChordStatus(null);
     }
   };
 
   const start = async () => {
     if (opening.current || mic.current) return; // one microphone at a time, even with a double tap
     opening.current = true;
+    const request = ++generation.current;
     setStarting(true);
     setError(null);
+    setNotice(null);
     try {
       const opened = await openMic();
       // Left the page while the permission prompt was open: release the microphone right away.
-      if (!mounted.current) return opened.close();
+      if (!mounted.current || request !== generation.current || document.hidden) return opened.close();
       mic.current = opened;
+      trace.current = [];
+      sung.current = [];
+      setHistory([]);
+      setFrame(f => f + 1);
       setRunning(true);
     } catch (e) {
-      if (mounted.current) setError(e instanceof Error ? e.message : 'Não foi possível usar o microfone.');
+      if (mounted.current && request === generation.current) setError(e instanceof Error ? e.message : 'Não foi possível usar o microfone.');
     } finally {
       opening.current = false;
-      if (mounted.current) setStarting(false);
+      if (mounted.current && request === generation.current) setStarting(false);
     }
   };
 
@@ -157,6 +179,35 @@ export const MicPage = () => {
       stop();
     };
   }, []);
+
+  useEffect(() => {
+    const hide = () => {
+      if (document.hidden && (mic.current || opening.current)) {
+        stop();
+        setNotice('Microfone pausado ao sair da tela. Toque em Ligar microfone para continuar.');
+      }
+    };
+    const leave = () => { stop(); };
+    document.addEventListener('visibilitychange', hide);
+    window.addEventListener('pagehide', leave);
+    return () => { document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', leave); };
+  }, []);
+
+  useEffect(() => {
+    const active = mic.current;
+    if (!running || !active) return;
+    const interrupted = () => {
+      if (mic.current !== active) return;
+      stop();
+      setNotice('A captura foi interrompida pelo aparelho. Toque em Ligar microfone para retomar.');
+    };
+    const state = () => { if (active.context.state !== 'running') interrupted(); };
+    const tracks = active.stream.getAudioTracks();
+    tracks.forEach(track => { track.addEventListener('ended', interrupted); track.addEventListener('mute', interrupted); });
+    active.context.addEventListener('statechange', state);
+    state();
+    return () => { tracks.forEach(track => { track.removeEventListener('ended', interrupted); track.removeEventListener('mute', interrupted); }); active.context.removeEventListener('statechange', state); };
+  }, [running]);
 
   // Pitch loop (tuner and voice): ~25 readings per second, steadied by a short median.
   useEffect(() => {
@@ -171,24 +222,29 @@ export const MicPage = () => {
     const half = new Float32Array(analyser.fftSize / 2);
     const rate = halve ? m.context.sampleRate / 2 : m.context.sampleRate;
     const recent: number[] = [];
-    let frame = 0;
+    let lastFrame = -Infinity;
+    let lastValid = 0;
     let raf = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
-      if (frame++ % 2) return;
+      const timestamp = performance.now();
+      if (timestamp - lastFrame < 50 || document.hidden) return;
+      lastFrame = timestamp;
       analyser.getFloatTimeDomainData(buf);
       const preset = TUNINGS.find((t) => t.id === settings.current.presetId)!;
-      const p = detectPitch(halve ? decimate2(buf, half) : buf, rate, { minHz: tab === 'voice' ? 70 : preset.minHz, maxHz: tab === 'voice' ? 1200 : 1600 });
+      const p = timestamp < referenceUntil.current ? null : detectPitch(halve ? decimate2(buf, half) : buf, rate, { minHz: tab === 'voice' ? 55 : preset.minHz, maxHz: tab === 'voice' ? 1200 : 1600 });
       const now = performance.now() / 1000;
       if (!p || p.clarity < 0.85) {
         recent.length = 0;
+        if (timestamp - lastValid > 600) { setReading(null); setVoiceNow(null); setVoicePitch(null); }
         if (tab === 'voice') setFrame((f) => f + 1);
         return;
       }
+      lastValid = timestamp;
       recent.push(p.hz);
       if (recent.length > 5) recent.shift();
       const hz = median(recent);
-      if (tab === 'tuner') setReading({ ...tunerReading(hz, preset, settings.current.a4), hz });
+      if (tab === 'tuner') setReading({ ...tunerReading(hz, preset, settings.current.a4, settings.current.selectedString), hz });
       else {
         const midi = 69 + 12 * Math.log2(hz / settings.current.a4);
         trace.current.push({ t: now, midi });
@@ -196,6 +252,7 @@ export const MicPage = () => {
         sung.current.push(midi);
         if (sung.current.length > 3000) sung.current.shift();
         setVoiceNow(midiName(Math.round(midi)));
+        setVoicePitch(midi);
         setFrame((f) => f + 1);
       }
     };
@@ -204,34 +261,38 @@ export const MicPage = () => {
       cancelAnimationFrame(raf);
       m.source.disconnect(analyser);
     };
-  }, [running, tab]);
+  }, [running, tab, presetId, selectedString, a4]);
 
   // Live chords: the microphone feeds the chord model in a worker, once per second.
   useEffect(() => {
     const m = mic.current;
     if (!running || !m || tab !== 'chords') return;
+    let cancelled = false;
     setChordStatus('Preparando o modelo de acordes…');
     const worker = new Worker(new URL('../worker/liveChords.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (e: MessageEvent<LiveChordsResponse>) => {
+      if (cancelled) return;
       const msg = e.data;
-      if (msg.type === 'ready') setChordStatus('Escutando… toque ou cante perto do aparelho.');
-      else if (msg.type === 'error') setChordStatus(`Não foi possível reconhecer: ${msg.message}`);
+      if (msg.type === 'ready') setChordStatus('Escutando… toque um acorde perto do aparelho.');
+      else if (msg.type === 'error') { setChord(null); setChordStatus(`Não foi possível reconhecer: ${msg.message}`); }
       else {
         setChord(msg.label);
         if (msg.label) setHistory((h) => (h[h.length - 1] === msg.label ? h : [...h, msg.label!].slice(-12)));
       }
     };
+    worker.onerror = () => { if (!cancelled) { setChord(null); setChordStatus('O reconhecimento foi interrompido. Troque de aba ou religue o microfone para tentar novamente.'); } };
     worker.postMessage({ type: 'start', sampleRate: m.context.sampleRate } satisfies LiveChordsRequest);
     let untap: (() => void) | null = null;
-    let cancelled = false;
     void tapSamples(m.context, m.source, (samples) => worker.postMessage({ type: 'audio', samples } satisfies LiveChordsRequest, [samples.buffer]))
       .then((u) => {
         if (cancelled) u();
         else untap = u;
       })
-      .catch(() => setChordStatus('Este navegador não deixa o app escutar o microfone continuamente. Tente o Chrome ou o Edge atualizados.'));
+      .catch(() => { if (!cancelled) { worker.terminate(); setChordStatus('Não foi possível iniciar a captura contínua neste navegador. Religue o microfone e confira a permissão de áudio.'); } });
     return () => {
       cancelled = true;
+      worker.onmessage = null;
+      worker.onerror = null;
       untap?.();
       worker.postMessage({ type: 'stop' } satisfies LiveChordsRequest);
       worker.terminate();
@@ -239,8 +300,16 @@ export const MicPage = () => {
   }, [running, tab]);
 
   const preset = TUNINGS.find((t) => t.id === presetId)!;
-  const suggestion = voiceType(sung.current);
+  const suggestion = useMemo(() => voiceType(sung.current), [frameTick]);
   const now = performance.now() / 1000;
+  const deviation = voicePitch === null ? null : Math.round((voicePitch - target) * 100);
+  const hearReference = (interval: boolean) => {
+    const notes = interval ? [target, target + 2, target] : [target];
+    const duration = notes.length * 0.8;
+    referenceUntil.current = performance.now() + (duration + 0.5) * 1000;
+    setVoiceNow(null); setVoicePitch(null);
+    synth.play(interval ? 'mic-interval' : 'mic-target', notes.map((pitch, i) => ({ time: i * 0.8, dur: 0.65, pitch: pitch + 12 * Math.log2(a4 / 440) })));
+  };
 
   return (
     <section className="max-w-3xl">
@@ -262,6 +331,7 @@ export const MicPage = () => {
           {error}
         </p>
       )}
+      {notice && <p role="status" className="mt-3 rounded-xl border border-border bg-surface p-3 text-sm text-muted-foreground">{notice}</p>}
 
       <ScrollStrip className="mt-4" role="tablist" label="Ferramenta" selected={tab} onKeyDown={rovingKeys} innerClassName="rounded-xl border border-border bg-surface p-1">
         {TABS.map((t) => (
@@ -270,7 +340,7 @@ export const MicPage = () => {
             type="button"
             role="tab"
             aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => { synth.stop(); setReading(null); setVoiceNow(null); setVoicePitch(null); setChord(null); setTab(t.id); }}
             className={`min-h-10 rounded-lg px-4 text-sm ${tab === t.id ? 'bg-primary font-semibold text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             {t.label}
@@ -283,7 +353,7 @@ export const MicPage = () => {
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <span className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
               <span aria-hidden>Instrumento</span>
-              <SheetSelect label="Instrumento" value={presetId} onChange={setPresetId} className="flex-1 font-semibold sm:flex-none" options={TUNINGS.map((t) => ({ value: t.id, label: t.label }))} />
+              <SheetSelect label="Instrumento" value={presetId} onChange={id => { setSelectedString(undefined); setReading(null); setPresetId(id); }} className="flex-1 font-semibold sm:flex-none" options={TUNINGS.map((t) => ({ value: t.id, label: t.label }))} />
             </span>
             <label className="flex items-center gap-2">
               Lá de referência
@@ -293,7 +363,7 @@ export const MicPage = () => {
                 max={466}
                 value={a4}
                 aria-label="Lá de referência (Hz)"
-                onChange={(e) => setA4(Math.min(466, Math.max(415, Number(e.target.value) || 440)))}
+                onChange={(e) => { setReading(null); setA4(Math.min(466, Math.max(415, Number(e.target.value) || 440))); }}
                 className="h-10 w-20 rounded-lg border border-border bg-surface px-2 tabular-nums"
               />
               Hz
@@ -305,29 +375,42 @@ export const MicPage = () => {
               {reading ? reading.note : '–'}
               {reading && <span className="text-3xl text-muted-foreground">{reading.octave}</span>}
             </p>
-            <p className="mt-1 text-lg text-muted-foreground">{reading ? `${reading.solfege} · ${reading.hz.toFixed(1)} Hz` : running ? 'Toque uma corda' : 'Ligue o microfone'}</p>
+            <p className="mt-1 text-lg text-muted-foreground">{reading ? `${reading.solfege} · ${reading.hz.toFixed(1)} Hz` : running ? 'Aguardando som… toque uma corda' : 'Ligue o microfone'}</p>
             <p className={`mt-3 min-h-7 text-lg font-semibold ${reading?.inTune ? 'text-chord' : 'text-amber-500'}`} role="status">
-              {reading && (reading.inTune ? 'Afinado' : reading.cents < 0 ? `Afine para cima (${reading.cents} cents)` : `Afine para baixo (+${reading.cents} cents)`)}
+              {reading && (reading.inTune ? 'Afinado' : Math.abs(reading.cents) > 150 ? `Nota distante do alvo (${reading.cents > 0 ? '+' : ''}${reading.cents} cents). Confira a corda e possíveis harmônicos.` : reading.cents < 0 ? `Afine para cima (${reading.cents} cents)` : `Afine para baixo (+${reading.cents} cents)`)}
             </p>
             {preset.strings.length > 0 && (
               <div className="mt-4 flex flex-wrap justify-center gap-2" aria-label="Cordas">
+                <button type="button" aria-pressed={selectedString === undefined} onClick={() => { setSelectedString(undefined); setReading(null); }} className={`min-h-11 rounded-full border px-3 text-sm ${selectedString === undefined ? 'border-primary text-chord' : 'border-border text-muted-foreground'}`}>Automático</button>
                 {preset.strings.map((m, i) => {
                   const string = preset.strings.length - i;
                   const active = reading?.target?.string === string;
                   return (
-                    <span key={i} className={`rounded-full border px-3 py-1 text-sm tabular-nums ${active ? (reading?.inTune ? 'border-primary bg-primary/15 text-chord' : 'border-amber-500 text-amber-500') : 'border-border text-muted-foreground'}`}>
+                    <button key={i} type="button" aria-pressed={selectedString === string} onClick={() => { setSelectedString(string); setReading(null); }} className={`min-h-11 rounded-full border px-3 py-1 text-sm tabular-nums ${selectedString === string ? 'border-primary bg-primary/15 text-chord' : active ? (reading?.inTune ? 'border-primary text-chord' : 'border-amber-500 text-amber-500') : 'border-border text-muted-foreground'}`}>
                       {string}ª · {midiName(m)}
-                    </span>
+                    </button>
                   );
                 })}
               </div>
             )}
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">Toque uma corda por vez. Se a escolha automática oscilar, selecione a corda desejada. Um harmônico pode aparecer uma oitava acima: confira também o som e a corda selecionada.</p>
         </div>
       )}
 
       {tab === 'voice' && (
         <div className="mt-6 space-y-3">
+          <section className="rounded-2xl border border-primary/30 bg-surface p-4" aria-label="Prática de afinação vocal">
+            <h2 className="font-semibold">Ouça, espere e cante</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Escolha uma referência confortável. Sustente a nota ou repita a frase de três notas depois de ouvir.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <SheetSelect label="Nota-alvo" value={String(target)} onChange={value => { synth.stop(); setTarget(Number(value)); }} options={Array.from({ length: 37 }, (_, i) => ({ value: String(48 + i), label: midiName(48 + i) }))} />
+              <PlayButton label={`Referência ${midiName(target)}`} active={synth.playing === 'mic-target'} onClick={() => hearReference(false)} />
+              <PlayButton label="Frase: nota, segunda maior, nota" active={synth.playing === 'mic-interval'} onClick={() => hearReference(true)} />
+            </div>
+            <p className={`mt-3 text-sm font-semibold ${deviation !== null && Math.abs(deviation) <= 15 ? 'text-chord' : 'text-muted-foreground'}`}>{deviation === null ? `Alvo: ${midiName(target)} · aguardando sua voz` : Math.abs(deviation) <= 15 ? `Próximo ao alvo ${midiName(target)} · ${deviation > 0 ? '+' : ''}${deviation} cents` : `${Math.abs(deviation)} cents ${deviation < 0 ? 'abaixo' : 'acima'} de ${midiName(target)}`}</p>
+            <p className="mt-2 text-xs text-muted-foreground">A captura de notas é ignorada durante a referência sonora e por um breve intervalo depois, para não contar o som do aparelho como sua voz. A comparação usa o alvo escolhido, inclusive sua oitava.</p>
+          </section>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-sm text-muted-foreground">Nota agora</p>
@@ -339,26 +422,25 @@ export const MicPage = () => {
               {suggestion ? (
                 <>
                   <p>
-                    Extensão cantada: <span className="font-semibold tabular-nums">{midiName(suggestion.low)} a {midiName(suggestion.high)}</span>
+                    Faixa observada nesta sessão: <span className="font-semibold tabular-nums">{midiName(suggestion.low)} a {midiName(suggestion.high)}</span>
                   </p>
-                  <p className="text-lg">
-                    Sugestão de voz: <span className="font-semibold text-chord">{suggestion.label}</span>
-                  </p>
+                  <details className="mt-2 max-w-64 text-xs text-muted-foreground"><summary className="cursor-pointer">Referência aproximada de registro</summary><p className="mt-2">{suggestion.label}: comparação baseada somente nas alturas captadas. Não determina sua classificação vocal ou tessitura.</p></details>
                 </>
               ) : (
-                <p className="max-w-56 text-muted-foreground">Cante uma escala do mais grave ao mais agudo que for confortável para ver a sugestão de voz.</p>
+                <p className="max-w-56 text-muted-foreground">Cante algumas notas confortáveis para observar a faixa captada, sem procurar seus limites.</p>
               )}
             </div>
           </div>
           <Trace points={trace.current} now={now} />
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">A sugestão vem só da extensão, não substitui a avaliação de um professor de canto.</p>
+            <p className="text-xs text-muted-foreground">Faixa estimada pelas notas mais frequentes da amostra; não representa sua extensão vocal completa.</p>
             <Button
               variant="ghost"
               onClick={() => {
                 sung.current = [];
                 trace.current = [];
                 setVoiceNow(null);
+                setVoicePitch(null);
                 setFrame((f) => f + 1);
               }}
             >
@@ -388,7 +470,7 @@ export const MicPage = () => {
               ))}
             </div>
           )}
-          <p className="mt-3 text-xs text-muted-foreground">O acorde aparece com cerca de um segundo de atraso: o app escuta os últimos segundos para decidir.</p>
+          <p className="mt-3 text-xs text-muted-foreground">O reconhecimento usa uma janela dos últimos segundos; o atraso depende do aparelho. Toque um acorde sustentado: uma nota cantada isoladamente não determina um acorde completo.</p>
         </div>
       )}
     </section>

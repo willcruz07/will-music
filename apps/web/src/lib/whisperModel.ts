@@ -1,3 +1,4 @@
+import { WHISPER_BLOCK_CACHE, whisperResourceCache } from './whisperCache.ts';
 /** Where Whisper runs: on the GPU (WebGPU) or on the processor (wasm). */
 export type WhisperDevice = 'webgpu' | 'wasm';
 
@@ -17,9 +18,17 @@ export const whisperCacheReady = async (device: WhisperDevice): Promise<boolean>
   if (typeof caches === 'undefined') return false;
   try {
     const name = whisperModelFor(device).split('/')[1]!;
-    const keys = (await (await caches.open('transformers-cache')).keys()).map((request) => new URL(request.url).pathname);
+    const legacy = await (await caches.open('transformers-cache')).keys();
+    const blocks = await (await caches.open(WHISPER_BLOCK_CACHE)).keys();
+    const entries = [...legacy, ...blocks];
     const required = ['config.json', 'tokenizer.json', 'tokenizer_config.json', 'preprocessor_config.json', 'onnx/encoder_model_q4.onnx', 'onnx/decoder_model_merged_q4.onnx'];
-    return required.every((file) => keys.some((path) => path.includes(`/${name}/resolve/`) && path.endsWith(`/${file}`)));
+    for (const file of required) {
+      const entry = entries.find(request => { const url = new URL(request.url); return !url.searchParams.has('__wm_block') && url.pathname.includes(`/${name}/resolve/`) && url.pathname.endsWith(`/${file}`); });
+      if (!entry) return false;
+      // Legacy entries are already complete responses; block manifests need validation.
+      if (!legacy.some(request => request.url === entry.url) && !await whisperResourceCache.match(entry.url)) return false;
+    }
+    return true;
   } catch { return false; }
 };
 

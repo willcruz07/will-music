@@ -1,9 +1,7 @@
-const NOTE_PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+import { normalizeChordSuffix, notePitchClass, parseChordToken } from './chordToken.ts';
 
 const notePc = (name: string): number | null => {
-  const m = /^([A-G])([#b]?)$/u.exec(name);
-  if (!m) return null;
-  return (NOTE_PC[m[1]!]! + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + 12) % 12;
+  return notePitchClass(name);
 };
 
 type Shape = { third: number | null; fifth: number; sixth?: number; seventh?: number; extras: number[] };
@@ -55,13 +53,13 @@ const parseSuffix = (suffix: string): Shape | null => {
 
 /** Pitch classes of a chord in Brazilian notation: bass first (when it differs), then root, 3rd, 5th, 6th, 7th, tensions. */
 export const chordNotes = (chord: string): number[] | null => {
-  const m = /^([A-G][#b]?)([^/]*)(?:\/([A-G][#b]?))?$/u.exec(chord.trim());
-  if (!m) return null;
-  const root = notePc(m[1]!);
-  const shape = parseSuffix(m[2]!);
+  const parsed = parseChordToken(chord);
+  if (!parsed) return null;
+  const root = notePc(parsed.root);
+  const shape = parseSuffix(normalizeChordSuffix(parsed.suffix));
   if (root === null || !shape) return null;
-  const bass = m[3] ? notePc(m[3]) : null;
-  if (m[3] && bass === null) return null;
+  const bass = parsed.bass ? notePc(parsed.bass) : null;
+  if (parsed.bass && bass === null) return null;
   const intervals = [0, shape.third, shape.fifth, shape.sixth, shape.seventh, ...shape.extras].filter((i): i is number => i !== null && i !== undefined);
   const tones = [...new Set(intervals.map((i) => (root + i) % 12))];
   return bass !== null && bass !== root ? [bass, ...tones.filter((t) => t !== bass)] : tones;

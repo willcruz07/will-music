@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ load: vi.fn() }));
-vi.mock('@huggingface/transformers', () => ({ pipeline: mocks.load, WhisperTextStreamer: class {} }));
+vi.mock('@huggingface/transformers', () => ({ env: {}, pipeline: mocks.load, WhisperTextStreamer: class {} }));
 beforeEach(() => { vi.resetModules(); mocks.load.mockReset(); vi.stubGlobal('navigator', { userAgent: 'test' }); });
 afterEach(() => vi.unstubAllGlobals());
 

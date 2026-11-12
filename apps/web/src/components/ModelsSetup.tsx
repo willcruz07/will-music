@@ -1,13 +1,12 @@
-import { AlertTriangle, Check, Download, Loader2, X } from 'lucide-react';
+import { Check, Download, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MODELS, type ModelId } from '@will-music/engine';
 import { CHORD_MODELS, downloadModels, missingModels } from '../lib/models.ts';
-import { MODELS_CHANGED, neverRemind, reminderDue, reminderWait, snoozeReminder } from '../lib/modelsReminder.ts';
+import { MODELS_CHANGED } from '../lib/modelsReminder.ts';
 import { formatBytes } from '../lib/storage.ts';
 import { WHISPER_BYTES, detectWhisperDevice, preloadWhisper, whisperCached } from '../lib/whisper.ts';
 import { BottomSheet } from '../ui/BottomSheet.tsx';
 import { Button } from '../ui/Button.tsx';
-import { confirmDialog } from '../ui/Dialog.tsx';
 import { StorageProtection } from './StorageProtection.tsx';
 
 const ASKED_KEY = 'wm-models-asked';
@@ -61,15 +60,10 @@ const whenNoModal = (fn: () => void): (() => void) => {
   return () => clearTimeout(timer);
 };
 
-/**
- * The analysis models: on the first run, a sheet asks to install them (with sizes, a check on each one as it
- * lands, including the default 6-track separation). Afterwards, while the basic ones are missing, a red notice floats
- * at the top; closing it offers "Me lembre mais tarde" (it comes back in a day) or "Não me exiba mais".
- */
+/** Optional first-run preparation; missing models are downloaded on demand. */
 export const ModelsSetup = () => {
   const [open, setOpen] = useState(false);
   const [ready, setReady] = useState<Set<ItemId> | null>(null);
-  const [badge, setBadge] = useState(false);
 
   const refresh = useCallback(async () => {
     const r = await readyItems();
@@ -98,49 +92,8 @@ export const ModelsSetup = () => {
     return () => window.removeEventListener(MODELS_CHANGED, onChange);
   }, [refresh]);
 
-  // The notice: only after the first-run question, while a basic model is missing and it is not snoozed.
-  const missingBasic = ready !== null && BASIC.some((i) => !ready.has(i.id));
-  useEffect(() => {
-    if (!missingBasic || open) {
-      setBadge(false);
-      return;
-    }
-    const wait = asked() ? reminderWait() : null;
-    if (wait === null) return;
-    const timer = window.setTimeout(() => setBadge(reminderDue()), wait);
-    return () => clearTimeout(timer);
-  }, [missingBasic, open]);
-
-  const dismissBadge = async () => {
-    const never = await confirmDialog({
-      title: 'Esconder o aviso?',
-      message: 'Sem os modelos, o app não monta cifras nem separa faixas. Os modelos podem ser baixados a qualquer momento em Ajustes.',
-      confirmLabel: 'Não me exiba mais',
-      cancelLabel: 'Me lembre mais tarde',
-    });
-    if (never) neverRemind();
-    else snoozeReminder();
-    setBadge(false);
-  };
-
   return (
     <>
-      {badge && (
-        <div
-          role="status"
-          className="player-slide fixed inset-x-3 z-30 mx-auto flex max-w-md items-center gap-2 rounded-2xl bg-danger py-1.5 pl-3 pr-1.5 text-white shadow-[0_12px_40px_-16px_rgb(0_0_0/0.6)]"
-          style={{ top: 'calc(env(safe-area-inset-top) + 4rem)' }}
-        >
-          <AlertTriangle className="size-4 shrink-0" aria-hidden />
-          <p className="flex-1 text-sm font-medium">Você não tem os modelos baixados no app.</p>
-          <button type="button" className="min-h-9 rounded-lg bg-white/20 px-3 text-sm font-semibold hover:bg-white/30" onClick={() => setOpen(true)}>
-            Baixar
-          </button>
-          <button type="button" aria-label="Fechar aviso" className="inline-flex size-9 items-center justify-center rounded-lg hover:bg-white/20" onClick={() => void dismissBadge()}>
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
       {open && ready && (
         <SetupSheet
           initialReady={ready}
@@ -155,13 +108,13 @@ export const ModelsSetup = () => {
   );
 };
 
-type Phase = { kind: 'ask' } | { kind: 'installing'; item: ItemId; label: string; fraction: number } | { kind: 'done' } | { kind: 'error'; message: string };
+type Phase = { kind: 'ask' } | { kind: 'installing'; item: ItemId; label: string; fraction: number } | { kind: 'done' };
 
 const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<ItemId>; onReady: (r: Set<ItemId>) => void; onClose: () => void }) => {
   const [phase, setPhase] = useState<Phase>({ kind: 'ask' });
   const [ready, setReadyState] = useState(initialReady);
   const [whisperBytes, setWhisperBytes] = useState(WHISPER_BYTES.webgpu);
-  const confirming = useRef(false);
+  const installLock = useRef(false);
 
   useEffect(() => {
     void detectWhisperDevice()
@@ -173,57 +126,37 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
   const pending = ITEMS.filter((i) => !ready.has(i.id));
   const total = pending.reduce((n, i) => n + bytesOf(i), 0);
   const installing = phase.kind === 'installing';
-  const missingBasic = BASIC.some((i) => !ready.has(i.id));
 
-  const markReady = (id: ItemId) =>
-    setReadyState((r) => {
-      const next = new Set(r).add(id);
-      onReady(next);
-      return next;
-    });
+  useEffect(() => { onReady(ready); }, [ready, onReady]);
+  const markReady = (id: ItemId) => setReadyState(r => new Set(r).add(id));
 
   const install = async () => {
+    if (installLock.current) return;
+    installLock.current = true;
     let base = 0;
     try {
       for (const item of pending) {
         const size = bytesOf(item);
-        const report = (done: number, all: number) =>
-          setPhase({
-            kind: 'installing',
-            item: item.id,
-            label: `${item.label}: ${mb(done)}${all ? ` de ${mb(all)}` : ''}`,
-            fraction: total ? (base + (all ? (done / all) * size : 0)) / total : 1,
-          });
+        const report = (done: number, all: number) => setPhase({
+          kind: 'installing', item: item.id,
+          label: item.label + ': ' + mb(done) + (all ? ' de ' + mb(all) : ''),
+          fraction: total ? Math.min(1, (base + (all ? Math.min(1, done / all) * size : 0)) / total) : 1,
+        });
         report(0, 0);
-        if (item.models === 'whisper') await preloadWhisper(report);
-        else await downloadModels(item.models, report);
-        markReady(item.id);
+        try {
+          if (item.models === 'whisper') await preloadWhisper(report);
+          else await downloadModels(item.models, report);
+          if (await itemReady(item)) markReady(item.id);
+        } catch {
+          // Setup is best effort. Analysis retries missing resources on demand.
+        }
         base += size;
       }
       setPhase({ kind: 'done' });
-    } catch (error) {
-      setPhase({ kind: 'error', message: error instanceof Error ? error.message : 'O download falhou.' });
-    }
+    } finally { installLock.current = false; }
   };
 
-  // Closing with the basic models still missing asks first; "Não" keeps the sheet open.
-  const requestClose = async () => {
-    if (installing || confirming.current) return;
-    if (missingBasic) {
-      confirming.current = true;
-      const ok = await confirmDialog({
-        title: 'Seguir sem os modelos?',
-        message: 'Você não baixou os modelos básicos. Tem certeza que deseja seguir sem baixar nada?',
-        confirmLabel: 'Sim, seguir',
-        cancelLabel: 'Não',
-      });
-      confirming.current = false;
-      if (!ok) return;
-      // The red notice comes back later, not right after this answer (unless it was hidden for good).
-      if (reminderWait() !== null) snoozeReminder();
-    }
-    onClose();
-  };
+  const requestClose = () => { if (!installLock.current) onClose(); };
 
   return (
     <BottomSheet title="Preparar o will-music" onClose={() => void requestClose()}>
@@ -232,8 +165,8 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
           {phase.kind === 'done' ? (
             <div className="py-4 text-center">
               <Check className="mx-auto size-10 text-primary" />
-              <p className="mt-2 text-lg font-semibold">Tudo pronto!</p>
-              <p className="mt-1 text-sm text-muted-foreground">Os modelos ficam no aparelho: a análise funciona até sem internet.</p>
+              <p className="mt-2 text-lg font-semibold">Vamos começar!</p>
+              <p className="mt-1 text-sm text-muted-foreground">Ao abrir uma música, o app prepara os recursos necessários. Os modelos já guardados podem ser usados offline.</p>
               <Button className="mt-4 w-full" onClick={onClose}>
                 Começar
               </Button>
@@ -273,18 +206,13 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
                   </div>
                 </div>
               )}
-              {phase.kind === 'error' && (
-                <p role="alert" className="mt-3 text-sm text-danger">
-                  {phase.message} Tente de novo; o que já foi baixado não se perde.
-                </p>
-              )}
               <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <Button variant="outline" className="min-h-11" disabled={installing} onClick={() => void requestClose()}>
                   {pending.length ? 'Depois' : 'Fechar'}
                 </Button>
                 {pending.length > 0 && (
                   <Button className="min-h-11" disabled={installing} onClick={() => void install()}>
-                    <Download className="size-4" /> {phase.kind === 'error' ? 'Tentar de novo' : 'Instalar agora'}
+                    <Download className="size-4" /> Instalar agora
                   </Button>
                 )}
               </div>

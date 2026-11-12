@@ -17,16 +17,17 @@ export type TunerReading = { note: string; solfege: string; octave: number; cent
  * What the tuner shows for a frequency: with an instrument, the nearest string and how far from it
  * (so a guitar string tuned a semitone low still points at the right string); otherwise the nearest note.
  */
-export const tunerReading = (hz: number, preset: TuningPreset, a4 = 440): TunerReading => {
+export const tunerReading = (hz: number, preset: TuningPreset, a4 = 440, selectedString?: number): TunerReading => {
   const exact = 69 + 12 * Math.log2(hz / a4);
   if (preset.strings.length) {
-    let best = 0;
-    preset.strings.forEach((m, i) => {
+    const selected = selectedString === undefined ? -1 : preset.strings.length - selectedString;
+    let best = selected >= 0 && selected < preset.strings.length ? selected : 0;
+    if (selected < 0 || selected >= preset.strings.length) preset.strings.forEach((m, i) => {
       if (Math.abs(exact - m) < Math.abs(exact - preset.strings[best]!)) best = i;
     });
     const midi = preset.strings[best]!;
     const near = noteOf(a4 * 2 ** ((midi - 69) / 12), a4);
-    const cents = Math.max(-99, Math.min(99, Math.round((exact - midi) * 100)));
+    const cents = Math.round((exact - midi) * 100);
     return { note: near.name, solfege: near.solfege, octave: near.octave, cents, target: { string: preset.strings.length - best, name: midiName(midi) }, inTune: Math.abs(cents) <= 5 };
   }
   const n = noteOf(hz, a4);

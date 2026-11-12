@@ -22,11 +22,21 @@ const analyze = async () => {
   busy = true;
   try {
     const recent = ring.subarray(Math.max(0, filled - ring.length), filled);
+    const tail = recent.subarray(Math.max(0, recent.length - rate * 0.5));
+    let energy = 0;
+    for (const value of tail) energy += value * value;
+    if (Math.sqrt(energy / Math.max(1, tail.length)) < 0.01) { post({ type: 'chord', label: null }); return; }
     const segments = await analyzeChords(resample(recent.slice(), rate, 22050), model.plan, model.runner);
     const end = recent.length / rate;
+    // Inference can outlast a change to silence; don't display the old chord afterward.
+    let liveEnergy = 0;
+    const liveTail = ring.subarray(Math.max(0, filled - Math.round(rate * 0.5)), filled);
+    for (const value of liveTail) liveEnergy += value * value;
+    if (Math.sqrt(liveEnergy / Math.max(1, liveTail.length)) < 0.01) { post({ type: 'chord', label: null }); return; }
     const now = [...segments].reverse().find((s) => s.start < end - 0.4);
     post({ type: 'chord', label: now && now.raw !== 'N' && now.raw !== 'X' ? toDisplayLabel(now.raw) : null });
   } catch (e) {
+    clearInterval(timer);
     post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
   } finally {
     busy = false;

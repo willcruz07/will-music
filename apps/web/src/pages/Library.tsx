@@ -1,5 +1,5 @@
-import { AudioLines, FileText, FolderOpen, Music, Music4, Plus, Search } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { AudioLines, FileText, FolderOpen, Globe, Music, Music4, Plus, Search } from 'lucide-react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AboutButton } from '../components/About.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { Link, useSearchParams } from 'react-router';
@@ -10,6 +10,7 @@ import { confirmDialog } from '../ui/Dialog.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
 import { LibraryCard, LibraryBadge } from '../components/LibraryCard.tsx';
 import { chartCardInfo, durationLabel } from '../lib/libraryCards.ts';
+import { useCardReveal } from '../lib/useCardReveal.ts';
 
 const STATUS: Record<Song['analysisStatus'], string | null> = {
   pending: 'Aguardando análise',
@@ -19,13 +20,14 @@ const STATUS: Record<Song['analysisStatus'], string | null> = {
 };
 
 const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+const CatalogBrowser = lazy(() => import('../components/CatalogBrowser.tsx').then(m => ({ default: m.CatalogBrowser })));
 
 export const Library = () => {
   const [songs, setSongs] = useState<Song[] | null>(null);
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
-  const tab = params.get('aba') === 'partituras' ? 'scores' : params.get('aba') === 'cifras' ? 'charts' : 'studio';
+  const tab = params.get('aba') === 'catalogo' ? 'catalog' : params.get('aba') === 'partituras' ? 'scores' : params.get('aba') === 'cifras' ? 'charts' : 'studio';
   const [audioIds, setAudioIds] = useState<Set<string>>(new Set());
   const [chartIds, setChartIds] = useState<Set<string>>(new Set());
   const [chartsBySong, setChartsBySong] = useState<Map<string, Chart>>(new Map());
@@ -50,12 +52,13 @@ export const Library = () => {
     return collection.filter(s => (folder === null || (s.folder ?? '') === folder) && (!q || normalize(`${s.title} ${s.artist}`).includes(q)));
   }, [collection, query, folder]);
 
+  const revealRef = useCardReveal(`${tab}:${visible.map(song => song.id).join(',')}`);
   const folders = useMemo(() => {
     const counts = new Map<string, number>();
     for (const s of collection) counts.set(s.folder ?? '', (counts.get(s.folder ?? '') ?? 0) + 1);
     return [...counts.entries()].sort(([a], [z]) => (a === '' ? 1 : z === '' ? -1 : a.localeCompare(z)));
   }, [collection]);
-  const counts = { studio: (songs ?? []).filter(s => audioIds.has(s.id)).length, charts: (songs ?? []).filter(s => !audioIds.has(s.id) && chartIds.has(s.id)).length, scores: (songs ?? []).filter(s => scoreIds.has(s.id)).length };
+  const counts = { catalog: '', studio: (songs ?? []).filter(s => audioIds.has(s.id)).length, charts: (songs ?? []).filter(s => !audioIds.has(s.id) && chartIds.has(s.id)).length, scores: (songs ?? []).filter(s => scoreIds.has(s.id)).length };
 
   return (
     <section>
@@ -75,12 +78,12 @@ export const Library = () => {
       </div>
       {notice && <p className="mt-3 text-sm" role="status">{notice}</p>}
       <p className="mt-2 text-sm text-muted-foreground">Seu espaço para ouvir, estudar e tocar.</p>
-      <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3" role="tablist" aria-label="Biblioteca" onKeyDown={rovingKeys}>
-        {([{ value: 'studio', label: 'Estúdio', description: 'Áudio e mixagem', icon: AudioLines }, { value: 'charts', label: 'Cifras', description: 'Letras e acordes', icon: FileText }, { value: 'scores', label: 'Partituras', description: 'Notas e instrumentos', icon: Music4 }] as const).map(({ value, label, description, icon: Icon }) => <button key={value} type="button" role="tab" aria-label={label} aria-selected={tab === value} aria-controls={value === 'scores' ? 'library-scores' : 'library-items'} onClick={() => { setFolder(null); const next = new URLSearchParams(params); if (value === 'studio') next.delete('aba'); else next.set('aba', value === 'charts' ? 'cifras' : 'partituras'); setParams(next, { replace: true }); }} className={`library-tab ${tab === value ? 'is-current' : ''}`}><span className="flex w-full items-center justify-between gap-1"><Icon className="size-5" aria-hidden /><span className="text-xs tabular-nums opacity-70" aria-hidden>{counts[value]}</span></span><span className="mt-3 block text-sm font-semibold">{label}</span><span className="mt-1 hidden text-xs text-muted-foreground sm:block">{description}</span></button>)}
+      <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3" role="tablist" aria-label="Biblioteca" onKeyDown={rovingKeys}>
+        {([{ value: 'studio', label: 'Estúdio', description: 'Áudio e mixagem', icon: AudioLines }, { value: 'charts', label: 'Cifras', description: 'Letras e acordes', icon: FileText }, { value: 'scores', label: 'Partituras', description: 'Notas e instrumentos', icon: Music4 }, { value: 'catalog', label: 'Catálogo', description: 'Descobrir novas cifras', icon: Globe }] as const).map(({ value, label, description, icon: Icon }) => <button key={value} type="button" role="tab" aria-label={label} aria-selected={tab === value} aria-controls={value === 'catalog' ? 'library-catalog' : value === 'scores' ? 'library-scores' : 'library-items'} onClick={() => { setFolder(null); const next = new URLSearchParams(params); if (value === 'studio') next.delete('aba'); else next.set('aba', value === 'catalog' ? 'catalogo' : value === 'charts' ? 'cifras' : 'partituras'); setParams(next, { replace: true }); }} className={`library-tab ${tab === value ? 'is-current' : ''}`}><span className="flex w-full items-center justify-between gap-1"><Icon className="size-5" aria-hidden /><span className="text-xs tabular-nums opacity-70" aria-hidden>{counts[value]}</span></span><span className="mt-3 block text-sm font-semibold">{label}</span><span className="mt-1 hidden text-xs text-muted-foreground sm:block">{description}</span></button>)}
       </div>
-      <p className="mt-4 text-sm text-muted-foreground">{tab === 'studio' ? 'Áudios originais para explorar faixas, letras e harmonia.' : tab === 'charts' ? 'Suas cifras salvas, com os tons e as formações que você escolheu.' : 'Partituras prontas para abrir, tocar e imprimir, sem reprocessar o áudio.'}</p>
+      <p className="mt-4 text-sm text-muted-foreground">{tab === 'catalog' ? 'Cifras do acervo Alt7 para descobrir, ler e salvar neste aparelho.' : tab === 'studio' ? 'Áudios originais para explorar faixas, letras e harmonia.' : tab === 'charts' ? 'Suas cifras salvas, com os tons e as formações que você escolheu.' : 'Partituras prontas para abrir, tocar e imprimir, sem reprocessar o áudio.'}</p>
 
-      {songs && songs.length > 0 && (
+      {tab !== 'catalog' && songs && songs.length > 0 && (
         <label className="mt-6 flex items-center gap-2 rounded-lg border border-border bg-surface px-3">
           <Search className="size-4 text-muted-foreground" />
           <input
@@ -93,7 +96,7 @@ export const Library = () => {
         </label>
       )}
 
-      {tab !== 'scores' && folders.length > 1 && (
+      {tab !== 'scores' && tab !== 'catalog' && folders.length > 1 && (
         <ScrollStrip className="mt-3" role="group" label="Pastas" selected={folder} innerClassName="gap-2 pb-1">
           {[[null, 'Todas', collection.length] as const, ...folders.map(([f, n]) => [f, f || 'Sem pasta', n] as const)].map(([value, label, count]) => (
             <button
@@ -109,7 +112,7 @@ export const Library = () => {
         </ScrollStrip>
       )}
 
-      {tab !== 'scores' && songs && songs.length === 0 && (
+      {tab !== 'scores' && tab !== 'catalog' && songs && songs.length === 0 && (
         <div className="mt-16 max-w-md">
           <Music className="size-10 text-primary" />
           <p className="mt-4 text-xl font-semibold">Sua biblioteca está vazia.</p>
@@ -122,8 +125,9 @@ export const Library = () => {
         </div>
       )}
 
+      {tab === 'catalog' && <Suspense fallback={<p role="status" className="mt-6 animate-pulse text-muted-foreground">Preparando o catálogo…</p>}><CatalogBrowser onSaved={() => void refresh().catch(e => setNotice(e instanceof Error ? e.message : 'Não foi possível atualizar a biblioteca.'))} /></Suspense>}
       {tab === 'scores' && <div id="library-scores"><Scores embedded query={query} revision={scoresRevision} onDeleted={() => void refresh().catch(e => setNotice(String(e)))} /></div>}
-      {tab !== 'scores' && <ul id="library-items" className="library-grid mt-5">
+      {tab !== 'scores' && tab !== 'catalog' && <ul ref={revealRef} key={tab} id="library-items" className="library-grid mt-5 library-panel-enter">
         {visible.map(song => {
           const chart = chartsBySong.get(song.id);
           const info = chartCardInfo(song, chart);
@@ -141,7 +145,7 @@ export const Library = () => {
             })} />;
         })}
       </ul>}
-      {tab !== 'scores' && songs && songs.length > 0 && visible.length === 0 && <p className="mt-6 text-muted-foreground">{query ? `Nenhuma música encontrada para “${query}”.` : tab === 'studio' ? 'Nenhum áudio nesta aba. Importe um MP3 para abrir o Estúdio.' : 'Nenhuma cifra independente. Salve uma cifra pelo Estúdio ou crie uma sem áudio.'}</p>}
+      {tab !== 'scores' && tab !== 'catalog' && songs && songs.length > 0 && visible.length === 0 && <p className="mt-6 text-muted-foreground">{query ? `Nenhuma música encontrada para “${query}”.` : tab === 'studio' ? 'Nenhum áudio nesta aba. Importe um MP3 para abrir o Estúdio.' : 'Nenhuma cifra independente. Salve uma cifra pelo Estúdio ou crie uma sem áudio.'}</p>}
 
       <AboutButton autoOpenOnce />
     </section>

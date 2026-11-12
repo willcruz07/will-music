@@ -24,6 +24,14 @@ describe('tuner', () => {
     expect(median([1, 100, 3])).toBe(3);
     expect(median([1, 2, 3, 4])).toBe(2.5);
   });
+
+  it('keeps a manually selected string and reports the full distance, including an octave error', () => {
+    const r = tunerReading(164.813778, guitar, 440, 6);
+    expect(r.target).toEqual({ string: 6, name: 'E2' });
+    expect(r.cents).toBe(1200);
+    expect(r.inTune).toBe(false);
+    expect(tunerReading(110, guitar, 440, 99).target?.string).toBe(5);
+  });
 });
 
 describe('microphone page', () => {

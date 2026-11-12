@@ -40,6 +40,10 @@ export const Settings = () => {
   return (
     <section className="max-w-2xl">
       <h1 className="mb-4 text-3xl font-bold tracking-tight">Ajustes</h1>
+      <Section title="Conta e catálogo">
+        <p className="text-sm text-muted-foreground">Gerencie a conta Google usada para acessar o will-music. As cifras salvas neste aparelho continuam disponíveis offline; a biblioteca não é sincronizada automaticamente.</p>
+        <Link to="/conta" className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-border px-4 text-sm font-semibold text-chord">Entrar ou gerenciar conta</Link>
+      </Section>
 
       <Section title="Tema">
         <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" onKeyDown={rovingKeys} aria-label="Tema">

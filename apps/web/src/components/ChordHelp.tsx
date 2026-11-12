@@ -5,17 +5,19 @@ import { chordNotes } from '../lib/chordNotation.ts';
 import { CHORD_TYPES, chordFormation, pcOf, spellChordTones } from '../lib/chordTheory.ts';
 import { ChordDiagram, type Instrument } from './ChordDiagram.tsx';
 import { InstrumentToggle, readInstrument } from './ChordPanel.tsx';
+import { normalizeChordSuffix, parseChordToken } from '../lib/chordToken.ts';
 
 /** Note names of a chord, each spelled by its letter from the root (Gm is G Bb D, not G A# D). */
 export const chordNoteNames = (chord: string): string[] => {
-  const m = /^([A-G][#b]?)([^/]*)(?:\/([A-G][#b]?))?$/u.exec(chord.trim());
+  const parsed = parseChordToken(chord);
   const pcs = chordNotes(chord);
-  if (!m || !pcs) return [];
-  const root = m[1]!;
+  if (!parsed || !pcs) return [];
+  const root = parsed.root;
   const rootPc = pcOf(root);
-  const dim7 = /°7|º7|dim7/u.test(m[2]!);
-  const spelled = CHORD_TYPES.some(type => type.suffix === m[2]) ? chordFormation(root, m[2]!).notes : [];
-  return pcs.map((pc, i) => (m[3] && i === 0 && pc !== rootPc ? m[3] : spelled.find(note => pcOf(note) === pc) ?? spellChordTones(root, [(pc - rootPc + 12) % 12], dim7)[0]!));
+  const suffix = normalizeChordSuffix(parsed.suffix);
+  const dim7 = /°7|º7|dim7/u.test(suffix);
+  const spelled = CHORD_TYPES.some(type => type.suffix === suffix) ? chordFormation(root, suffix).notes : [];
+  return pcs.map((pc, i) => (parsed.bass && i === 0 && pc !== rootPc ? parsed.bass : spelled.find(note => pcOf(note) === pc) ?? spellChordTones(root, [(pc - rootPc + 12) % 12], dim7)[0]!));
 };
 
 const FORM_LABEL: Record<Instrument, string> = { violao: 'Forma', teclado: 'Inversão', cavaquinho: 'Forma' };

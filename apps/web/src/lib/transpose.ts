@@ -1,3 +1,4 @@
+import { normalizeAccidentals, notePitchClass, parseChordToken, splitChordLabels } from './chordToken.ts';
 const SHARPS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLATS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 const PC: Record<string, number> = Object.fromEntries([...SHARPS.map((n, i) => [n, i]), ...FLATS.map((n, i) => [n, i])]);
@@ -13,9 +14,9 @@ const FLAT_DEGREES_IN_MAJOR = new Set([3, 8, 10]);
 const mod12 = (n: number) => ((n % 12) + 12) % 12;
 
 const parseKey = (key: string): { pc: number; minor: boolean } | null => {
-  const match = /^([A-G][#b]?)(m?)$/u.exec(key.trim());
-  const pc = match ? PC[match[1]!] : undefined;
-  return pc === undefined ? null : { pc, minor: match![2] === 'm' };
+  const match = /^([A-G](?:#{1,2}|b{1,2})?)(m?)$/u.exec(normalizeAccidentals(key.trim()));
+  const pc = match ? notePitchClass(match[1]!) : null;
+  return pc === null ? null : { pc, minor: match![2] === 'm' };
 };
 
 export const prefersFlats = (key: string): boolean => FLAT_KEYS.has(key.trim());
@@ -34,12 +35,14 @@ export const spellPitch = (pc: number, key: string | boolean): string => {
  * or a boolean to force flats (true) or sharps (false).
  */
 export const transposeChord = (chord: string, semitones: number, key: string | boolean = false): string => {
-  const match = /^([A-G][#b]?)([^/]*)(?:\/([A-G][#b]?))?$/u.exec(chord.trim());
-  if (!match) return chord;
-  const [, root, suffix, bass] = match;
+  const labels = splitChordLabels(chord);
+  if (labels.length > 1) return labels.map(label => transposeChord(label, semitones, key)).join(' ');
+  const parsed = parseChordToken(chord);
+  if (!parsed) return chord;
+  const { root, suffix, bass } = parsed;
   const move = (note: string) => {
-    const pc = PC[note];
-    return pc === undefined ? note : spellPitch(mod12(pc + semitones), key);
+    const pc = notePitchClass(note);
+    return pc === null ? note : spellPitch(mod12(pc + semitones), key);
   };
   const out = `${move(root!)}${suffix}`;
   return bass ? `${out}/${move(bass)}` : out;

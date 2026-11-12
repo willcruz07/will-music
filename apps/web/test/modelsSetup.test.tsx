@@ -24,7 +24,7 @@ vi.mock('../src/lib/whisper.ts', async (orig) => ({
 
 beforeEach(() => {
   localStorage.clear();
-  cached = new Set(['chordnet', 'cqtPlan', 'skey']);
+  cached = new Set(models.CHORD_MODELS);
   whisperIn = false;
   vi.mocked(models.missingModels).mockReset().mockImplementation(async (ids: ModelId[] = []) => ids.filter((id) => !cached.has(id)));
   vi.mocked(models.downloadModels).mockReset().mockImplementation(async (ids: ModelId[], onProgress) => {
@@ -52,22 +52,21 @@ describe('first-run models setup', () => {
     const sheet = await screen.findByRole('dialog', { name: /Preparar o will-music/ });
     const row = (name: RegExp) => within(sheet).getByText(name).closest('li')!;
     expect(row(/Acordes e tom/)).toHaveTextContent('Baixado');
-    expect(row(/Separar voz e instrumental/)).not.toHaveTextContent('Baixado');
-    expect(row(/Separar em 4 faixas/)).toHaveTextContent(/opcional/);
+    expect(row(/^Separar faixas$/)).not.toHaveTextContent('Baixado');
     await userEvent.click(screen.getByRole('button', { name: 'Instalar agora' }));
-    expect(models.downloadModels).toHaveBeenCalledWith(['kara2Core', 'kara2Data'], expect.any(Function));
     expect(models.downloadModels).toHaveBeenCalledWith(['basicPitch'], expect.any(Function));
     expect(models.downloadModels).toHaveBeenCalledWith(['demucs6s'], expect.any(Function));
     expect(whisper.preloadWhisper).toHaveBeenCalled();
     expect(await screen.findByText(/Tudo pronto/)).toBeInTheDocument();
   });
 
-  it('leaves the 4-track model out when it is unchecked', async () => {
+  it('installs the default six-track model without an optional checkbox', async () => {
     setup();
-    await userEvent.click(await screen.findByRole('checkbox', { name: /Separar em 4 faixas/ }));
+    await screen.findByRole('dialog', { name: /Preparar o will-music/ });
+    expect(screen.queryByRole('checkbox')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Instalar agora' }));
     await screen.findByText(/Tudo pronto/);
-    expect(models.downloadModels).not.toHaveBeenCalledWith(['demucs6s'], expect.any(Function));
+    expect(models.downloadModels).toHaveBeenCalledWith(['demucs6s'], expect.any(Function));
   });
 
   it('closing without the basic models asks first: "Não" keeps the sheet open', async () => {
@@ -94,7 +93,7 @@ describe('first-run models setup', () => {
   });
 
   it('stays quiet when everything is already installed', async () => {
-    cached = new Set(['chordnet', 'cqtPlan', 'skey', 'kara2Core', 'kara2Data', 'basicPitch']);
+    cached = new Set([...models.CHORD_MODELS, 'demucs6s', 'basicPitch']);
     whisperIn = true;
     setup();
     await new Promise((r) => setTimeout(r, 0));

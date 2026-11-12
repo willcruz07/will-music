@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "artist.slug", "order": "ASCENDING" },
+        { "fieldPath": "title", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "artist.name", "order": "ASCENDING" },
+        { "fieldPath": "title", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

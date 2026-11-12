@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
-import { WhisperTextStreamer, pipeline, type AutomaticSpeechRecognitionPipeline } from '@huggingface/transformers';
+import { env, WhisperTextStreamer, pipeline, type AutomaticSpeechRecognitionPipeline } from '@huggingface/transformers';
+import { whisperResourceCache } from '../lib/whisperCache.ts';
 import { type WhisperChunk, windowCount } from '../lib/transcript.ts';
 import { whisperModelFor } from '../lib/whisperModel.ts';
 import { isWordTimestampFailure } from '../lib/analysisExecution.ts';
@@ -15,6 +16,8 @@ export type WhisperResponse =
   | { type: 'error'; message: string };
 
 const post = (m: WhisperResponse) => (self as DedicatedWorkerGlobalScope).postMessage(m);
+env.useCustomCache = true;
+env.customCache = whisperResourceCache;
 
 self.onmessage = async (event: MessageEvent<WhisperRequest>) => {
   const request = event.data;

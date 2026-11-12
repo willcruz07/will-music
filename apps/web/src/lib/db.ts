@@ -16,6 +16,8 @@ export type Song = {
   timeSignature?: string;
   /** User folder in the chart library (e.g. Culto, Natal, Ensaio). */
   folder?: string;
+  /** Provenance only; saved charts remain independent, locally editable documents. */
+  catalogSource?: { project: string; collection: 'cifras'; id: string; savedAt: string };
   favorite: boolean;
   analysisStatus: AnalysisStatus;
   analysisError?: string;
