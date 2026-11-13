@@ -1,0 +1,117 @@
+// FRAGMENTO: inserir dentro de match /databases/{database}/documents.
+// Não substitui as regras existentes de users, cifras ou artistas.
+function wmSigned() { return request.auth != null; }
+function wmEmail() { return request.auth.token.email.lower(); }
+function wmVerified() { return wmSigned() && request.auth.token.email_verified == true; }
+function wmRecipientOpen(email) {
+  return !exists(/databases/$(database)/documents/wmInvitePreferences/$(email))
+    || get(/databases/$(database)/documents/wmInvitePreferences/$(email)).data.acceptsInvites == true;
+}
+function wmShareOwner(shareId) {
+  return wmSigned() && get(/databases/$(database)/documents/wmShares/$(shareId)).data.ownerUid == request.auth.uid;
+}
+function wmShareReader(shareId, version) {
+  let invitation = shareId + '__' + wmEmail();
+  let invite = get(/databases/$(database)/documents/wmInvites/$(invitation)).data;
+  return wmVerified() && invite.recipientEmail == wmEmail()
+    && invite.status in ['pending', 'accepted'] && version <= invite.offeredVersion;
+}
+match /users/{uid}/{kind}/{entityId} {
+  allow read: if wmSigned() && uid == request.auth.uid && kind in ['wmCharts', 'wmSetlists'];
+  allow create, update: if wmSigned() && uid == request.auth.uid
+    && kind in ['wmCharts', 'wmSetlists']
+    && request.resource.data.keys().hasOnly(['revision', 'deleted', 'payload', 'updatedAt'])
+    && request.resource.data.revision is int
+    && request.resource.data.revision == (resource == null ? 1 : resource.data.revision + 1)
+    && request.resource.data.deleted is bool && request.resource.data.updatedAt is string
+    && (request.resource.data.deleted ? request.resource.data.payload == null : request.resource.data.payload is map);
+  // Tombstones retain revisions so another offline device cannot silently resurrect deletions.
+  allow delete: if false;
+}
+match /wmShares/{shareId} {
+  allow get: if wmSigned() && (resource == null || resource.data.ownerUid == request.auth.uid
+    || wmShareReader(shareId, 1));
+  allow list: if false;
+  allow create, update: if wmVerified()
+    && request.auth.uid.matches('^[A-Za-z0-9_-]+$')
+    && shareId.matches('^' + request.auth.uid + '__.+$')
+    && request.resource.data.keys().hasOnly(['ownerUid', 'ownerName', 'ownerPhoto', 'name', 'version', 'itemCount', 'updatedAt', 'localListId', 'fingerprint'])
+    && request.resource.data.ownerUid == request.auth.uid
+    && (resource == null || resource.data.ownerUid == request.auth.uid)
+    && request.resource.data.ownerName is string && request.resource.data.ownerPhoto is string
+    && request.resource.data.name is string && request.resource.data.name.size() <= 200
+    && request.resource.data.localListId is string && request.resource.data.fingerprint is string
+    && request.resource.data.updatedAt is string
+    && request.resource.data.version is int
+    && request.resource.data.version == (resource == null ? 1 : resource.data.version + 1)
+    && request.resource.data.itemCount is int && request.resource.data.itemCount > 0 && request.resource.data.itemCount <= 100;
+  allow delete: if false;
+  match /versions/{version} {
+    allow read: if wmSigned() && (wmShareOwner(shareId) || wmShareReader(shareId, int(version)));
+    allow create: if wmVerified()
+      && getAfter(/databases/$(database)/documents/wmShares/$(shareId)).data.ownerUid == request.auth.uid
+      && getAfter(/databases/$(database)/documents/wmShares/$(shareId)).data.version == int(version)
+      && request.resource.data.keys().hasOnly(['ownerUid', 'ownerName', 'ownerPhoto', 'name', 'version', 'itemCount', 'updatedAt'])
+      && request.resource.data.ownerUid == request.auth.uid && request.resource.data.version == int(version)
+      && request.resource.data.itemCount == getAfter(/databases/$(database)/documents/wmShares/$(shareId)).data.itemCount;
+    allow update, delete: if false;
+    match /items/{itemId} {
+      allow read: if wmSigned() && (wmShareOwner(shareId) || wmShareReader(shareId, int(version)));
+      allow create: if wmVerified()
+        && !exists(/databases/$(database)/documents/wmShares/$(shareId)/versions/$(version))
+        && getAfter(/databases/$(database)/documents/wmShares/$(shareId)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/wmShares/$(shareId)).data.version == int(version)
+        && existsAfter(/databases/$(database)/documents/wmShares/$(shareId)/versions/$(version))
+        && request.resource.data.keys().hasOnly(['id', 'order', 'song', 'chart', 'targetKey', 'transpose', 'note'])
+        && request.resource.data.id is string && request.resource.data.order is int
+        && request.resource.data.order >= 0
+        && request.resource.data.order < getAfter(/databases/$(database)/documents/wmShares/$(shareId)).data.itemCount
+        && request.resource.data.song is map && request.resource.data.chart is map
+        && request.resource.data.chart.chordPro is string && request.resource.data.chart.chordPro.size() <= 300000;
+      allow update, delete: if false;
+    }
+  }
+}
+function wmInviteShape(d, id) {
+  return d.keys().hasAll(['shareId', 'senderUid', 'senderName', 'senderPhoto', 'recipientEmail', 'name', 'itemCount', 'offeredVersion', 'acceptedVersion', 'declinedVersion', 'status', 'updatedAt'])
+    && d.keys().hasOnly(['shareId', 'senderUid', 'senderName', 'senderPhoto', 'recipientEmail', 'recipientUid', 'name', 'itemCount', 'offeredVersion', 'acceptedVersion', 'declinedVersion', 'status', 'updatedAt'])
+    && d.shareId is string && d.senderUid is string && d.recipientEmail is string
+    && d.recipientEmail == d.recipientEmail.lower() && d.recipientEmail.size() <= 200
+    && id == d.shareId + '__' + d.recipientEmail
+    && d.senderName is string && d.senderPhoto is string && d.name is string && d.updatedAt is string
+    && d.itemCount is int && d.itemCount > 0 && d.itemCount <= 100
+    && d.offeredVersion is int && d.offeredVersion > 0
+    && d.acceptedVersion is int && d.acceptedVersion >= 0 && d.acceptedVersion <= d.offeredVersion
+    && d.declinedVersion is int && d.declinedVersion >= 0 && d.declinedVersion <= d.offeredVersion
+    && d.status in ['pending', 'accepted', 'declined'];
+}
+match /wmInvites/{inviteId} {
+  allow get: if wmVerified() && (resource == null || resource.data.senderUid == request.auth.uid || resource.data.recipientEmail == wmEmail());
+  allow list: if wmVerified() && (resource.data.senderUid == request.auth.uid || resource.data.recipientEmail == wmEmail());
+  allow create: if wmVerified() && wmInviteShape(request.resource.data, inviteId)
+    && wmRecipientOpen(request.resource.data.recipientEmail)
+    && request.resource.data.senderUid == request.auth.uid
+    && wmShareOwner(request.resource.data.shareId)
+    && request.resource.data.offeredVersion == get(/databases/$(database)/documents/wmShares/$(request.resource.data.shareId)).data.version
+    && request.resource.data.status == 'pending' && request.resource.data.acceptedVersion == 0
+    && request.resource.data.declinedVersion == 0 && !('recipientUid' in request.resource.data);
+  allow update: if wmVerified() && wmInviteShape(request.resource.data, inviteId) && (
+    (resource.data.senderUid == request.auth.uid
+      && wmShareOwner(resource.data.shareId)
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'itemCount', 'offeredVersion', 'senderName', 'senderPhoto', 'updatedAt', 'status', 'declinedVersion'])
+      && request.resource.data.offeredVersion >= resource.data.offeredVersion
+      && request.resource.data.offeredVersion == get(/databases/$(database)/documents/wmShares/$(resource.data.shareId)).data.version
+      && (request.resource.data.status == resource.data.status || (resource.data.status == 'declined' && request.resource.data.status == 'pending'))
+      && (resource.data.status != 'declined' || request.resource.data.status != 'pending' || wmRecipientOpen(resource.data.recipientEmail))
+      && (request.resource.data.declinedVersion == resource.data.declinedVersion || request.resource.data.declinedVersion == 0))
+    || (resource.data.recipientEmail == wmEmail()
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['recipientUid', 'acceptedVersion', 'declinedVersion', 'status', 'updatedAt'])
+      && request.resource.data.recipientUid == request.auth.uid
+      && request.resource.data.acceptedVersion >= resource.data.acceptedVersion
+      && ((request.resource.data.status == 'accepted' && request.resource.data.acceptedVersion == resource.data.offeredVersion)
+        || (request.resource.data.acceptedVersion == resource.data.acceptedVersion
+          && request.resource.data.declinedVersion == resource.data.offeredVersion
+          && request.resource.data.status == (resource.data.status == 'accepted' ? 'accepted' : 'declined'))))
+  );
+  allow delete: if false;
+}

@@ -8,6 +8,7 @@ import { WHISPER_BYTES, detectWhisperDevice, preloadWhisper, whisperCached } fro
 import { BottomSheet } from '../ui/BottomSheet.tsx';
 import { Button } from '../ui/Button.tsx';
 import { StorageProtection } from './StorageProtection.tsx';
+import { isMobileStudio } from '../lib/studioDevice.ts';
 
 const ASKED_KEY = 'wm-models-asked';
 const mb = (bytes: number) => formatBytes(bytes);
@@ -23,15 +24,16 @@ const ITEMS: Item[] = [
   { id: 'lyrics', label: 'Transcrição da letra', about: 'para reconhecer a letra a partir da voz da música', models: 'whisper' },
   { id: 'notes', label: 'Notas da partitura', about: 'para gerar partituras e tablaturas', models: ['basicPitch'] },
 ];
-const BASIC = ITEMS;
+const itemsForDevice = () => isMobileStudio() ? ITEMS.filter(item => item.id === 'chords') : ITEMS;
 
 const itemReady = async (item: Item): Promise<boolean> =>
   item.models === 'whisper' ? whisperCached() : (await missingModels(item.models)).length === 0;
 
 /** Which items are already on the device. */
 const readyItems = async (): Promise<Set<ItemId>> => {
-  const ready = await Promise.all(ITEMS.map((i) => itemReady(i).catch(() => false)));
-  return new Set(ITEMS.filter((_, k) => ready[k]).map((i) => i.id));
+  const items = itemsForDevice();
+  const ready = await Promise.all(items.map((i) => itemReady(i).catch(() => false)));
+  return new Set(items.filter((_, k) => ready[k]).map((i) => i.id));
 };
 
 const asked = () => {
@@ -76,7 +78,7 @@ export const ModelsSetup = () => {
     let alive = true;
     let stop = () => {};
     void refresh().then((r) => {
-      if (!alive || asked() || BASIC.every((i) => r.has(i.id))) return;
+      if (!alive || asked() || itemsForDevice().every((i) => r.has(i.id))) return;
       stop = whenNoModal(() => alive && setOpen(true));
     });
     return () => {
@@ -123,7 +125,7 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
   }, []);
 
   const bytesOf = (item: Item) => (item.models === 'whisper' ? whisperBytes : sum(item.models));
-  const pending = ITEMS.filter((i) => !ready.has(i.id));
+  const pending = itemsForDevice().filter((i) => !ready.has(i.id));
   const total = pending.reduce((n, i) => n + bytesOf(i), 0);
   const installing = phase.kind === 'installing';
 
@@ -177,8 +179,9 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
                 Para analisar músicas, o app usa modelos de inteligência artificial que rodam no seu aparelho.
                 {pending.length > 0 ? ` Instale agora (cerca de ${mb(total)}, melhor no Wi-Fi):` : ' Todos os escolhidos já estão no aparelho.'}
               </p>
+              {isMobileStudio() && <p className="mt-3 text-sm text-muted-foreground">No celular ou tablet, preparamos apenas a identificação de acordes e tom. Use um computador para transcrever letras e para maior estabilidade ao separar faixas.</p>}
               <ul className="mt-3 space-y-2">
-                {ITEMS.map((item) => {
+                {itemsForDevice().map((item) => {
                   const done = ready.has(item.id);
                   const busy = phase.kind === 'installing' && phase.item === item.id;
                   return (

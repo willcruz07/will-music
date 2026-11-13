@@ -1,11 +1,14 @@
-import { Music4 } from 'lucide-react';
+import { Link } from 'react-router';
 import { useEffect, useState } from 'react';
 import { type Song, db, listSongs } from '../lib/db.ts';
 import { deleteSavedScore, hasScoreType, SCORE_TYPES } from '../lib/score.ts';
 import { confirmDialog } from '../ui/Dialog.tsx';
 import { LibraryCard, LibraryBadge } from '../components/LibraryCard.tsx';
+import { LibraryEmptyState } from '../components/LibraryEmptyState.tsx';
+import { isMobileStudio } from '../lib/studioDevice.ts';
+import { Button } from '../ui/Button.tsx';
 
-export const Scores = ({ embedded = false, query = '', onDeleted, revision = 0 }: { embedded?: boolean; query?: string; onDeleted?: () => void; revision?: number }) => {
+export const Scores = ({ embedded = false, query = '', onDeleted, onClearSearch, revision = 0 }: { embedded?: boolean; query?: string; onDeleted?: () => void; onClearSearch?: () => void; revision?: number }) => {
   const [songs, setSongs] = useState<Song[] | null>(null);
   const [ready, setReady] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -30,14 +33,11 @@ export const Scores = ({ embedded = false, query = '', onDeleted, revision = 0 }
         Partituras salvas, prontas para abrir sem reprocessar o áudio. Gere novas partes na aba Partituras do Estúdio.
       </p>}
       {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
-      {songs && visible.length === 0 && (
-        <div className="mt-16 max-w-md">
-          <Music4 className="size-10 text-primary" />
-          <p className="mt-4 text-xl font-semibold">{query ? 'Nenhuma partitura encontrada.' : 'Nenhuma partitura salva.'}</p>
-          <p className="mt-2 text-muted-foreground">
-            Abra um áudio no Estúdio, gere a parte desejada e use “Salvar partitura”.
-          </p>
-        </div>
+      {!error && songs && visible.length === 0 && (
+        <LibraryEmptyState section="Partituras" title={ready.size && query.trim() ? 'Nenhuma partitura com este nome' : 'Suas partituras, prontas para estudar'}
+          description={ready.size && query.trim() ? `Não encontramos partituras para “${query.trim()}”. Tente outro título ou nome de artista.` : isMobileStudio() ? 'As partituras salvas ficam reunidas aqui para leitura e estudo. Para gerar novas partes a partir de um áudio, use o Estúdio em um computador e depois importe o pacote neste aparelho.' : 'Gere as partes de uma música no Estúdio e escolha “Salvar partituras”. Elas ficam reunidas aqui para abrir, ouvir e imprimir sem analisar o áudio novamente.'}>
+          {ready.size && query.trim() ? onClearSearch && <Button variant="outline" onClick={onClearSearch}>Limpar busca</Button> : <Link to={isMobileStudio() ? '/pasta' : '/'} className="inline-flex min-h-11 items-center rounded-xl border border-border px-4 text-sm font-semibold text-chord hover:bg-muted">{isMobileStudio() ? 'Importar da minha pasta' : 'Abrir Estúdio'}</Link>}
+        </LibraryEmptyState>
       )}
       <ul className="library-grid mt-5">
         {visible.map(s => {

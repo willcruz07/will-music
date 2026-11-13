@@ -26,6 +26,19 @@ beforeEach(async () => {
 const makeSong = () => createSong({ title: 'Inédita', artist: 'Banda', durationSec: 8 }, new Blob(['x'], { type: 'audio/mpeg' }));
 
 describe('original-audio pipeline', () => {
+  it.each(['iPhone', 'Android Mobile', 'Macintosh'])('runs only chords on mobile %s without launching separation or Whisper', async userAgent => {
+    vi.stubGlobal('navigator', { userAgent, maxTouchPoints: 5, hardwareConcurrency: 4 });
+    try {
+      const song = await makeSong();
+      const events: import('../src/lib/pipeline.ts').PipelineProgress[] = [];
+      await runPipeline(song.id, event => events.push(event), { execution: 'parallel' });
+      expect(source.prepareAnalysisStems).not.toHaveBeenCalled();
+      expect(whisper.transcribeSong).not.toHaveBeenCalled();
+      expect(analyzeInWorker).toHaveBeenCalledTimes(1);
+      expect(events.some(event => event.tasks?.find(task => task.id === 'lyrics')?.status === 'skipped')).toBe(true);
+      expect((await db.analyses.where('songId').equals(song.id).first())?.chords.length).toBeGreaterThan(0);
+    } finally { vi.unstubAllGlobals(); }
+  });
   it('preserves a computed result when final storage is refused, exports it and retries without rerunning models', async () => {
     const song = await makeSong();
     const refuse = () => { throw Object.assign(new Error('QuotaExceededError'), { name: 'AbortError' }); };
@@ -52,15 +65,15 @@ describe('original-audio pipeline', () => {
     } finally { db.analyses.hook('creating').unsubscribe(refuse); clearPendingAnalysis(song.id); }
   });
 
-  it('analyzes the original first, publishes chords and then transcribes without separating or searching', async () => {
+  it('prepares tracks on desktop, analyzes original chords and then transcribes without searching', async () => {
     const search = vi.spyOn(lrclib, 'searchLyrics');
     const song = await makeSong();
     const events: PipelineProgress[] = [];
     await runPipeline(song.id, (p) => events.push(p));
     expect(analyzeInWorker).toHaveBeenCalledBefore(vi.mocked(whisper.transcribeSong));
-    expect(source.prepareAnalysisStems).not.toHaveBeenCalled();
+    expect(source.prepareAnalysisStems).toHaveBeenCalledTimes(1);
     expect(source.decodeHarmonicAudio).not.toHaveBeenCalled();
-    expect(whisper.transcribeSong).toHaveBeenCalledWith(song.id, expect.any(Function), expect.objectContaining({ original: true }));
+    expect(whisper.transcribeSong).toHaveBeenCalledWith(song.id, expect.any(Function), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(search).not.toHaveBeenCalled();
     expect(events.at(-1)!.label).toBe('Montando sua música…');
     expect(events.some((e) => e.lyricsPending)).toBe(true);

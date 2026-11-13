@@ -1,4 +1,5 @@
 import { isIOS } from './ios.ts';
+import { isMobileStudio, MOBILE_TRACKS_NOTICE } from './studioDevice.ts';
 import { MODELS, type ModelId, SEPARATION_GEOMETRY, STEM_MODES, type StemMode, modelVersion, toStereoPlanar } from '@will-music/engine';
 import type { SeparationResponse, SeparationTracks } from '../worker/separationProtocol.ts';
 import { type StemName, type StemsRecord, db, now } from './db.ts';
@@ -95,6 +96,7 @@ type Deps = {
 
 /** Separates and stores MP3 tracks; a quota refusal returns the completed tracks for session-only playback. */
 export const separateSong = async (songId: string, onProgress: (p: SeparationProgress) => void, deps: Deps = {}): Promise<{ record: StemsRecord; persisted: boolean }> => {
+  if (isMobileStudio()) throw new Error(MOBILE_TRACKS_NOTICE);
   const mode = deps.mode ?? 'six';
   const gpu = 'gpu' in deps ? deps.gpu : (navigator as Navigator & { gpu?: GpuLike }).gpu;
   if (!(await hasUsableWebGpu(gpu))) throw new Error(NO_WEBGPU);

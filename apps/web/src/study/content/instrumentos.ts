@@ -98,7 +98,7 @@ export const TECLADO: Lesson[] = [
     title: 'Mão esquerda e mão direita',
     summary: 'Baixo na esquerda, acorde na direita.',
     blocks: [
-      t('O ponto de partida no teclado é dividir as funções: a **mão esquerda** toca a **tônica** (ou tônica e oitava) no grave e a **mão direita** toca a **tríade** no meio do teclado. Isso já soa como um arranjo cheio.'),
+      t('Um ponto de partida no teclado é dividir as funções: a **mão esquerda** toca a **fundamental do acorde** (ou fundamental e oitava) no grave e a **mão direita** toca a **tríade** no registro médio. Em uma inversão, o baixo indicado pode ser outra nota. Tônica é a referência da tonalidade, não o nome de todo baixo.'),
       { kind: 'progression', name: 'Pratique com I – V – vi – IV', degrees: ['I', 'V', 'vi', 'IV'], key: 'C' },
       { kind: 'tip', text: 'Não toque a terça no grave da mão esquerda: no grave, notas próximas embolam o som.' },
     ],

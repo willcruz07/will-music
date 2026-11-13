@@ -11,7 +11,7 @@ export const HARMONIA: Lesson[] = [
     title: 'Notas, tons e semitons',
     summary: 'As 12 notas, como elas se chamam na cifra e a menor distância entre elas.',
     blocks: [
-      t('A música ocidental usa **12 notas** que se repetem em oitavas. Sete delas têm nome próprio: **Dó, Ré, Mi, Fá, Sol, Lá, Si**. Na cifra elas viram letras: **C D E F G A B**.'),
+      t('No sistema de **12 sons por oitava** usado neste app e em grande parte da música ocidental, as notas se repetem em registros diferentes. Sete nomes básicos são **Dó, Ré, Mi, Fá, Sol, Lá, Si**. Na cifra eles correspondem a **C D E F G A B**. Outras tradições e afinações também existem.'),
       t('Entre duas notas vizinhas do teclado (contando as pretas) existe um **semitom**, a menor distância usada. Dois semitons formam um **tom**. Entre Mi e Fá, e entre Si e Dó, não há tecla preta: ali a distância já é de um semitom.'),
       { kind: 'list', title: 'Sustenido e bemol', items: ['**#** (sustenido) sobe meio tom: C# fica entre C e D.', '**b** (bemol) desce meio tom: Db é a mesma tecla que C#.', 'Notas com o mesmo som e nomes diferentes (C# e Db) são **enarmônicas**. O nome certo depende do tom em que você está.'] },
       { kind: 'intervals', root: 'C', semitones: [1, 2], caption: 'Ouça a diferença entre um semitom e um tom' },
@@ -231,10 +231,10 @@ export const HARMONIA: Lesson[] = [
     summary: 'Quando pensar no tom inteiro e quando pensar acorde por acorde.',
     blocks: [
       t('Os **modos** são a escala maior começando em cada grau: jônio (I), dórico (ii), frígio (iii), lídio (IV), mixolídio (V), eólio (vi) e lócrio (vii). Cada um tem um caráter próprio.'),
-      t('Para improvisar sobre uma progressão **diatônica** (todos os acordes do mesmo tom) você pode tocar **uma escala só: a do centro tonal**. Sobre C – Am – F – G, a escala de Dó maior serve para tudo. Quando aparece um acorde de fora (A7 em Dó), mude a escala naquele trecho (A mixolídio com b9 e b13, por exemplo).'),
+      t('Sobre uma progressão **diatônica**, a escala do centro tonal é uma referência comum. Em C – Am – F – G, as notas de Dó maior fornecem material, mas duração e acento devem considerar cada acorde. Se aparecer A7, observe seu Dó♯ e a chegada em Dm: você pode ajustar uma linha ou explorar outra coleção, sem precisar trocar de escala mecanicamente a cada acorde.'),
       { kind: 'scale', scale: 'dorian', root: 'D', caption: 'D dórico tem as notas de Dó maior, mas o centro é Ré: funciona sobre Dm7 em um vamp.' },
       { kind: 'scale', scale: 'lydian', root: 'F', caption: 'F lídio: o som "aberto" do IV7M.' },
-      { kind: 'tip', text: '**Centro tonal** para músicas que ficam num tom; **acorde por acorde** quando a harmonia muda de tom a cada compasso (jazz, bossa).' },
+      { kind: 'tip', text: 'Pensar no centro tonal e observar cada acorde são abordagens complementares. Uma troca de acorde, mesmo no jazz ou na bossa, não significa necessariamente uma mudança de tonalidade.' },
     ],
   },
   {

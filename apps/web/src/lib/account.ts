@@ -103,6 +103,13 @@ export const startAccount = (): Promise<void> => initializing ??= (async () => {
 
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const getAccountState = (): AccountState => state;
+/** Custom display name belongs to the app profile, never to Google credentials. */
+export const applyAccountDisplayName = (uid: string, name: string): void => {
+  if (state.user?.uid !== uid) return;
+  profileEpoch++; profileRequest = null;
+  savedProfile = { uid, profile: { name, email: state.user.email, photo: state.user.photo } };
+  emit({ ...state, user: { ...state.user, name }, profileStatus: undefined, profileError: null });
+};
 export const useAccount = () => {
   const snapshot = useSyncExternalStore(subscribe, getAccountState, getAccountState);
   useEffect(() => { void startAccount(); }, []);

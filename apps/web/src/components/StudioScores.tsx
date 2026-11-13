@@ -1,5 +1,6 @@
 import { Download, Save } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isMobileStudio } from '../lib/studioDevice.ts';
 import { Link } from 'react-router';
 import type { Analysis, Chart, Song, StemsRecord } from '../lib/db.ts';
 import { generateStudioScore, saveStudioScores, studioScoreReady, type StudioScore } from '../lib/studioScore.ts';
@@ -59,7 +60,7 @@ export const StudioScores = ({ song, analysis, chart, tracks, active, waiting, o
     finally { if (controller.current === abort) { controller.current = null; setProgress(null); } }
   };
   useEffect(() => {
-    if (active && !waiting && tracks?.length && !ready && !attempted.current.has(type)) void generate();
+    if (!isMobileStudio() && active && !waiting && tracks?.length && !ready && !attempted.current.has(type)) void generate();
   }, [active, waiting, tracks, ready, type]);
   return <div>
     <div className="flex items-center gap-3">

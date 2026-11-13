@@ -1,4 +1,5 @@
-import { AudioLines, FileText, FolderOpen, Globe, Music, Music4, Plus, Search } from 'lucide-react';
+import { LIBRARY_CHANGED } from '../lib/sharingTypes.ts';
+import { AudioLines, FileText, FolderOpen, Globe, Music4, Search } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AboutButton } from '../components/About.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
@@ -11,6 +12,9 @@ import { rovingKeys } from '../lib/a11y.ts';
 import { LibraryCard, LibraryBadge } from '../components/LibraryCard.tsx';
 import { chartCardInfo, durationLabel } from '../lib/libraryCards.ts';
 import { useCardReveal } from '../lib/useCardReveal.ts';
+import { LibraryEmptyState } from '../components/LibraryEmptyState.tsx';
+import { Button } from '../ui/Button.tsx';
+import { isMobileStudio } from '../lib/studioDevice.ts';
 
 const STATUS: Record<Song['analysisStatus'], string | null> = {
   pending: 'Aguardando análise',
@@ -43,7 +47,10 @@ export const Library = () => {
   const [folder, setFolder] = useState<string | null>(null);
 
   useEffect(() => {
+    const changed = () => { void refresh().catch(() => {}); };
+    window.addEventListener(LIBRARY_CHANGED, changed);
     void refresh().catch(e => setNotice(e instanceof Error ? e.message : 'Não foi possível carregar a biblioteca.'));
+    return () => window.removeEventListener(LIBRARY_CHANGED, changed);
   }, []);
 
   const collection = useMemo(() => (songs ?? []).filter(s => tab === 'studio' ? audioIds.has(s.id) : !audioIds.has(s.id) && chartIds.has(s.id)), [songs, tab, audioIds, chartIds]);
@@ -112,21 +119,16 @@ export const Library = () => {
         </ScrollStrip>
       )}
 
-      {tab !== 'scores' && tab !== 'catalog' && songs && songs.length === 0 && (
-        <div className="mt-16 max-w-md">
-          <Music className="size-10 text-primary" />
-          <p className="mt-4 text-xl font-semibold">Sua biblioteca está vazia.</p>
-          <p className="mt-2 text-muted-foreground">
-            Adicione um MP3 e o will-music encontra o tom, os acordes e a letra para montar a cifra.
-          </p>
-          <Link to="/nova" className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 font-semibold text-primary-foreground hover:brightness-105">
-            <Plus className="size-4" /> Adicionar a primeira música
-          </Link>
-        </div>
+      {tab !== 'scores' && tab !== 'catalog' && songs && collection.length === 0 && (
+        <LibraryEmptyState section={tab === 'studio' ? 'Estúdio' : 'Cifras'} title={tab === 'studio' ? 'Seu próximo estudo começa com uma música' : 'Reúna as cifras que você quer tocar'}
+          description={tab === 'studio' ? (isMobileStudio() ? 'Importe um MP3 para ouvir, identificar o tom e explorar os acordes. Seus áudios ficam organizados nesta aba.' : 'Importe um MP3 para explorar acordes, letras e faixas no Estúdio. Seus áudios ficam organizados nesta aba.') : 'As cifras que você salvar aparecem aqui, prontas para ler, transpor e estudar. Encontre uma no catálogo ou crie a sua sem precisar de áudio.'}>
+          <Link to={tab === 'studio' ? '/nova' : '/?aba=catalogo'} className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground hover:brightness-105">{tab === 'studio' ? 'Importar áudio' : 'Explorar catálogo'}</Link>
+          {tab === 'charts' && <Link to="/nova" className="inline-flex min-h-11 items-center rounded-xl border border-border px-4 text-sm font-semibold text-chord hover:bg-muted">Criar minha cifra</Link>}
+        </LibraryEmptyState>
       )}
 
-      {tab === 'catalog' && <Suspense fallback={<p role="status" className="mt-6 animate-pulse text-muted-foreground">Preparando o catálogo…</p>}><CatalogBrowser onSaved={() => void refresh().catch(e => setNotice(e instanceof Error ? e.message : 'Não foi possível atualizar a biblioteca.'))} /></Suspense>}
-      {tab === 'scores' && <div id="library-scores"><Scores embedded query={query} revision={scoresRevision} onDeleted={() => void refresh().catch(e => setNotice(String(e)))} /></div>}
+      {tab === 'catalog' && <Suspense fallback={<p role="status" className="mt-6 animate-pulse text-muted-foreground">Preparando o catálogo…</p>}><CatalogBrowser /></Suspense>}
+      {tab === 'scores' && <div id="library-scores"><Scores embedded query={query} onClearSearch={() => setQuery('')} revision={scoresRevision} onDeleted={() => void refresh().catch(e => setNotice(String(e)))} /></div>}
       {tab !== 'scores' && tab !== 'catalog' && <ul ref={revealRef} key={tab} id="library-items" className="library-grid mt-5 library-panel-enter">
         {visible.map(song => {
           const chart = chartsBySong.get(song.id);
@@ -145,7 +147,7 @@ export const Library = () => {
             })} />;
         })}
       </ul>}
-      {tab !== 'scores' && tab !== 'catalog' && songs && songs.length > 0 && visible.length === 0 && <p className="mt-6 text-muted-foreground">{query ? `Nenhuma música encontrada para “${query}”.` : tab === 'studio' ? 'Nenhum áudio nesta aba. Importe um MP3 para abrir o Estúdio.' : 'Nenhuma cifra independente. Salve uma cifra pelo Estúdio ou crie uma sem áudio.'}</p>}
+      {tab !== 'scores' && tab !== 'catalog' && songs && collection.length > 0 && visible.length === 0 && <LibraryEmptyState section={tab === 'studio' ? 'Estúdio' : 'Cifras'} title="Nenhum resultado com estes filtros" description={query.trim() ? `Não encontramos itens para “${query.trim()}” nesta seleção. Tente outro nome ou limpe os filtros para ver sua coleção.` : 'Não há itens nesta pasta. Limpe os filtros para voltar à sua coleção.'}><Button variant="outline" onClick={() => { setQuery(''); setFolder(null); }}>Limpar filtros</Button></LibraryEmptyState>}
 
       <AboutButton autoOpenOnce />
     </section>

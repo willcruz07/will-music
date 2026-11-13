@@ -4,16 +4,268 @@
       "collectionGroup": "cifras",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "artist.slug", "order": "ASCENDING" },
-        { "fieldPath": "title", "order": "ASCENDING" }
+        {
+          "fieldPath": "artist.slug",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "cifras",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "artist.name", "order": "ASCENDING" },
-        { "fieldPath": "title", "order": "ASCENDING" }
+        {
+          "fieldPath": "artist.name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "style",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "style",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.name",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "style",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.slug",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "style",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "style",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "style",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.name",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "artist.slug",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "artist.name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "style",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.slug",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "style",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "title",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "artist.slug",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.photo",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "artist.slug",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.image",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "artist.slug",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.photoURL",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "artist.name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.photo",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "artist.name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.image",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cifras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "artist.name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "artist.photoURL",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],

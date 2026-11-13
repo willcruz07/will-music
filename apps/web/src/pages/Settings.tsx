@@ -4,13 +4,14 @@ import { ExportButton, ImportButton } from '../components/PackageButtons.tsx';
 import { AboutButton } from '../components/About.tsx';
 import { InstallApp } from '../components/PwaPrompts.tsx';
 import { db } from '../lib/db.ts';
-import { deleteCachedModel, deleteCachedModels, downloadAllModels, listCachedModels } from '../lib/models.ts';
+import { CHORD_MODELS, deleteCachedModel, deleteCachedModels, downloadAllModels, downloadModels, listCachedModels } from '../lib/models.ts';
 import { formatBytes, hasPredictableQuota, storageStatus } from '../lib/storage.ts';
 import { StorageProtection } from '../components/StorageProtection.tsx';
 import { useThemePref } from '../lib/theme.ts';
 import { Button } from '../ui/Button.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
 import { readExecutionPreference, saveExecutionPreference, type ExecutionPreference } from '../lib/analysisExecution.ts';
+import { isMobileStudio, MOBILE_LYRICS_NOTICE } from '../lib/studioDevice.ts';
 
 const MODEL_NAMES: Record<string, string> = { lv0: 'Acordes (LV-Chordia 1/5)', lv1: 'Acordes (LV-Chordia 2/5)', lv2: 'Acordes (LV-Chordia 3/5)', lv3: 'Acordes (LV-Chordia 4/5)', lv4: 'Acordes (LV-Chordia 5/5)', lvPlans: 'Planos de frequência (LV-Chordia)', lvDictionary: 'Dicionário (LV-Chordia)', chordnet: 'Acordes (ChordMini)', cqtPlan: 'Plano de frequências dos acordes', skey: 'Tom (S-KEY)', kara2Core: 'Separação de faixas (estrutura)', kara2Data: 'Separação de faixas (pesos)', basicPitch: 'Notas da partitura (Basic Pitch)', demucs6s: 'Separação em 4 e 6 faixas (HTDemucs)' };
 
@@ -71,7 +72,7 @@ export const Settings = () => {
 
       <Section title="Processamento das músicas">
         <label className="block text-sm font-semibold">Acordes e transcrição
-          <select aria-label="Execução das análises" value={execution} onChange={(event) => {
+          <select aria-label="Execução das análises" disabled={isMobileStudio()} value={execution} onChange={(event) => {
             const value = event.target.value as ExecutionPreference;
             setExecution(value); saveExecutionPreference(value);
           }} className="mt-2 block min-h-11 w-full rounded-lg border border-border bg-surface px-3">
@@ -80,7 +81,7 @@ export const Settings = () => {
             <option value="sequential">Uma tarefa por vez</option>
           </select>
         </label>
-        <p className="mt-2 text-sm text-muted-foreground">No automático, iPhone e iPad executam uma tarefa por vez. Em computadores com GPU disponível e ao menos quatro processadores lógicos, o app permite execução paralela. O modo paralelo é experimental e pode usar mais memória. Após a letra e os acordes, o app inicia a separação de faixas quando há GPU compatível. No iPhone ou iPad, pede confirmação antes de separar.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{isMobileStudio() ? MOBILE_LYRICS_NOTICE + ' A análise automática identifica apenas tom e acordes. Para separar e mixar faixas, use o Estúdio em um computador.' : 'No computador, a separação de faixas vem antes da identificação de acordes e da transcrição. O modo automático pode executar acordes e letra em paralelo quando há GPU disponível e ao menos quatro processadores lógicos. A execução paralela pode usar mais memória.'}</p>
       </Section>
 
       <Section title="Modelos de análise">
@@ -92,8 +93,9 @@ export const Settings = () => {
           disabled={!!downloading}
           onClick={() => {
             setDownloading('Começando');
-            void downloadAllModels((done, total) => setDownloading(`Baixando ${formatBytes(done)} de ${formatBytes(total)}`))
-              .then(() => setNotice('Todos os modelos estão no aparelho: a análise, a separação e as partituras funcionam sem internet. A transcrição da letra (Whisper) baixa na primeira vez que for usada.'))
+            const report = (done: number, total: number) => setDownloading(`Baixando ${formatBytes(done)} de ${formatBytes(total)}`);
+            void (isMobileStudio() ? downloadModels(CHORD_MODELS, report) : downloadAllModels(report))
+              .then(() => setNotice(isMobileStudio() ? 'Modelos de acordes e tom preparados. Para separar faixas e transcrever letras, use um computador.' : 'Todos os modelos estão no aparelho: a análise, a separação e as partituras funcionam sem internet. A transcrição da letra (Whisper) baixa na primeira vez que for usada.'))
               .catch((e: unknown) => setNotice(e instanceof Error ? e.message : 'O download falhou.'))
               .finally(() => {
                 setDownloading(null);

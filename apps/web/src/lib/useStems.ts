@@ -5,8 +5,7 @@ import type { StemsRecord } from './db.ts';
 import { exportMixMp3 } from './exportMix.ts';
 import { isRunning } from './jobs.ts';
 import { getSessionStems, retainSessionStems, setSessionStems } from './sessionStems.ts';
-import { isIOS } from './ios.ts';
-import { confirmDialog } from '../ui/Dialog.tsx';
+import { isMobileStudio, MOBILE_TRACKS_NOTICE } from './studioDevice.ts';
 import { type MixTrack, mixVolumes } from './mixer.ts';
 import { type SeparationProgress, deleteStemSet, listStemSets, selectStemSet, separateSong } from './stems.ts';
 
@@ -28,6 +27,7 @@ export const useStems = (songId: string, originalUrl?: string, autoMix = false) 
   const [temporaryTracks, setTemporaryTracks] = useState(false);
 
   const load = useCallback(async () => {
+    if (isMobileStudio()) return; // Keep original playback; do not load large stored stem sets into memory.
     const current = generation.current;
     const sets = await listStemSets(songId);
     if (generation.current !== current) return;
@@ -66,21 +66,13 @@ export const useStems = (songId: string, originalUrl?: string, autoMix = false) 
 
   const separate = useCallback(
     async (mode: StemMode = 'six') => {
+      if (isMobileStudio()) { setError(MOBILE_TRACKS_NOTICE); return; }
       if (abort.current || isRunning(songId)) return; // the pipeline owns separation while analyzing
       setError(null);
       const controller = new AbortController();
       abort.current = controller;
       setProgress({ stage: 'models', done: 0, total: 1, mode });
       try {
-        if (isIOS() && mode !== 'vocals') {
-          const proceed = await confirmDialog({
-            title: 'Separar faixas neste aparelho?',
-            message: 'A separação usa bastante memória. No iPhone ou iPad, o navegador pode interromper o processamento ou recarregar a página. Proteger o armazenamento não evita esse limite. Para maior estabilidade, separe no computador. Se continuar, mantenha o app aberto em primeiro plano.',
-            confirmLabel: 'Continuar neste aparelho',
-            cancelLabel: 'Agora não',
-          });
-          if (!proceed || controller.signal.aborted) return;
-        }
         const result = await separateSong(songId, (p) => setProgress({ ...p, mode }), { mode, signal: controller.signal, persist: false });
         if (controller.signal.aborted) return;
         setSessionStems(songId, result.persisted ? undefined : result.record);

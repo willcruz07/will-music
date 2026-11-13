@@ -71,3 +71,21 @@ A busca por artistas exibe cartões com foto e nome, obtidos de páginas limitad
 A consulta filtrada por artista e ordenada por título requer índices compostos. As definições estão em `docs/firebase-catalogo.indexes.json`. No Firebase Console, em Firestore > Índices > Composto, crie dois índices para a coleção `cifras`, escopo Coleção: `artist.slug` crescente + `title` crescente; e `artist.name` crescente + `title` crescente. Aguarde o status Ativado e tente novamente. O link de criação fornecido pelo erro do SDK no console do navegador também preenche o índice exigido pela consulta. Este arquivo é uma referência para integrar à configuração existente; não substitui nem remove índices remotos. Nada foi publicado automaticamente.
 
 O leitor passa a quebrar por palavras, preservando as posições dos acordes e os offsets de edição. A transposição aceita notas minúsculas como `c#m7`, acidentes Unicode, inversões e extensões com barra numérica (como `C6/9`), sem confundir a extensão com um baixo.
+
+## Revisão: catálogo compacto e filtros
+
+A listagem usa linhas compactas com avatar, título/artista e metadados, sem banner e sem botão de salvar. Salvar permanece no leitor da cifra. No mobile há uma coluna e, a partir de 768px, duas. Pesquisa, modos e filtros ficam sticky abaixo do header (considerando safe-area). Bottom sheet oferece A–Z/Z–A, letra inicial e estilos reais paginados do campo `style`. O resumo aparece no botão e pode ser limpo. Filtros são mantidos na URL e no retorno da cifra.
+
+Esta revisão substitui a estratégia anterior de artistas: busca páginas adicionais até 24 artistas distintos, com teto de 24 consultas e verificação de tempo entre consultas (12 segundos). Cada consulta lê no máximo as 24 posições restantes, pulando o último nome para não percorrer todas as cifras de um artista. Em conexões lentas ou dados muito repetidos, pode entregar menos de 24 com “Carregar mais”. Não confundir o número carregado com o total do acervo.
+
+Contagem de cifras por artista usa `getCountFromServer`, com até três chamadas por lote, cache de cinco minutos e sem bloquear a lista. Com estilo ativo, a quantidade respeita o estilo. Falha de contagem não inventa um número nem impede abrir o artista. Essas agregações e a descoberta de estilos fazem consultas adicionais ao Firestore; não baixam todo o conteúdo do artista.
+
+Não há campos normalizados no esquema consultado: prefixos, letras e ordenação seguem a grafia/indexação do Firestore (sensíveis a caixa e acentos), não uma ordenação linguística completa em português. A interface informa essa limitação. Estilos são obtidos por cursor do próprio campo, em páginas de até 12 valores distintos, com opção de continuar.
+
+`docs/firebase-catalogo.indexes.json` inclui agora combinações de estilo, artista e título nas duas direções. Se o Firestore pedir um índice, use o link original preservado no console. As definições são locais; não foram publicadas nem substituirão índices existentes automaticamente. Uma falha de índice não remove o filtro para mostrar resultados de outra consulta.
+
+## Foto compartilhada por artista
+
+Fotos válidas encontradas em cifras do mesmo artista são compartilhadas entre avatares e preservadas quando outra ocorrência vier sem foto. Os campos `artist.photo`, `artist.image` e `artist.photoURL` são considerados, com validação de URL HTTPS. Falhas de carregamento da imagem eliminam essa candidata durante a sessão e permitem tentar outra.
+
+Para avatares sem candidata, a interface observa proximidade com a área visível e faz uma busca complementar indexada pelo mesmo slug (ou nome, no formato legado). Cada campo de foto retorna no máximo quatro documentos, com no máximo três buscas de artista simultâneas, deduplicação e intervalo de cinco minutos entre buscas do mesmo artista. Não varre todas as cifras. As novas combinações de índice estão em `docs/firebase-catalogo.indexes.json`, apenas como definição local. Se faltarem índices, o console preserva o erro original para criá-los no Firebase. A foto continua opcional e sua ausência não impede abrir a cifra.

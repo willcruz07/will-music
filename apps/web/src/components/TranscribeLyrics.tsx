@@ -5,11 +5,13 @@ import { describeTranscription } from '../lib/transcript.ts';
 import { transcribeSong } from '../lib/whisper.ts';
 import { Button } from '../ui/Button.tsx';
 import { ProgressBar } from './AnalysisProgress.tsx';
+import { isMobileStudio, MOBILE_LYRICS_NOTICE } from '../lib/studioDevice.ts';
 
 export const TranscribeLyrics = ({ songId, hasStems, onApply }: { songId: string; hasStems: boolean; onApply: (lyrics: LyricsChoice) => void }) => {
   const [status, setStatus] = useState<{ label: string; fraction?: number; detail?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const gpu = !!(navigator as Navigator & { gpu?: unknown }).gpu;
+  if (isMobileStudio()) return <p className="mt-6 rounded-xl border border-border bg-surface p-4 text-sm leading-relaxed text-muted-foreground">{MOBILE_LYRICS_NOTICE}</p>;
   return (
     <div className="mt-6 max-w-2xl rounded-lg border border-border p-4">
       <h2 className="text-lg font-semibold">Transcrever a letra do áudio</h2>

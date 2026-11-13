@@ -8,7 +8,7 @@ export const IMPROVISO: Lesson[] = [
     track: 'improviso',
     level: 'iniciante',
     title: 'Primeiro solo com a pentatônica',
-    summary: 'Cinco notas que funcionam sobre quase tudo num tom.',
+    summary: 'Cinco notas para começar a criar frases com ritmo e intenção.',
     blocks: [
       t('A **pentatônica** tira da escala maior as duas notas que mais "brigam" com os acordes (o 4º e o 7º grau). Sobre uma música em Lá menor (ou Dó maior), a pentatônica de Lá menor é um ponto de partida; as notas sustentadas ainda precisam ser comparadas com cada acorde e com a melodia.'),
       { kind: 'scale', scale: 'minorPentatonic', root: 'A', caption: 'O desenho clássico da 5ª casa: decore esta posição primeiro.' },
@@ -60,7 +60,7 @@ export const IMPROVISO: Lesson[] = [
     title: 'Escala bebop e linhas de jazz',
     summary: 'A nota de passagem que faz as notas do acorde caírem nos tempos.',
     blocks: [
-      t('A **escala bebop dominante** é o mixolídio com uma sétima maior de passagem (8 notas). Tocando em colcheias a partir de uma nota do acorde, as notas do acorde caem nos tempos fortes, o que dá às linhas de jazz o seu balanço característico.'),
+      t('A **escala bebop dominante** acrescenta uma sétima maior de passagem ao mixolídio, totalizando oito notas. Em certos desenhos contínuos de colcheias, especialmente descendentes e iniciados no pulso por uma nota do acorde, isso ajuda a alinhar notas do acorde aos pulsos. O alinhamento depende do percurso e do ponto de partida; o balanço do jazz também envolve acentos, articulação e interpretação.'),
       { kind: 'scale', scale: 'bebopDominant', root: 'G', caption: 'Sobre G7: Sol, Lá, Si, Dó, Ré, Mi, Fá, Fá#.' },
       { kind: 'tip', text: 'Combine com enclosures e com o **ii–V**: comece a linha no Dm7 e "converse" com as guias até a terça do C.' },
     ],
@@ -72,7 +72,7 @@ export const IMPROVISO: Lesson[] = [
     title: 'Tensão sobre o dominante',
     summary: 'Alterada, diminuta e tons inteiros sobre o V7.',
     blocks: [
-      t('O acorde dominante é o momento de mais tensão da música, e o improvisador pode carregar nas cores. Três escalas típicas sobre o V7, especialmente quando ele resolve num acorde menor:'),
+      t('Em uma **cadência tonal**, o dominante pode concentrar tensão antes da chegada. As coleções abaixo oferecem cores diferentes sobre V7; escolha notas considerando a melodia, as alterações do acorde e o destino. Não é necessário tocar todas as cores juntas:'),
       { kind: 'scale', scale: 'altered', root: 'G', caption: 'Alterada: b9, #9, #11 e b13 juntas.' },
       { kind: 'scale', scale: 'diminishedHW', root: 'G', caption: 'Diminuta semitom-tom: b9, #9, #11 e 13.' },
       { kind: 'scale', scale: 'wholeTone', root: 'G', caption: 'Tons inteiros: 9, #11 e b13.' },

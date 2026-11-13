@@ -37,7 +37,7 @@ export default defineConfig({
         categories: ['music', 'education', 'productivity'],
         shortcuts: [
           { name: 'Adicionar música', short_name: 'Adicionar', url: '/nova', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
-          { name: 'Listas', url: '/listas', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Palco', url: '/palco', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
           { name: 'Partituras', url: '/partituras', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
         ],
         icons: [

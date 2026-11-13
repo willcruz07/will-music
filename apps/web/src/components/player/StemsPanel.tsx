@@ -10,6 +10,7 @@ import { Button } from '../../ui/Button.tsx';
 import { confirmDialog } from '../../ui/Dialog.tsx';
 import { Mixer } from '../Mixer.tsx';
 import { TracksSkeleton } from '../StudioSkeletons.tsx';
+import { isMobileStudio, MOBILE_TRACKS_NOTICE } from '../../lib/studioDevice.ts';
 
 const mb = (n: number) => Math.round(n / 1e6);
 
@@ -41,6 +42,7 @@ export const StemsPanel = ({ stems, title, hasAudio, mixer, automaticMix = false
   const [choosing, setChoosing] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  if (isMobileStudio()) return <p className="rounded-xl border border-border bg-surface p-4 text-sm leading-relaxed text-muted-foreground">{MOBILE_TRACKS_NOTICE}</p>;
   const exportButton = <Button variant={automaticMix ? 'primary' : 'outline'} disabled={!!exporting} onClick={() => {
     setExportError(null); setExporting('Preparando');
     void exportMix(setExporting).then(blob => downloadBlob(blob, `${title || 'música'} (mixagem).mp3`))

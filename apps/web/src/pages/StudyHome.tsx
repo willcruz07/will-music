@@ -6,6 +6,7 @@ import { rovingKeys } from '../lib/a11y.ts';
 import { LessonBlocks, Rich } from '../study/blocks.tsx';
 import { TRACKS, lessonById, readDone, readLast, setDone, setLast, trackLessons } from '../study/catalog.ts';
 import { LEVELS, type Level, type Track } from '../study/types.ts';
+import { TRACK_INTRODUCTIONS } from '../study/explanations/index.ts';
 
 const GROUPS: { id: Track['group']; about: string }[] = [
   { id: 'Teoria e harmonia', about: 'O que vale para qualquer instrumento: harmonia, ritmo, escalas e improviso.' },
@@ -170,6 +171,10 @@ export const TrackPage = () => {
       <p className="mt-2 text-xs text-muted-foreground">{track.group}</p>
       <h1 className="text-3xl font-bold tracking-tight">{track.title}</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">{track.about}</p>
+      <section className="mt-4 max-w-2xl rounded-2xl border border-border bg-surface p-4" aria-label="Introdução à trilha">
+        <h2 className="font-semibold">Antes de começar</h2>
+        <p className="mt-2 leading-relaxed text-muted-foreground">{TRACK_INTRODUCTIONS[track.id]}</p>
+      </section>
       <p className="mt-3 max-w-2xl text-sm text-muted-foreground">Estude a explicação, ouça os exemplos e pratique antes de avançar. A marcação “estudada” registra sua leitura; use os exercícios para avaliar o que já consegue executar.</p>
       <div className="mt-4 max-w-md">
         <p className="mb-1 text-sm tabular-nums">

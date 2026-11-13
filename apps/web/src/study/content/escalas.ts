@@ -8,7 +8,7 @@ export const ESCALAS: Lesson[] = [
     track: 'escalas',
     level: 'iniciante',
     title: 'Maior, menor e pentatônicas',
-    summary: 'As escalas que estão em 90% das músicas.',
+    summary: 'Quatro referências para começar a ouvir e construir frases.',
     blocks: [
       t('Quatro escalas resolvem quase tudo no começo: a **maior**, a **menor natural** e as duas **pentatônicas**. Toque cada uma subindo e descendo, devagar, falando o nome das notas.'),
       { kind: 'scale', scale: 'major', root: 'G' },
@@ -40,7 +40,7 @@ export const ESCALAS: Lesson[] = [
     title: 'Menor harmônica e melódica',
     summary: 'As menores que criam o dominante e a base do jazz.',
     blocks: [
-      t('A **menor harmônica** eleva a 7ª da menor natural para criar o V7 (E7 em Lá menor). Entre a 6ª e a 7ª fica uma **segunda aumentada** (3 semitons), o som "oriental" característico.'),
+      t('A **menor harmônica** eleva a 7ª da menor natural, permitindo o V7 (E7 em Lá menor). Entre a 6ª e a 7ª fica uma **segunda aumentada** (3 semitons): em Lá menor, Fá–Sol♯. Essa distância é uma característica da coleção, não uma identificação automática de uma cultura musical.'),
       { kind: 'scale', scale: 'harmonicMinor', root: 'A' },
       t('A **menor melódica** (do jazz) eleva também a 6ª: sobe como uma maior com terça menor. Seus modos geram a escala alterada e o lídio dominante.'),
       { kind: 'scale', scale: 'melodicMinor', root: 'A' },
@@ -67,8 +67,8 @@ export const ESCALAS: Lesson[] = [
     title: 'Escalas orientais e árabes',
     summary: 'Hijaz, menor húngara, bizantina e as pentatônicas japonesas.',
     blocks: [
-      t('Muitas escalas de outras tradições têm em comum a **segunda aumentada** e a **segunda menor**, que dão o colorido "oriental" ao ouvido ocidental. Na música árabe o sistema completo é o dos **maqamat**, que também usam quartos de tom (que o teclado não toca). Aqui estão as aproximações temperadas mais usadas:'),
-      { kind: 'scale', scale: 'phrygianDominant', root: 'E', caption: 'Próximo do maqam Hijaz; também é o som do flamenco.' },
+      t('As coleções abaixo permitem comparar **segundas menores** e **segundas aumentadas** em diferentes desenhos. A prática dos **maqamat** envolve também percurso melódico e afinações que não se reduzem ao teclado temperado. As tradições japonesas possuem outros contextos próprios. Os exemplos do app são aproximações para explorar intervalos, não definições completas dessas linguagens:'),
+      { kind: 'scale', scale: 'phrygianDominant', root: 'E', caption: 'Coleção temperada para comparar intervalos associados a Hijaz e a certos contextos de flamenco; não reproduz toda a prática dessas tradições.' },
       { kind: 'scale', scale: 'doubleHarmonic', root: 'C', caption: 'Bizantina / Hijaz Kar: duas segundas aumentadas.' },
       { kind: 'scale', scale: 'hungarianMinor', root: 'A' },
       { kind: 'scale', scale: 'hirajoshi', root: 'E', caption: 'Japonesa (koto).' },
@@ -83,7 +83,7 @@ export const ESCALAS: Lesson[] = [
     title: 'Escalas indianas: os thaats',
     summary: 'Os dez "pais" de onde os ragas são classificados.',
     blocks: [
-      t('Na música clássica do norte da Índia (hindustani), os **ragas** são agrupados em dez **thaats**, escalas-mãe de sete notas. Um raga é muito mais que a escala: tem notas proibidas na subida ou na descida, frases obrigatórias, hora do dia e sentimento (rasa). Os thaats são um bom ponto de entrada.'),
+      t('Na música clássica hindustani, o sistema dos dez **thaats**, associado a Bhatkhande, oferece uma classificação por coleções de sete notas. Ele não esgota todos os ragas ou sistemas de classificação. Um **raga** envolve caminhos de subida e descida, hierarquia de notas, frases características e convenções de interpretação; pode também ter associações de horário e caráter. O thaat é uma referência inicial, não uma descrição completa do raga.'),
       { kind: 'list', items: ['**Bilawal** = maior · **Khamaj** = mixolídio · **Kafi** = dórico · **Asavari** = menor natural · **Bhairavi** = frígio · **Kalyan** = lídio (raga Yaman).', 'E quatro sem equivalente nos modos gregos: **Bhairav, Poorvi, Marwa e Todi**.'] },
       { kind: 'scale', scale: 'bhairav', root: 'C' },
       { kind: 'scale', scale: 'poorvi', root: 'C' },

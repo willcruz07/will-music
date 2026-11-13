@@ -14,6 +14,7 @@ export type TrackId = 'harmonia' | 'ritmo' | 'improviso' | 'escalas' | 'canto' |
 /** The parts a lesson is made of; the interactive ones play with the app's own synth. */
 export type Block =
   | { kind: 'text'; text: string }
+  | { kind: 'explanation'; context: string; simple: string; example: string }
   | { kind: 'list'; title?: string; items: string[] }
   | { kind: 'tip'; text: string; tone?: 'tip' | 'warning' }
   | { kind: 'chords'; chords: string[]; caption?: string }

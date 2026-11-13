@@ -14,6 +14,9 @@ import { IconButton } from './ui/Button.tsx';
 import { useStudioLayout } from './lib/studioLayout.ts';
 import { AccountLink } from './components/AccountLink.tsx';
 import { RequireAccount } from './components/RequireAccount.tsx';
+import { RouteScrollReset } from './components/RouteScrollReset.tsx';
+import { NotificationsBell } from './components/NotificationsBell.tsx';
+import { AccountLibrary } from './components/AccountLibrary.tsx';
 
 // The library opens first; every other screen (and its heavy libraries) loads on demand.
 const named = <K extends string>(load: () => Promise<Record<K, React.ComponentType<any>>>, name: K) =>
@@ -40,6 +43,7 @@ const CatalogChart = named(() => import('./pages/CatalogChart.tsx'), 'CatalogCha
 const CatalogChartRoute = () => { const { id } = useParams(); return <CatalogChart key={id} />; };
 const CatalogArtist = named(() => import('./pages/CatalogArtist.tsx'), 'CatalogArtist');
 const CatalogArtistRoute = () => { const { artistId } = useParams(); return <CatalogArtist key={artistId} />; };
+const LegacySetlistRoute = () => { const { id } = useParams(); return <Navigate to={`/palco/repertorio/${id}`} replace />; };
 
 // Reads the saved preference, never the <html> class (the stage forces dark while it is open).
 export const ThemeToggle = () => {
@@ -62,18 +66,22 @@ const KeepAwake = () => {
 };
 
 export const App = () => (
+  <>
+  <RouteScrollReset />
   <Suspense fallback={<Loading />}>
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="*" element={<RequireAccount><AuthenticatedApp /></RequireAccount>} />
+      <Route path="*" element={<RequireAccount><AccountLibrary><AuthenticatedApp /></AccountLibrary></RequireAccount>} />
     </Routes>
     <DialogHost />
   </Suspense>
+  </>
 );
 
 const AuthenticatedApp = () => <>
     <KeepAwake />
     <Routes>
+      <Route path="/palco/compartilhada/:id" element={<Stage mode="shared" />} />
       <Route path="/palco/lista/:id" element={<Stage mode="list" />} />
       <Route path="/palco/musica/:id" element={<Stage mode="song" />} />
       <Route path="*" element={<Layout />} />
@@ -86,7 +94,7 @@ const Layout = () => {
   return (
   <div className={`${studio ? 'studio-layout ' : ''}flex min-h-dvh flex-col`}>
     <header hidden={studio} className="glass sticky top-0 z-20 border-b border-border pt-[env(safe-area-inset-top)]">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
+      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 px-3 sm:px-4">
         <Link to="/" className="inline-flex items-center gap-2 font-[family-name:var(--font-display)] text-lg font-semibold tracking-tight">
           <img src={`${import.meta.env.BASE_URL}icons/mark-96.png`} alt="" width={32} height={32} className="size-8 rounded-lg" />
           {/* The name with the version right under it, in one block. */}
@@ -97,9 +105,9 @@ const Layout = () => {
             </span>
           </span>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
           <TopNav />
-          <SettingsLink />
+          <SettingsLink /><NotificationsBell />
           <AccountLink />
           <ThemeToggle />
         </div>
@@ -123,8 +131,10 @@ const Layout = () => {
           <Route path="/estudo/trilha/:id" element={<TrackPage />} />
           <Route path="/estudo/aula/:id" element={<LessonPage />} />
           <Route path="/armazenamento" element={<StoragePage />} />
-          <Route path="/listas" element={<Setlists />} />
-          <Route path="/listas/:id" element={<SetlistEdit />} />
+          <Route path="/palco" element={<Setlists />} />
+          <Route path="/palco/repertorio/:id" element={<SetlistEdit />} />
+          <Route path="/listas" element={<Navigate to="/palco" replace />} />
+          <Route path="/listas/:id" element={<LegacySetlistRoute />} />
           <Route path="/ajustes" element={<Settings />} />
           <Route path="/conta" element={<Login account />} />
           <Route path="/catalogo" element={<Navigate to="/?aba=catalogo" replace />} />

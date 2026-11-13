@@ -5,6 +5,8 @@ import { Login } from '../src/pages/Login.tsx';
 import { accountReturn, RequireAccount } from '../src/components/RequireAccount.tsx';
 
 const fake = vi.hoisted(() => ({ snapshot: { user: null as null | { uid: string; name: string; email: string; photo: null; providers: string[] }, ready: true, error: null }, google: vi.fn(), logout: vi.fn() }));
+vi.mock('../src/lib/cloud/personalSync.ts', () => ({ usePersonalSync: () => ({ status: 'idle' }), requestPersonalSync: vi.fn() }));
+vi.mock('../src/components/MusicianProfileEditor.tsx', () => ({ MusicianProfileEditor: () => <div>Editor de perfil musical</div> }));
 vi.mock('../src/lib/account.ts', () => ({
   useAccount: () => fake.snapshot, prepareGoogle: async () => fake.google, hasGoogleSession: (user: typeof fake.snapshot.user) => !!user?.providers.includes('google.com'),
   leaveAccount: fake.logout, startAccount: vi.fn(), accountError: () => 'Não foi possível entrar.',

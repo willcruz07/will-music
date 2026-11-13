@@ -226,6 +226,17 @@ export const LessonBlocks = ({ blocks, lessonId, instrument }: { blocks: Block[]
       {blocks.map((b, i) => {
         const id = `${lessonId}-${i}`;
         switch (b.kind) {
+          case 'explanation':
+            return <section key={i} aria-label="Entenda o conceito" className="my-5 min-w-0 rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <h2 className="text-base font-semibold text-foreground">Conceito e contexto</h2>
+              <p className="mt-2 text-muted-foreground"><Rich text={b.context} /></p>
+              <div className="mt-4 border-l-2 border-primary/50 pl-3 sm:pl-4">
+                <h3 className="text-sm font-semibold text-chord">Em outras palavras</h3>
+                <p className="mt-1 text-muted-foreground"><Rich text={b.simple} /></p>
+              </div>
+              <h3 className="mt-4 text-sm font-semibold text-foreground">Um exemplo para entender</h3>
+              <p className="mt-1 text-muted-foreground"><Rich text={b.example} /></p>
+            </section>;
           case 'text':
             return b.text.split('\n\n').map((p, k) => (
               <p key={`${i}-${k}`} className="my-3 text-muted-foreground">

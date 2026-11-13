@@ -90,12 +90,12 @@ export type ScoreRecord = {
   choir?: { voices: Record<VoicePart, NoteEvent[]>; source: string };
 };
 
-export type SetlistItem = { songId: string; targetKey?: string; note?: string };
+export type SetlistItem = { id?: string; songId: string; targetKey?: string; transpose?: number; note?: string };
 export type Setlist = { id: string; name: string; date?: string; items: SetlistItem[]; createdAt: string; updatedAt: string };
 
 // Audio lives in IndexedDB as a Blob (works in every target browser, Safari included);
 // swapping it for OPFS later only touches this file.
-export const db = new Dexie('will-music') as Dexie & {
+export type LibraryDatabase = Dexie & {
   songs: EntityTable<Song, 'id'>;
   audio: EntityTable<AudioRecord, 'songId'>;
   analyses: EntityTable<Analysis, 'id'>;
@@ -105,7 +105,11 @@ export const db = new Dexie('will-music') as Dexie & {
   peaks: EntityTable<PeaksRecord, 'songId'>;
   settings: EntityTable<{ key: string; value: unknown }, 'key'>;
   scores: EntityTable<ScoreRecord, 'songId'>;
+  sharedSetlists: EntityTable<import('./sharingTypes.ts').SharedSetlist, 'id'>;
 };
+
+export const createLibraryDatabase = (name: string): LibraryDatabase => {
+const db = new Dexie(name) as LibraryDatabase;
 
 db.version(1).stores({
   songs: 'id, title, artist, updatedAt',
@@ -127,6 +131,7 @@ db.version(5)
 db.version(6).stores({ stems: null });
 // v7: app settings that must survive (e.g. the connected device folder handle).
 db.version(7).stores({ settings: 'key' });
+db.version(8).stores({ sharedSetlists: 'id, ownerUid, updatedAt' });
 
 // Public readers always receive a Blob, including the binary fallback used for refused Blob writes.
 // No schema upgrade is needed: only the non-indexed audio payload changes representation.
@@ -137,6 +142,13 @@ db.audio.hook('reading', (record: StoredAudioRecord | undefined) =>
     ? { ...record, blob: new Blob([record.blob], { type: record.mimeType }) }
     : record,
 );
+
+return db;
+};
+
+export let db = createLibraryDatabase('will-music');
+
+const isBinaryAudio = (value: Blob | ArrayBuffer): value is ArrayBuffer => Object.prototype.toString.call(value) === '[object ArrayBuffer]';
 
 // A binary retry needs a full memory copy. Keep it bounded for large WAVs and mobile devices.
 const MAX_BINARY_RETRY_BYTES = 64 * 1024 * 1024;
@@ -199,3 +211,22 @@ export const deleteSong = async (id: string): Promise<void> => {
 };
 
 export const listSongs = (): Promise<Song[]> => db.songs.orderBy('updatedAt').reverse().toArray();
+
+let activeLibraryUid: string | null = null;
+export const selectAccountLibrary = async (uid: string): Promise<void> => {
+  if (activeLibraryUid === uid) return;
+  if (activeLibraryUid && activeLibraryUid !== uid) {
+    window.location.reload();
+    return new Promise<void>(() => {});
+  }
+  const legacy = db.name === 'will-music' ? db : createLibraryDatabase('will-music');
+  const owner = await legacy.transaction('rw', legacy.settings, async () => {
+    const record = await legacy.settings.get('account-library-owner');
+    if (typeof record?.value === 'string') return record.value;
+    await legacy.settings.put({ key: 'account-library-owner', value: uid });
+    return uid;
+  });
+  if (owner !== uid) { legacy.close(); db = createLibraryDatabase('will-music-account-' + encodeURIComponent(uid)); }
+  await db.open();
+  activeLibraryUid = uid;
+};

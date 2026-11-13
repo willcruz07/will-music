@@ -6,6 +6,7 @@ import { getSessionStems } from './sessionStems.ts';
 import { type TranscribeProgress, type WhisperChunk, isUsefulTranscript, leadingSilence, transcriptToLines, wordsToSegments } from './transcript.ts';
 import type { LyricLine, StemsRecord } from './db.ts';
 import { type WhisperDevice, detectWhisperDevice, whisperCacheReady } from './whisperModel.ts';
+import { isMobileStudio, MOBILE_LYRICS_NOTICE } from './studioDevice.ts';
 
 const RATE = 16000;
 
@@ -60,6 +61,7 @@ export const whisperCached = async (device?: WhisperDevice): Promise<boolean> =>
 /** Downloads and caches the Whisper model without transcribing (first-run setup). */
 export const preloadWhisper = (onProgress: (loaded: number, total: number) => void): Promise<void> =>
   new Promise((resolve, reject) => {
+    if (isMobileStudio()) return reject(new Error(MOBILE_LYRICS_NOTICE));
     const worker = new Worker(new URL('../worker/whisper.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = async (event: MessageEvent<WhisperResponse>) => {
       const msg = event.data;
@@ -89,6 +91,7 @@ export const transcribeSong = async (
   onProgress: (p: TranscribeProgress) => void,
   source?: { stems?: StemsRecord; original?: boolean; signal?: AbortSignal },
 ): Promise<{ lines: LyricLine[]; usedVocals: boolean }> => {
+  if (isMobileStudio()) throw new Error(MOBILE_LYRICS_NOTICE);
   source?.signal?.throwIfAborted();
   const cached = await whisperCached();
   onProgress(cached ? { stage: 'load' } : { stage: 'download', loaded: 0, total: 0 });

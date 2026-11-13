@@ -417,7 +417,10 @@ export const folderSync = createFolderSync();
 const DISPLAY_ONLY = new Set(['fontSize', 'transpose', 'updatedAt']);
 
 /** Watches the database and keeps the connected folder up to date. */
+let folderSyncStarted = false;
 export const startFolderAutoSync = (): void => {
+  if (folderSyncStarted) return;
+  folderSyncStarted = true;
   const changed = (mods: object) => Object.keys(mods).some((k) => !DISPLAY_ONLY.has(k));
   db.charts.hook('creating', (_pk, obj) => void folderSync.request(obj.songId));
   db.charts.hook('updating', (mods, _pk, obj) => void (changed(mods) && folderSync.request(obj.songId)));

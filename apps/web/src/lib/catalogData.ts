@@ -2,8 +2,9 @@ import { parseChordPro } from './chart.ts';
 import { db, now, type Song } from './db.ts';
 import { firebaseConfig } from './cloud/config.ts';
 import { isQuotaError } from './storage.ts';
+import { validArtistPhoto } from './catalogPhotoUrl.ts';
 
-export type CatalogArtist = { name: string; photo: string; slug: string };
+export type CatalogArtist = { name: string; photo: string; slug: string; photoCandidates?: string[] };
 export type CatalogChart = { id: string; title: string; artist: string; artistRef?: CatalogArtist; content: string; style: string; key?: string };
 const text = (value: unknown) => typeof value === 'string' ? value : '';
 const validKey = (value: string) => /^[A-G][#b]?m?$/u.test(value.trim()) ? value.trim() : undefined;
@@ -12,7 +13,8 @@ export const mapCatalogArtist = (data: Record<string, unknown>): CatalogArtist |
   const raw = data.artist && typeof data.artist === 'object' ? data.artist as Record<string, unknown> : {};
   const name = text(raw.name) || text(data.artist);
   if (!name.trim()) return null;
-  return { name, slug: text(raw.slug), photo: text(raw.photo) || text(raw.image) || text(raw.photoURL) };
+  const candidates = [...new Set([raw.photo, raw.image, raw.photoURL].map(validArtistPhoto).filter(Boolean))];
+  return { name, slug: text(raw.slug), photo: candidates[0] ?? '', ...(candidates.length > 1 ? { photoCandidates: candidates } : {}) };
 };
 export const catalogArtistId = (artist: CatalogArtist): string => artist.slug ? `slug:${artist.slug}` : `name:${artist.name}`;
 export const catalogArtistSelector = (id: string): { field: 'artist.slug' | 'artist.name'; value: string } => {

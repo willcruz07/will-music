@@ -12,7 +12,7 @@ export const CANTO: Lesson[] = [
     summary: 'O diafragma, a respiração baixa e o controle do ar.',
     blocks: [
       t('A voz é **ar em movimento** passando pelas pregas vocais. Por isso o canto começa na respiração. Em pé, com os pés na largura dos ombros, joelhos destravados, ombros soltos e o peito levemente aberto, o ar entra com mais facilidade.'),
-      t('O **diafragma** é o músculo em forma de cúpula sob os pulmões. Na inspiração ele desce, e por isso a barriga e as costelas laterais se expandem: é a **respiração baixa** (costodiafragmática). O **apoio** é manter essa expansão enquanto o ar sai devagar, sem empurrar com a garganta.'),
+      t('O **diafragma** participa da inspiração, aumentando o espaço disponível na caixa torácica. O abdômen e as costelas podem se movimentar durante essa ação; o ar entra nos pulmões, não na barriga. No ensino de canto, **apoio** descreve a coordenação entre respiração e emissão, sem rigidez ou pressão desnecessária na garganta.'),
       { kind: 'exercise', title: 'Exercícios', steps: ['Deite de barriga para cima com um livro sobre o umbigo: inspire pelo nariz fazendo o livro subir, sem subir os ombros.', 'Em pé, inspire em 4 tempos e solte o ar num "sss" contínuo por 8, depois 12 e 16 tempos, mantendo as costelas abertas.', 'Solte o ar em "s-s-s-s" curtos, sentindo a barriga trabalhar a cada som.'] },
       CUIDADO,
     ],
@@ -62,7 +62,7 @@ export const CANTO: Lesson[] = [
     title: 'Ressonância, colocação e projeção',
     summary: 'Volume sem força: o som que corre na sala.',
     blocks: [
-      t('A **ressonância** é a amplificação do som nas cavidades acima das pregas (faringe, boca, nariz). A **colocação** é onde você sente essas vibrações: no peito nas notas graves, na "máscara" (ossos do rosto) nas médias e agudas.'),
+      t('O **trato vocal** modifica o som produzido pelas pregas vocais, reforçando ou atenuando regiões de frequência. **Colocação** é uma imagem pedagógica usada para descrever sensações de vibração, que variam entre pessoas e exercícios. Sentir vibração no rosto ou no peito não significa que o som seja produzido ou transferido para esses locais.'),
       t('**Projetar** não é gritar. É usar bem a ressonância e o apoio para que o som chegue longe com pouco esforço na garganta.'),
       { kind: 'exercise', steps: ['Cante "nhã-nhã-nhã" sentindo vibrar o nariz e as bochechas.', 'Fale uma frase como se chamasse alguém do outro lado da rua, sem gritar; depois cante a mesma frase com essa sensação.', 'Sirene em "ng" (como no fim de "sing"): ótimo para encontrar a ressonância alta.'] },
       CUIDADO,
@@ -88,7 +88,7 @@ export const CANTO: Lesson[] = [
     summary: 'Até onde a voz vai e onde ela mora.',
     blocks: [
       t('**Extensão** é do grave mais grave ao agudo mais agudo que você consegue emitir. **Tessitura** é a faixa onde você canta com conforto e qualidade por bastante tempo; é um dos fatores da classificação, junto do timbre, das passagens e da avaliação técnica: **baixo, barítono e tenor** (vozes masculinas) e **contralto, mezzo-soprano e soprano** (femininas).'),
-      { kind: 'list', items: ['O **Microfone → Voz** do app mostra a extensão que você cantou e sugere a classificação.', 'A classificação também depende do timbre e de onde ficam as passagens: um professor confirma.', 'Escolha o **tom** das músicas pela sua tessitura, não pelo tom original.'] },
+      { kind: 'list', items: ['O **Microfone → Voz** do app ajuda a observar as alturas registradas numa execução; isso não confirma uma classificação vocal.', 'A classificação também depende do timbre e de onde ficam as passagens, com avaliação individual.', 'Escolha o **tom** das músicas considerando uma região confortável para a frase inteira, não apenas a nota mais alta.'] },
       CUIDADO,
     ],
   },

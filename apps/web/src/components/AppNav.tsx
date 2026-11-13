@@ -6,7 +6,7 @@ type Item = { to: string; label: string; icon: typeof Library; end: boolean };
 
 const ITEMS: Item[] = [
   { to: '/', label: 'Biblioteca', icon: Library, end: true },
-  { to: '/listas', label: 'Listas', icon: ListMusic, end: false },
+  { to: '/palco', label: 'Palco', icon: ListMusic, end: false },
   { to: '/microfone', label: 'Microfone', icon: Mic, end: false },
   { to: '/estudo', label: 'Estudo', icon: GraduationCap, end: false },
 ];

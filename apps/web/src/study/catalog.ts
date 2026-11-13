@@ -9,6 +9,7 @@ import { CAVAQUINHO } from './content/cavaquinho.ts';
 import { PARTITURAS } from './content/partituras.ts';
 import { APROFUNDAMENTO } from './content/aprofundamento.ts';
 import { LEVELS, type Lesson, type Track, type TrackId } from './types.ts';
+import { explainLesson } from './explanations/index.ts';
 
 /** The study tracks, grouped so theory, voice, instruments and styles stay apart. */
 export const TRACKS: Track[] = [
@@ -25,7 +26,7 @@ export const TRACKS: Track[] = [
   { id: 'estilos', title: 'Estilos musicais', group: 'Estilos', about: 'Louvor, bossa nova, samba e pagode, MPB, rock, funk, R&B e gospel americano.' },
 ];
 
-export const LESSONS: Lesson[] = [...HARMONIA, ...RITMO, ...ESCALAS, ...IMPROVISO, ...CANTO, ...VIOLAO, ...TECLADO, ...BATERIA, ...ESTILOS, ...CAVAQUINHO, ...PARTITURAS, ...APROFUNDAMENTO];
+export const LESSONS: Lesson[] = [...HARMONIA, ...RITMO, ...ESCALAS, ...IMPROVISO, ...CANTO, ...VIOLAO, ...TECLADO, ...BATERIA, ...ESTILOS, ...CAVAQUINHO, ...PARTITURAS, ...APROFUNDAMENTO].map(explainLesson);
 
 const levelOrder = (l: Lesson) => LEVELS.findIndex((x) => x.id === l.level);
 // Insert foundations where they are needed without renaming old lesson IDs or resetting progress.

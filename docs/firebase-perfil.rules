@@ -1,0 +1,63 @@
+// FRAGMENTO DE REFERÊNCIA. Requer rules_version = '2'.
+// Incorporar dentro de match /databases/{database}/documents.
+// Revisar/substituir a regra de escrita de users existente: regras permissivas
+// sobrepostas NÃO são restringidas por este fragmento.
+function wmProfileOwner(uid) {
+  return request.auth != null && request.auth.uid == uid && request.auth.token.email_verified == true;
+}
+function wmProfileUrl(value) { return value is string && value.size() <= 300 && (value == '' || value.matches('^https://.+')); }
+function wmMusicianValid(p) {
+  return p is map && p.keys().hasAll(['nickname', 'bio', 'location', 'instruments', 'styles', 'experience', 'acceptsInvites', 'socials'])
+    && p.keys().hasOnly(['nickname', 'bio', 'location', 'instruments', 'styles', 'experience', 'acceptsInvites', 'socials'])
+    && p.nickname is string && p.nickname.size() <= 40 && p.bio is string && p.bio.size() <= 600
+    && p.location is map && p.location.keys().hasOnly(['city', 'region', 'country'])
+    && p.location.city is string && p.location.city.size() <= 80
+    && p.location.region is string && p.location.region.size() <= 80
+    && p.location.country is string && p.location.country.size() <= 60
+    && p.instruments is list && p.instruments.size() <= 15
+    && p.instruments.hasOnly(['Voz', 'Violão', 'Guitarra', 'Teclado', 'Piano', 'Cavaquinho', 'Baixo', 'Bateria', 'Percussão', 'Violino', 'Saxofone', 'Flauta', 'Acordeon', 'Ukulele', 'Outros'])
+    && p.styles is list && p.styles.size() <= 18
+    && p.styles.hasOnly(['Gospel', 'Adoração', 'MPB', 'Samba', 'Pagode', 'Bossa nova', 'Jazz', 'Blues', 'Rock', 'Pop', 'Soul', 'Funk', 'Sertanejo', 'Forró', 'Reggae', 'Clássica', 'Instrumental', 'Outros'])
+    && p.experience in ['', 'starting', 'learning', 'experienced', 'professional'] && p.acceptsInvites is bool
+    && p.socials is map && p.socials.keys().hasOnly(['instagram', 'youtube', 'tiktok', 'facebook', 'website'])
+    && wmProfileUrl(p.socials.instagram) && wmProfileUrl(p.socials.youtube)
+    && wmProfileUrl(p.socials.tiktok) && wmProfileUrl(p.socials.facebook) && wmProfileUrl(p.socials.website);
+}
+function wmProfilePreferenceMatches(uid, p) {
+  return getAfter(/databases/$(database)/documents/wmInvitePreferences/$(request.auth.token.email.lower())).data.acceptsInvites == p.acceptsInvites;
+}
+match /users/{uid} {
+  allow get: if wmProfileOwner(uid);
+  allow list: if false;
+  allow create: if wmProfileOwner(uid)
+    && request.resource.data.keys().hasOnly(['name', 'email', 'photoURL', 'musicianProfile', 'createdAt', 'updatedAt', 'lastAuth', 'notification', 'preferences'])
+    && request.resource.data.name is string && request.resource.data.name.size() <= 90
+    && request.resource.data.email == request.auth.token.email
+    && request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 2048
+    && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+    && request.resource.data.lastAuth == request.time && request.resource.data.notification == []
+    && request.resource.data.preferences == { 'pushEnabled': true, 'publicSetlistDefault': true, 'collabSetlistDefault': false }
+    && wmMusicianValid(request.resource.data.musicianProfile)
+    && wmProfilePreferenceMatches(uid, request.resource.data.musicianProfile);
+  allow update: if wmProfileOwner(uid)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'email', 'photoURL', 'musicianProfile', 'updatedAt', 'lastAuth'])
+    && request.resource.data.updatedAt == request.time
+    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['name']) || (request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 90))
+    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']) || request.resource.data.email == request.auth.token.email)
+    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL']) || (request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 2048))
+    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastAuth']) || request.resource.data.lastAuth == request.time)
+    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['musicianProfile'])
+      || (wmMusicianValid(request.resource.data.musicianProfile) && wmProfilePreferenceMatches(uid, request.resource.data.musicianProfile)));
+  // willMusicStats, roles, owner, premium, notifications and preferences are not writable here.
+  allow delete: if false;
+}
+match /wmInvitePreferences/{email} {
+  // Exact-address lookups only. No profile details, UID or directory listing.
+  allow get: if request.auth != null && request.auth.token.email_verified == true;
+  allow list: if false;
+  allow create, update: if request.auth != null && request.auth.token.email_verified == true
+    && email == request.auth.token.email.lower()
+    && request.resource.data.keys().hasOnly(['acceptsInvites']) && request.resource.data.acceptsInvites is bool
+    && request.resource.data.acceptsInvites == getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('musicianProfile', {}).get('acceptsInvites', false);
+  allow delete: if false;
+}

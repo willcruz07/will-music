@@ -81,6 +81,28 @@ html {
   text-rendering: optimizeLegibility;
 }
 
+/* App surfaces: prevent text selection and iOS long-press callouts while navigating. */
+body,
+body * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Editing still needs caret placement, selection, cut/copy and paste. */
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable="true"] *,
+[contenteditable=""],
+[contenteditable=""] *,
+[contenteditable="plaintext-only"],
+[contenteditable="plaintext-only"] * {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 /* No double-tap zoom delay on controls. */
 a,
 button,
@@ -372,6 +394,13 @@ h1 {
 .library-card-icon { display: inline-flex; width: 2.25rem; height: 2.25rem; align-items: center; justify-content: center; flex-shrink: 0; border-radius: .75rem; background: color-mix(in oklab, var(--primary) 12%, transparent); color: var(--chord); }
 .library-card-score .library-card-icon { background: color-mix(in oklab, var(--glow) 12%, transparent); color: var(--glow); }
 .library-card-chart .library-card-icon { background: var(--surface-2); }
+.catalog-search-sticky { position: sticky; top: calc(env(safe-area-inset-top) + 3.5rem); z-index: 15; margin-inline: -.5rem; padding: .5rem; border-bottom: 1px solid var(--border); background: var(--background); }
+.catalog-results { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+.catalog-result { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: .875rem; background: var(--surface); }
+.catalog-result-link { display: flex; min-width: 0; min-height: 5rem; height: 100%; align-items: center; gap: .75rem; padding: .75rem; }
+.catalog-result:focus-within { border-color: var(--primary); }
+@media (min-width: 768px) { .catalog-results { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (hover: hover) and (pointer: fine) { .catalog-result:hover { border-color: var(--primary); background: var(--surface-2); } }
 .library-card:focus-within { border-color: var(--primary); }
 .library-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .library-panel-enter { animation: library-panel-enter 200ms ease-out; }

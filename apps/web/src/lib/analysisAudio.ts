@@ -3,20 +3,15 @@ import { type StemsRecord } from './db.ts';
 import { decodeForAnalysis } from './decode.ts';
 import { getSessionStems, setSessionStems } from './sessionStems.ts';
 import { hasUsableWebGpu, listStemSets, separateSong, type SeparationProgress } from './stems.ts';
-import { isIOS } from './ios.ts';
-import { confirmDialog } from '../ui/Dialog.tsx';
+import { isMobileStudio } from './studioDevice.ts';
 
 export const prepareAnalysisStems = async (songId: string, progress: (p: SeparationProgress) => void, signal?: AbortSignal): Promise<{ stems?: StemsRecord; warning?: string }> => {
   signal?.throwIfAborted();
+  if (isMobileStudio()) return {};
   const existing = getSessionStems(songId) ?? (await listStemSets(songId)).find((set) => set.mode === 'six');
   if (existing) return { stems: existing };
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
   if (!(await hasUsableWebGpu(gpu))) return { warning: 'Separação indisponível neste navegador. A letra e os acordes foram analisados a partir do áudio original.' };
-  if (isIOS() && !(await confirmDialog({
-    title: 'Separar faixas neste aparelho?',
-    message: 'A separação usa bastante memória e pode recarregar o navegador no iPhone ou iPad. Prefira o computador. Você pode continuar a análise com o áudio original sem separar as faixas.',
-    confirmLabel: 'Separar neste aparelho', cancelLabel: 'Usar áudio original',
-  }))) return { warning: 'Você optou por analisar o áudio original, sem separar as faixas.' };
   signal?.throwIfAborted();
   const result = await separateSong(songId, progress, { mode: 'six', persist: false, signal });
   setSessionStems(songId, result.record);

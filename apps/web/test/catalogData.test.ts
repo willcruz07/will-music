@@ -6,6 +6,10 @@ import { parseChordPro } from '../src/lib/chart.ts';
 beforeEach(async () => { await db.songs.clear(); await db.charts.clear(); });
 
 describe('catalog adapter and independent offline saves', () => {
+  it('ignores an invalid primary photo and accepts the alternative image field', () => {
+    const item = mapCatalogChart('photo-validation', { title: 'Teste', artist: { name: 'Artista', photo: 'sem foto', image: 'https://example.com/valid.jpg' } })!;
+    expect(item.artistRef?.photo).toBe('https://example.com/valid.jpg');
+  });
   it('preserves slash chords and comments, and never invents a C key', () => {
     const item = mapCatalogChart('doc-1', { title: 'Canção', artist: { name: 'Artista' }, content: '{Intro}\n[C/E]Minha [G7(b9)]canção', style: 'mpb' })!;
     expect(item.key).toBeUndefined();

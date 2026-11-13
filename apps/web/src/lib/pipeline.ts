@@ -11,6 +11,7 @@ import { savePendingAnalysis } from './saveAnalysis.ts';
 import { isQuotaError } from './storage.ts';
 import { estimateAudioBpm } from './audioTempo.ts';
 import { prepareAnalysisStems } from './analysisAudio.ts';
+import { isMobileStudio } from './studioDevice.ts';
 
 import { resolveAnalysisExecution, isResourceFailure, type ExecutionPreference } from './analysisExecution.ts';
 export type AnalysisTaskProgress = { id: 'tracks' | 'chords' | 'lyrics'; label: string; detail?: string; fraction?: number; status: 'waiting' | 'running' | 'done' | 'error' | 'skipped' };
@@ -35,13 +36,15 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
   let transcriptionRetried = false;
   try {
     const execution = await resolveAnalysisExecution(options.execution);
+    const mobile = isMobileStudio();
     const warnings: string[] = [];
     const previous = await db.analyses.where('songId').equals(songId).first();
     let lyrics = lyricsToKeep(previous?.lyrics);
     let tempo = song.tempo;
-    const tracksTask: AnalysisTaskProgress = { id: 'tracks', label: 'Separando faixas da música…', status: 'running' };
-    const chordsTask: AnalysisTaskProgress = { id: 'chords', label: 'Aguardando a separação das faixas', status: 'waiting' };
+    const tracksTask: AnalysisTaskProgress = { id: 'tracks', label: mobile ? 'Usando o áudio original' : 'Separando faixas da música…', status: mobile ? 'skipped' : 'running' };
+    const chordsTask: AnalysisTaskProgress = { id: 'chords', label: mobile ? 'Preparando o áudio dos acordes' : 'Aguardando a separação das faixas', status: mobile ? 'running' : 'waiting' };
     const lyricsTask: AnalysisTaskProgress = { id: 'lyrics', label: lyrics?.lines.length ? 'Letra preservada' : 'Aguardando a transcrição', status: lyrics?.lines.length ? 'skipped' : 'waiting' };
+    if (mobile) { lyricsTask.status = 'skipped'; lyricsTask.label = lyrics?.lines.length ? 'Letra preservada' : 'Transcrição disponível no computador'; }
     const snapshot = () => [{ ...tracksTask }, { ...chordsTask }, { ...lyricsTask }];
     const publish = () => {
       if (stopped || controller.signal.aborted || assembling) return;
@@ -50,7 +53,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       onProgress({ label: both ? 'Analisando acordes e transcrevendo a letra…' : active.label, detail: active.detail, fraction: active.fraction, lyricsPending: chartPublished && lyricsTask.status === 'running', tasks: snapshot(), tempo });
     };
     publish();
-    try {
+    if (!mobile) try {
       const prepared = await prepareAnalysisStems(songId, p => {
         tracksTask.detail = `Bloco ${Math.min(p.total, p.done + 1)} de ${p.total}`;
         tracksTask.fraction = p.total ? p.done / p.total : undefined;
@@ -96,7 +99,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       chordsTask.fraction = e.total ? e.done / e.total : undefined;
       publish();
     }, controller.signal);
-    if (execution === 'parallel' && !lyrics?.lines.length) launchLyrics();
+    if (!mobile && execution === 'parallel' && !lyrics?.lines.length) launchLyrics();
     const result = await chordPromise;
     chordsMs = performance.now() - chordsStarted;
     chordsTask.status = 'done'; chordsTask.label = 'Tom e acordes prontos'; chordsTask.fraction = 1;
@@ -139,7 +142,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
 
       assembling = false;
     };
-    if (!lyrics?.lines.length && (lyricsTask.status === 'running' || execution === 'sequential')) {
+    if (!mobile && !lyrics?.lines.length && (lyricsTask.status === 'running' || execution === 'sequential')) {
       await saveResult();
       chartPublished = true;
       if (execution === 'sequential') launchLyrics();
