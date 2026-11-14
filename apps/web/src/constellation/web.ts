@@ -1,4 +1,5 @@
 import { type Center, type Chord, type Motion, type Move, chordKey, neighbors, startCenter } from './harmony.ts';
+import { guideMove, guidesFor } from './guides.ts';
 
 /**
  * The state of a constellation: the stars opened so far, the links between them, the trail walked, the
@@ -15,7 +16,7 @@ export type Visit = { key: string; chord: Chord; center: Center; resolvesTo?: Ch
  * `steps[i]`: the move that reached `trail[i]` (null for the starting chord and for a jump back to an opened star).
  * Kept per step, not per star: a star visited twice keeps the color of each visit, and the start never changes.
  */
-export type Web = { nodes: Record<string, StarNode>; links: Link[]; trail: string[]; steps: (Move | null)[]; visits: Visit[]; origin: Visit; focus: string; center: Center; opened: boolean };
+export type Web = { nodes: Record<string, StarNode>; links: Link[]; trail: string[]; steps: (Move | null)[]; visits: Visit[]; origin: Visit; focus: string; center: Center; opened: boolean; guide?: { id: string; cursor: number } };
 export type PreviewStar = { key: string; chord: Chord; center: Center; x: number; y: number; from: string; move: Move };
 
 const ORBIT_RADIUS = 220;
@@ -24,11 +25,20 @@ const MIN_GAP = 90;
 const STEP = Math.PI / 6;
 const SECTOR = (Math.PI * 2) / 3;
 
-export const startWeb = (chord: Chord): Web => {
+export const startWeb = (chord: Chord, center: Center = startCenter(chord)): Web => {
   const key = chordKey(chord);
-  const center = startCenter(chord);
   const origin = { key, chord: { ...chord }, center: { ...center } };
   return { nodes: { [key]: { key, chord: { ...chord }, center, x: 0, y: 0 } }, links: [], trail: [key], steps: [null], visits: [origin], origin, focus: key, center, opened: false };
+};
+
+export const activeGuide = (web: Web) => web.guide ? guidesFor(web.center).find(g => g.id === web.guide!.id) : undefined;
+export const guidedNext = (web: Web): Move | null => {
+  const guide = activeGuide(web);
+  return guide ? guideMove(guide, web.guide!.cursor, web.center) : null;
+};
+export const startGuidedWeb = (id: string, center: Center): Web | null => {
+  const guide = guidesFor(center).find(g => g.id === id);
+  return guide ? openFocus({ ...startWeb(guide.steps[0]!.chord, center), guide: { id, cursor: 0 } }) : null;
 };
 
 const far = (nodes: Iterable<{ x: number; y: number }>, x: number, y: number) => [...nodes].every((n) => Math.hypot(n.x - x, n.y - y) > MIN_GAP);
@@ -54,7 +64,15 @@ export const openFocus = (web: Web): Web => {
   const prev = web.trail.length > 1 ? nodes[web.trail[web.trail.length - 2]!] : undefined;
   const heading = prev && (prev.x !== focus.x || prev.y !== focus.y) ? Math.atan2(focus.y - prev.y, focus.x - prev.x) : -Math.PI / 2;
   const next: Record<Motion, number> = { resolve: heading, tensiona: heading + SECTOR, relaxa: heading - SECTOR };
-  for (const move of neighbors(focus.chord, web.center, focus.resolvesTo)) {
+  const recommended = guidedNext(web);
+  const regular = neighbors(focus.chord, web.center, focus.resolvesTo);
+  if (recommended) {
+    const candidate = regular.find(m => chordKey(m.to) === chordKey(recommended.to));
+    recommended.options = [{ ...recommended, options: [] }, ...(candidate?.options.filter(m => m.to.quality !== recommended.to.quality) ?? [])];
+  }
+  const moves = recommended && chordKey(recommended.to) !== focus.key
+    ? [recommended, ...regular.filter(m => chordKey(m.to) !== chordKey(recommended.to))].slice(0, 16) : regular;
+  for (const move of moves) {
     const key = chordKey(move.to);
     if (!nodes[key]) {
       const spot = freeSpot(Object.values(nodes), focus, next[move.motion]);
@@ -93,13 +111,16 @@ export const previewStars = (web: Web): PreviewStar[] => {
 };
 
 export const walk = (web: Web, move: Move): Web => {
+  const expected = guidedNext(web)?.to;
+  const guide = expected && chordKey(expected) === chordKey(move.to) && expected.quality === move.to.quality
+    ? { id: web.guide!.id, cursor: web.guide!.cursor + 1 } : undefined;
   const key = chordKey(move.to);
   const at = web.nodes[key] ?? { key, ...freeSpot(Object.values(web.nodes), web.nodes[web.focus]!, 0) };
   // The type the student chose (G7(b9) instead of G7) is what the star now holds.
   const { resolvesTo: _old, ...rest } = at as StarNode;
   const nodes = { ...web.nodes, [key]: { ...rest, key, chord: move.to, center: move.nextCenter, ...(move.resolvesTo ? { resolvesTo: move.resolvesTo } : {}) } };
   const visit: Visit = { key, chord: { ...move.to }, center: { ...move.nextCenter }, ...(move.resolvesTo ? { resolvesTo: { ...move.resolvesTo } } : {}) };
-  return openFocus({ ...web, nodes, trail: [...web.trail, key], steps: [...web.steps, move], visits: [...web.visits, visit], focus: key, center: move.nextCenter });
+  return openFocus({ ...web, guide, nodes, trail: [...web.trail, key], steps: [...web.steps, move], visits: [...web.visits, visit], focus: key, center: move.nextCenter });
 };
 
 /** Brings an opened star back to focus; the path continues from there (the trail is cut back if it was on it). */
@@ -113,7 +134,7 @@ export const focusOn = (web: Web, key: string, visitIndex?: number): Web => {
   const visits = at >= 0 ? web.visits.slice(0, at + 1) : [...web.visits, visit];
   const { resolvesTo: _old, ...rest } = node;
   const nodes = { ...web.nodes, [key]: { ...rest, ...visit } };
-  return openFocus({ ...web, nodes, trail, steps, visits, focus: key, center: visit.center });
+  return openFocus({ ...web, guide: web.guide && at >= 0 ? { id: web.guide.id, cursor: at } : undefined, nodes, trail, steps, visits, focus: key, center: visit.center });
 };
 
 /** The move that last reached a star on the trail (its first visit wins for the starting chord: it stays the start). */
@@ -123,10 +144,10 @@ export const arrivalOf = (web: Web, key: string): Move | null | undefined => {
   return first === 0 ? null : web.steps[web.trail.lastIndexOf(key)] ?? null;
 };
 
-export const resetWeb = (web: Web): Web => openFocus(startWeb(web.origin.chord));
+export const resetWeb = (web: Web): Web => (web.guide ? startGuidedWeb(web.guide.id, web.origin.center) : null) ?? openFocus(startWeb(web.origin.chord, web.origin.center));
 
 /** An explicit exploration choice, never inferred from a single local resolution. */
 export const adoptCenter = (web: Web, center: Center): Web => {
   const visit = { ...web.visits.at(-1)!, center: { ...center } };
-  return openFocus({ ...web, center: visit.center, visits: [...web.visits.slice(0, -1), visit] });
+  return openFocus({ ...web, guide: undefined, center: visit.center, visits: [...web.visits.slice(0, -1), visit] });
 };

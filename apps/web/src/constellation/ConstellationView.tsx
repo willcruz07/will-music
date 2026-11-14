@@ -1,8 +1,8 @@
 import { LocateFixed, ZoomIn, ZoomOut } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { type Camera, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, clamp, sliderToZoom, zoomAround, zoomToSlider } from './camera.ts';
-import { type Motion, type Move, chordName, isAltered } from './harmony.ts';
-import { type Web, orbit, previewStars } from './web.ts';
+import { type Motion, type Move, chordKey, chordName, isAltered } from './harmony.ts';
+import { type Web, guidedNext, orbit, previewStars } from './web.ts';
 
 export const MOTION_COLOR: Record<Motion, string> = { resolve: 'var(--primary)', tensiona: '#f59e0b', relaxa: 'var(--glow)' };
 export const ALTERED_COLOR = '#f472b6';
@@ -59,6 +59,9 @@ export const ConstellationView = ({
   onOpen: () => void;
 }) => {
   const box = useRef<HTMLDivElement>(null);
+  const arrowId = `constellation-arrow-${useId().replace(/:/g, '')}`;
+  const recommended = guidedNext(web);
+  const recommendedKey = recommended ? chordKey(recommended.to) : null;
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, zoom: 1 });
   const [dragging, setDragging] = useState(false);
@@ -223,6 +226,7 @@ export const ConstellationView = ({
         role="group"
         aria-label={`Constelação a partir de ${name(web.focus)}`}
       >
+        <defs><marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--muted-foreground)" /></marker></defs>
         <g
           className={dragging || wheeling ? '' : 'transition-transform duration-[450ms] ease-out motion-reduce:transition-none'}
           style={{ transform: `translate(${size.w / 2}px, ${size.h / 2}px) scale(${camera.zoom}) translate(${-camera.x}px, ${-camera.y}px)` }}
@@ -232,7 +236,11 @@ export const ConstellationView = ({
             const a = web.nodes[l.from]!;
             const b = web.nodes[l.to]!;
             const live = l.from === web.focus;
-            return <line key={`${l.from}-${l.to}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={live ? colorOf(l.move) : 'var(--border)'} strokeOpacity={live ? 0.55 : 0.5} strokeWidth={live ? 2 : 1} />;
+            const length = Math.hypot(b.x - a.x, b.y - a.y);
+            if (length < 1) return null;
+            const dx = (b.x - a.x) / length; const dy = (b.y - a.y) / length;
+            const inset = l.to === web.focus ? 50 : live ? 42 : 30;
+            return <line key={`${l.from}-${l.to}`} x1={a.x + dx * (live ? 50 : 30)} y1={a.y + dy * (live ? 50 : 30)} x2={b.x - dx * inset} y2={b.y - dy * inset} markerEnd={live ? `url(#${arrowId})` : undefined} strokeDasharray={l.move.relation === 'notas-comuns' ? '5 4' : undefined} stroke={live ? colorOf(l.move) : 'var(--border)'} strokeOpacity={live ? 0.7 : 0.5} strokeWidth={live && l.to === recommendedKey ? 3.5 : live ? 2 : 1} />;
           })}
 
           <g data-testid="preview-ring" opacity={0.35}>
@@ -287,13 +295,14 @@ export const ConstellationView = ({
                 tabIndex={i === 0 ? 0 : -1}
                 data-orbit=""
                 data-key={l.to}
-                aria-label={`${label}, ${motionLabel(l.move)}`}
+                  aria-label={`${label}, ${motionLabel(l.move)}${l.to === recommendedKey ? ', próximo passo guiado' : ''}`}
                 aria-pressed={sel}
                 className="cursor-pointer outline-none [&:focus-visible>circle]:stroke-[var(--foreground)]"
                 onClick={tap(() => (sel ? onWalk(l.to) : onSelect(l.to)))}
                 onPointerEnter={(e) => e.pointerType === 'mouse' && onSelect(l.to)}
                 onKeyDown={(e) => onOrbitKey(e, l.to)}
               >
+                {l.to === recommendedKey && <circle data-testid="guided-star" cx={n.x} cy={n.y} r={46} fill="none" stroke="var(--primary)" strokeWidth={2} strokeDasharray="4 4" pointerEvents="none" />}
                 <circle data-key={walked ? l.to : undefined} data-color={walked} cx={n.x} cy={n.y} r={sel ? 38 : 32} fill={walked ?? 'var(--surface)'} stroke={colorOf(l.move)} strokeWidth={sel ? 4 : walked ? 3.5 : 2.5} />
                 <text x={n.x} y={n.y + 5} textAnchor="middle" fontSize={Math.max(9, Math.min(15, 95 / label.length))} fontWeight={700} fill={walked ? 'var(--on-motion)' : textColorOf(l.move)} data-label={l.to}>
                   {label}

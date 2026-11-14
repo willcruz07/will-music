@@ -34,6 +34,20 @@ const goTo = async (name: string) => {
 beforeEach(() => play.mockClear());
 
 describe('Constelação de acordes page', () => {
+  it('opens chord formations from the path and follows a guided cadence without leaving the page', async () => {
+    await startAtC();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver formação de C' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar caminho' }));
+    expect(screen.getByTestId('guided-star')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo acorde: G7' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo acorde: C7M' }));
+    expect(screen.getByTestId('progression')).toHaveTextContent('Dm7 → G7 → C7M');
+    expect(screen.getByRole('status')).toHaveTextContent('Caminho concluído');
+    await userEvent.click(screen.getByRole('button', { name: 'Ouvir com linha-guia' }));
+    expect(play).toHaveBeenCalledWith('linha-guia', expect.any(Array));
+  });
   it('offers inversions of the current chord directly and preserves the chosen bass in the path', async () => {
     await startAtC();
     const positions = screen.getByRole('region', { name: 'Acorde atual: C · inversões' });

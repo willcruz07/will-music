@@ -37,9 +37,11 @@ describe('harmony v2: relax, tension, resolution', () => {
     }
   });
 
-  it('dark colors of the dominant ask for the minor resolution first', () => {
+  it('alterations do not force a minor destination: the tonal context orders the choices', () => {
     const dark = neighbors({ root: 7, quality: '7(b9)' }, C).filter((x) => x.motion === 'resolve');
-    expect(chordName(dark[0]!.to, dark[0]!.nextCenter)).toBe('Cm7');
+    expect(chordName(dark[0]!.to, dark[0]!.nextCenter)).toBe('C7M');
+    const minor = neighbors({ root: 7, quality: '7(b9)' }, { root: 0, minor: true }).filter(x => x.motion === 'resolve');
+    expect(chordName(minor[0]!.to, minor[0]!.nextCenter)).toBe('Cm7');
     const clear = neighbors({ root: 7, quality: '7(13)' }, C).filter((x) => x.motion === 'resolve');
     expect(chordName(clear[0]!.to, clear[0]!.nextCenter)).toBe('C7M');
   });
@@ -131,6 +133,7 @@ describe('harmony v2: relax, tension, resolution', () => {
 
   it('knows the level of a chord in its center', () => {
     expect(levelOf({ root: 0, quality: '7M' }, C)).toBe('repouso');
+    expect(levelOf({ root: 6, quality: '7M' }, C)).toBe('afastamento');
     expect(levelOf({ root: 9, quality: 'm7' }, C)).toBe('repouso');
     expect(levelOf({ root: 2, quality: 'm7' }, C)).toBe('afastamento');
     expect(levelOf({ root: 5, quality: '7M' }, C)).toBe('afastamento');
@@ -255,11 +258,11 @@ describe('a plain dominant offers both resolutions', () => {
   });
 });
 
-describe('every tension: resolve, chromatic approach above and below, or turn into its own minor', () => {
-  it('G7 offers Ab7 and F#7 (chromatic approach) and Gm7 (relaxes into the ii of F)', () => {
+describe('motivated dominant continuations', () => {
+  it('G7 offers the descending subV chain and its own minor, without an arbitrary upward dominant', () => {
     const m = at(neighbors({ root: 7, quality: '7' }, C));
-    expect(m['Ab7']!.motion).toBe('tensiona');
-    expect(m['Ab7']!.why).toMatch(/sobe meio tom/);
+    expect(m['Ab7']).toBeUndefined();
+    expect(m['F#7']!.resolvesTo).toEqual({ root: 5, quality: '7M' });
     expect(m['F#7']!.why).toMatch(/desce meio tom/);
     expect(m['Gm7']!.motion).toBe('relaxa');
     expect(m['Gm7']!.why).toMatch(/ii de um novo ii–V, que leva a F/);
