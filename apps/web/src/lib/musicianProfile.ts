@@ -7,19 +7,19 @@ export type MusicianProfile = {
   location: { city: string; region: string; country: string };
   instruments: string[]; styles: string[];
   experience: '' | keyof typeof MUSICAL_LEVELS;
-  acceptsInvites: boolean;
+  acceptsInvites: boolean; discoverable: boolean;
   socials: { instagram: string; youtube: string; tiktok: string; facebook: string; website: string };
 };
 export type MusicianDetails = { name: string; musicianProfile: MusicianProfile };
 export type MusicianAccount = MusicianDetails & { contributions: number | null };
-export const emptyMusicianProfile = (): MusicianProfile => ({ nickname: '', bio: '', location: { city: '', region: '', country: '' }, instruments: [], styles: [], experience: '', acceptsInvites: false, socials: { instagram: '', youtube: '', tiktok: '', facebook: '', website: '' } });
+export const emptyMusicianProfile = (): MusicianProfile => ({ nickname: '', bio: '', location: { city: '', region: '', country: '' }, instruments: [], styles: [], experience: '', acceptsInvites: false, discoverable: false, socials: { instagram: '', youtube: '', tiktok: '', facebook: '', website: '' } });
 const text = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const choices = (value: unknown, allowed: string[]) => Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === 'string' && allowed.includes(item)))].slice(0, allowed.length) : [];
 /** Defensive reader for legacy/partial documents; the writer validates rather than truncating. */
 export const readMusicianProfile = (value: unknown): MusicianProfile => {
   const input = value && typeof value === 'object' ? value as Partial<MusicianProfile> : {};
   const blank = emptyMusicianProfile();
-  return { nickname: text(input.nickname, 40), bio: text(input.bio, 600), location: { city: text(input.location?.city, 80), region: text(input.location?.region, 80), country: text(input.location?.country, 60) }, instruments: choices(input.instruments, MUSICAL_INSTRUMENTS), styles: choices(input.styles, MUSICAL_STYLES), experience: input.experience && Object.hasOwn(MUSICAL_LEVELS, input.experience) ? input.experience : '', acceptsInvites: input.acceptsInvites === true, socials: Object.fromEntries(Object.keys(blank.socials).map(key => [key, text(input.socials?.[key as keyof MusicianProfile['socials']], 300)])) as MusicianProfile['socials'] };
+  return { nickname: text(input.nickname, 40), bio: text(input.bio, 600), location: { city: text(input.location?.city, 80), region: text(input.location?.region, 80), country: text(input.location?.country, 60) }, instruments: choices(input.instruments, MUSICAL_INSTRUMENTS), styles: choices(input.styles, MUSICAL_STYLES), experience: input.experience && Object.hasOwn(MUSICAL_LEVELS, input.experience) ? input.experience : '', acceptsInvites: input.acceptsInvites === true, discoverable: input.discoverable === true, socials: Object.fromEntries(Object.keys(blank.socials).map(key => [key, text(input.socials?.[key as keyof MusicianProfile['socials']], 300)])) as MusicianProfile['socials'] };
 };
 const socialHosts = { instagram: ['instagram.com'], youtube: ['youtube.com', 'youtu.be'], tiktok: ['tiktok.com'], facebook: ['facebook.com', 'fb.com'] };
 export const socialLink = (kind: keyof MusicianProfile['socials'], value: string): string => {

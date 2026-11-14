@@ -1,5 +1,7 @@
 # Perfil musical na conta
 
+Extensão: publicação opcional em **Encontrar músicos** usando `musicianProfile.discoverable`, desativada por padrão. A projeção pública, convites por UID, índices e integração das regras atualizadas estão descritos em [firebase-musicos.md](firebase-musicos.md).
+
 `/conta` agora permite editar nome, apelido/nome artístico, apresentação, cidade/região/país, instrumentos e voz, estilos, experiência, redes sociais e disponibilidade para novos convites de setlists. Foto e e-mail continuam vinculados à identidade já existente; editar o nome do aplicativo não altera as credenciais Google.
 
 ## Persistência

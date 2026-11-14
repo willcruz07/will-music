@@ -1,13 +1,13 @@
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const cloud = vi.hoisted(() => ({ data: new Map<string, Record<string, unknown>>(), user: { uid: 'owner', email: 'owner@example.com', name: 'Dono', photo: 'https://example.com/photo.jpg' } }));
+const cloud = vi.hoisted(() => ({ or: vi.fn((...constraints: unknown[]) => constraints), data: new Map<string, Record<string, unknown>>(), user: { uid: 'owner', email: 'owner@example.com', name: 'Dono', photo: 'https://example.com/photo.jpg' } }));
 vi.mock('../src/lib/account.ts', () => ({ getAccountState: () => ({ user: cloud.user }) }));
 vi.mock('../src/lib/cloud/firebase.ts', () => ({ cloudApp: {}, cloudAuth: { get currentUser() { return cloud.user; } } }));
 vi.mock('firebase/firestore', () => {
   const snapshot = (path: string) => ({ id: path.split('/').at(-1), exists: () => cloud.data.has(path), data: () => structuredClone(cloud.data.get(path)) });
   return {
     getFirestore: () => ({}), doc: (_db: unknown, ...parts: string[]) => parts.join('/'), collection: (_db: unknown, ...parts: string[]) => parts.join('/'),
-    query: (path: string) => path, orderBy: () => ({}), where: () => ({}), onSnapshot: () => () => {}, writeBatch: () => ({}),
+    or: cloud.or, query: (path: string) => path, orderBy: () => ({}), where: (field: string, operator: string, value: unknown) => ({ field, operator, value }), onSnapshot: () => () => {}, writeBatch: () => ({}),
     getDocFromServer: async (path: string) => snapshot(path),
     getDocsFromServer: async (path: string) => { const keys = [...cloud.data.keys()].filter(key => key.startsWith(path + '/') && !key.slice(path.length + 1).includes('/')).sort(); return { docs: keys.map(snapshot), size: keys.length }; },
     runTransaction: async (_db: unknown, work: (tx: unknown) => unknown) => {
@@ -19,7 +19,7 @@ vi.mock('firebase/firestore', () => {
   };
 });
 import { db, type Setlist } from '../src/lib/db.ts';
-import { publishSetlist, restoreAcceptedSetlist, sendSetlistInvite, shareIdFor } from '../src/lib/cloud/sharing.ts';
+import { acceptSetlistInvite, isInviteRecipient, publishSetlist, restoreAcceptedSetlist, sendMusicianSetlistInvite, sendSetlistInvite, shareIdFor, watchInvites } from '../src/lib/cloud/sharing.ts';
 import type { SetlistInvite } from '../src/lib/sharingTypes.ts';
 
 const list: Setlist = { id: 'list', name: 'Ensaio', items: [{ id: 'item', songId: 'song' }], createdAt: '', updatedAt: '' };
@@ -33,6 +33,29 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('setlist publications and invitations', () => {
+  it('observes invitations for the authenticated UID or its normalized email', () => {
+    const stop = watchInvites(' OWNER@EXAMPLE.COM ', () => {}, () => {});
+    expect(cloud.or).toHaveBeenLastCalledWith({ field: 'recipientEmail', operator: '==', value: 'owner@example.com' }, { field: 'recipientUid', operator: '==', value: 'owner' });
+    stop();
+  });
+  it('invites and accepts by UID without reading or disclosing the recipient email', async () => {
+    cloud.data.set('wmMusicians/guest', { name: 'Convidado', acceptsInvites: true });
+    await sendMusicianSetlistInvite(list, 'guest');
+    const path = `wmInvites/${shareIdFor('owner', list.id)}__uid_guest`;
+    const invitation = { ...cloud.data.get(path), id: path.split('/').at(-1) } as SetlistInvite;
+    expect(invitation).toMatchObject({ recipientUid: 'guest', recipientEmail: '', recipientName: 'Convidado', status: 'pending' });
+    expect(isInviteRecipient(invitation, 'intruder', 'guest@example.com')).toBe(false);
+    cloud.user = { uid: 'guest', email: 'private-email@example.com', name: 'Convidado', photo: '' };
+    await acceptSetlistInvite(invitation);
+    expect(cloud.data.get(path)?.status).toBe('accepted');
+    expect((await db.sharedSetlists.get(invitation.shareId))?.items[0]?.chart.chordPro).toBe('[C]Letra');
+    expect(cloud.data.get(path)?.recipientEmail).toBe('');
+  });
+  it('blocks UID invitations when the public profile is unavailable or opted out', async () => {
+    await expect(sendMusicianSetlistInvite(list, 'guest')).rejects.toThrow('retirou');
+    cloud.data.set('wmMusicians/guest', { name: 'Convidado', acceptsInvites: false });
+    await expect(sendMusicianSetlistInvite(list, 'guest')).rejects.toThrow('não está recebendo');
+  });
   it('reuses unchanged publications and preserves earlier versions on edits', async () => {
     const first = await publishSetlist(list);
     expect(first.version).toBe(1);

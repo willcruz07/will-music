@@ -12,6 +12,11 @@ beforeEach(async () => {
 });
 
 describe('musician profile offline outbox', () => {
+  it('keeps old cached profiles private until the user explicitly opts in', async () => {
+    const legacy = details('Perfil antigo'); delete (legacy.musicianProfile as Partial<typeof legacy.musicianProfile>).discoverable;
+    await db.settings.put({ key: 'wm-musician-profile', value: { uid: 'one', revision: 'old', pending: true, account: { ...legacy, contributions: null } } });
+    expect((await getCachedMusician('one'))?.account.musicianProfile.discoverable).toBe(false);
+  });
   it('explains nested storage refusals without claiming the draft was saved', () => {
     expect(musicianProfileError({ name: 'AbortError', code: 22, inner: { name: 'QuotaExceededError' } })).toContain('não permitiu guardar');
   });

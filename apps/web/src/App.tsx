@@ -39,6 +39,9 @@ const MicPage = named(() => import('./pages/MicPage.tsx'), 'MicPage');
 const ConstellationPage = named(() => import('./pages/ConstellationPage.tsx'), 'ConstellationPage');
 const Stage = named(() => import('./pages/Stage.tsx'), 'Stage');
 const Login = named(() => import('./pages/Login.tsx'), 'Login');
+const Musicians = named(() => import('./pages/Musicians.tsx'), 'Musicians');
+const Musician = named(() => import('./pages/Musician.tsx'), 'Musician');
+const MusicianRoute = () => { const { id } = useParams(); return <Musician key={id} />; };
 const CatalogChart = named(() => import('./pages/CatalogChart.tsx'), 'CatalogChart');
 const CatalogChartRoute = () => { const { id } = useParams(); return <CatalogChart key={id} />; };
 const CatalogArtist = named(() => import('./pages/CatalogArtist.tsx'), 'CatalogArtist');
@@ -136,6 +139,8 @@ const Layout = () => {
           <Route path="/listas" element={<Navigate to="/palco" replace />} />
           <Route path="/listas/:id" element={<LegacySetlistRoute />} />
           <Route path="/ajustes" element={<Settings />} />
+          <Route path="/musicos" element={<Musicians />} />
+          <Route path="/musicos/:id" element={<MusicianRoute />} />
           <Route path="/conta" element={<Login account />} />
           <Route path="/catalogo" element={<Navigate to="/?aba=catalogo" replace />} />
           <Route path="/catalogo/:id" element={<CatalogChartRoute />} />

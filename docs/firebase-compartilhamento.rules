@@ -7,14 +7,27 @@ function wmRecipientOpen(email) {
   return !exists(/databases/$(database)/documents/wmInvitePreferences/$(email))
     || get(/databases/$(database)/documents/wmInvitePreferences/$(email)).data.acceptsInvites == true;
 }
+function wmInviteRecipient(d) {
+  return d.get('recipientUid', '') == request.auth.uid || (d.recipientEmail != '' && d.recipientEmail == wmEmail());
+}
+function wmInviteTargetOpen(d) {
+  return d.recipientEmail != '' ? wmRecipientOpen(d.recipientEmail)
+    : (exists(/databases/$(database)/documents/wmMusicians/$(d.recipientUid))
+      && get(/databases/$(database)/documents/users/$(d.recipientUid)).data.musicianProfile.discoverable == true
+      && get(/databases/$(database)/documents/users/$(d.recipientUid)).data.musicianProfile.acceptsInvites == true);
+}
 function wmShareOwner(shareId) {
   return wmSigned() && get(/databases/$(database)/documents/wmShares/$(shareId)).data.ownerUid == request.auth.uid;
 }
+function wmShareInviteAllows(invitation, version) {
+  return exists(/databases/$(database)/documents/wmInvites/$(invitation))
+    && wmInviteRecipient(get(/databases/$(database)/documents/wmInvites/$(invitation)).data)
+    && get(/databases/$(database)/documents/wmInvites/$(invitation)).data.status in ['pending', 'accepted']
+    && version <= get(/databases/$(database)/documents/wmInvites/$(invitation)).data.offeredVersion;
+}
 function wmShareReader(shareId, version) {
-  let invitation = shareId + '__' + wmEmail();
-  let invite = get(/databases/$(database)/documents/wmInvites/$(invitation)).data;
-  return wmVerified() && invite.recipientEmail == wmEmail()
-    && invite.status in ['pending', 'accepted'] && version <= invite.offeredVersion;
+  return wmVerified() && (wmShareInviteAllows(shareId + '__uid_' + request.auth.uid, version)
+    || wmShareInviteAllows(shareId + '__' + wmEmail(), version));
 }
 match /users/{uid}/{kind}/{entityId} {
   allow read: if wmSigned() && uid == request.auth.uid && kind in ['wmCharts', 'wmSetlists'];
@@ -74,10 +87,12 @@ match /wmShares/{shareId} {
 }
 function wmInviteShape(d, id) {
   return d.keys().hasAll(['shareId', 'senderUid', 'senderName', 'senderPhoto', 'recipientEmail', 'name', 'itemCount', 'offeredVersion', 'acceptedVersion', 'declinedVersion', 'status', 'updatedAt'])
-    && d.keys().hasOnly(['shareId', 'senderUid', 'senderName', 'senderPhoto', 'recipientEmail', 'recipientUid', 'name', 'itemCount', 'offeredVersion', 'acceptedVersion', 'declinedVersion', 'status', 'updatedAt'])
+    && d.keys().hasOnly(['shareId', 'senderUid', 'senderName', 'senderPhoto', 'recipientEmail', 'recipientUid', 'recipientName', 'name', 'itemCount', 'offeredVersion', 'acceptedVersion', 'declinedVersion', 'status', 'updatedAt'])
     && d.shareId is string && d.senderUid is string && d.recipientEmail is string
     && d.recipientEmail == d.recipientEmail.lower() && d.recipientEmail.size() <= 200
-    && id == d.shareId + '__' + d.recipientEmail
+    && (d.recipientEmail != '' ? id == d.shareId + '__' + d.recipientEmail
+      : (d.get('recipientUid', '') is string && d.get('recipientUid', '').size() > 0
+        && id == d.shareId + '__uid_' + d.recipientUid && d.recipientName is string && d.recipientName.size() <= 90))
     && d.senderName is string && d.senderPhoto is string && d.name is string && d.updatedAt is string
     && d.itemCount is int && d.itemCount > 0 && d.itemCount <= 100
     && d.offeredVersion is int && d.offeredVersion > 0
@@ -86,25 +101,26 @@ function wmInviteShape(d, id) {
     && d.status in ['pending', 'accepted', 'declined'];
 }
 match /wmInvites/{inviteId} {
-  allow get: if wmVerified() && (resource == null || resource.data.senderUid == request.auth.uid || resource.data.recipientEmail == wmEmail());
-  allow list: if wmVerified() && (resource.data.senderUid == request.auth.uid || resource.data.recipientEmail == wmEmail());
+  allow get: if wmVerified() && (resource == null || resource.data.senderUid == request.auth.uid || wmInviteRecipient(resource.data));
+  allow list: if wmVerified() && (resource.data.senderUid == request.auth.uid || wmInviteRecipient(resource.data));
   allow create: if wmVerified() && wmInviteShape(request.resource.data, inviteId)
-    && wmRecipientOpen(request.resource.data.recipientEmail)
+    && wmInviteTargetOpen(request.resource.data)
     && request.resource.data.senderUid == request.auth.uid
     && wmShareOwner(request.resource.data.shareId)
     && request.resource.data.offeredVersion == get(/databases/$(database)/documents/wmShares/$(request.resource.data.shareId)).data.version
     && request.resource.data.status == 'pending' && request.resource.data.acceptedVersion == 0
-    && request.resource.data.declinedVersion == 0 && !('recipientUid' in request.resource.data);
+    && request.resource.data.declinedVersion == 0
+    && (request.resource.data.recipientEmail == '' ? request.resource.data.recipientUid != request.auth.uid : !('recipientUid' in request.resource.data));
   allow update: if wmVerified() && wmInviteShape(request.resource.data, inviteId) && (
     (resource.data.senderUid == request.auth.uid
       && wmShareOwner(resource.data.shareId)
-      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'itemCount', 'offeredVersion', 'senderName', 'senderPhoto', 'updatedAt', 'status', 'declinedVersion'])
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'itemCount', 'offeredVersion', 'senderName', 'senderPhoto', 'recipientName', 'updatedAt', 'status', 'declinedVersion'])
       && request.resource.data.offeredVersion >= resource.data.offeredVersion
       && request.resource.data.offeredVersion == get(/databases/$(database)/documents/wmShares/$(resource.data.shareId)).data.version
       && (request.resource.data.status == resource.data.status || (resource.data.status == 'declined' && request.resource.data.status == 'pending'))
-      && (resource.data.status != 'declined' || request.resource.data.status != 'pending' || wmRecipientOpen(resource.data.recipientEmail))
+      && (resource.data.status != 'declined' || request.resource.data.status != 'pending' || wmInviteTargetOpen(resource.data))
       && (request.resource.data.declinedVersion == resource.data.declinedVersion || request.resource.data.declinedVersion == 0))
-    || (resource.data.recipientEmail == wmEmail()
+    || (wmInviteRecipient(resource.data)
       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['recipientUid', 'acceptedVersion', 'declinedVersion', 'status', 'updatedAt'])
       && request.resource.data.recipientUid == request.auth.uid
       && request.resource.data.acceptedVersion >= resource.data.acceptedVersion

@@ -6,6 +6,8 @@ import { BottomSheet } from '../ui/BottomSheet.tsx';
 import { confirmDialog } from '../ui/Dialog.tsx';
 import { AddToSetlist } from './AddToSetlist.tsx';
 import { PrintChartButton } from './PrintChartButton.tsx';
+import { useCatalogPublication } from '../lib/useCatalogPublication.ts';
+import { CatalogPublication } from './CatalogPublication.tsx';
 
 export const ChartOptions = ({ chart, song, shownKey, content, onPatch, onEdit, disabled = false }: {
   chart: Chart; song: Song; shownKey?: string; content: RefObject<HTMLElement | null>;
@@ -17,6 +19,7 @@ export const ChartOptions = ({ chart, song, shownKey, content, onPatch, onEdit, 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const publication = useCatalogPublication(song.catalogSource, open);
   const patch = async (value: Partial<Chart>) => {
     if (busy) return;
     setBusy(true); setError(null);
@@ -36,12 +39,13 @@ export const ChartOptions = ({ chart, song, shownKey, content, onPatch, onEdit, 
     </div>
     <div className="flex flex-wrap items-start gap-2 border-t border-border pt-3"><Button disabled={disabled || busy} onClick={() => { setDraft(chart.chordPro); setInitial(chart.chordPro); setEditError(null); setOpen(true); }}><Pencil className="size-4" /> Editar letra e cifra</Button><AddToSetlist songId={song.id} disabled={disabled || busy} /><PrintChartButton content={content} title={song.title} artist={song.artist} /></div>
     {error && <p className="text-sm text-danger" role="alert">{error}</p>}
-    {open && <BottomSheet title="Editar letra e cifra" onClose={close} size="wide" initialFocus={panel => panel.querySelector('textarea')}>{() => <form className="space-y-3 overflow-auto px-4 pb-5" onSubmit={e => { e.preventDefault(); if (busy) return; setBusy(true); setEditError(null); void onEdit(draft).then(() => setOpen(false)).catch(e => setEditError(e instanceof Error ? e.message : 'Não foi possível salvar. O texto foi mantido.')).finally(() => setBusy(false)); }}>
+    {open && <BottomSheet title="Editar letra e cifra" onClose={close} size="wide" initialFocus={panel => panel.querySelector('textarea')}>{() => <form className="space-y-3 overflow-auto px-4 pb-5" onSubmit={e => { e.preventDefault(); if (busy) return; setBusy(true); setEditError(null); void publication.save(draft, () => onEdit(draft)).then(() => setOpen(false)).catch(e => setEditError(e instanceof Error ? e.message : 'Não foi possível salvar. O texto foi mantido.')).finally(() => setBusy(false)); }}>
       <p className="text-sm text-muted-foreground">Escreva os acordes entre colchetes: [G]letra da música [D].</p>
       {chart.transpose !== 0 && <p className="text-xs text-muted-foreground">O texto está no tom original; a transposição de {chart.transpose > 0 ? '+' : ''}{chart.transpose} semitons é aplicada na leitura.</p>}
       <textarea aria-label="Cifra em ChordPro" value={draft} onChange={e => setDraft(e.target.value)} disabled={busy} spellCheck={false} className="h-[42dvh] w-full resize-y rounded-xl border border-border bg-background p-4 font-mono text-base" />
+      <CatalogPublication value={publication} disabled={busy} />
       {editError && <p role="alert" className="text-sm text-danger">{editError}</p>}
-      <div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={close}>Cancelar</Button><Button type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar alterações'}</Button></div>
+      <div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={close}>Cancelar</Button><Button type="submit" disabled={busy || publication.blocked}>{busy ? 'Salvando…' : 'Salvar alterações'}</Button></div>
     </form>}</BottomSheet>}
   </section>;
 };

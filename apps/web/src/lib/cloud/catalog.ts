@@ -1,4 +1,4 @@
-import { collection, documentId, endAt, getCountFromServer, getDocFromServer, getDocsFromServer, getFirestore, doc, limit, orderBy, query, startAfter, startAt, where, type QueryConstraint, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
+import { collection, documentId, endAt, getCountFromServer, getDocFromServer, getDocsFromServer, getFirestore, doc, limit, orderBy, query, runTransaction, startAfter, startAt, where, type QueryConstraint, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { cloudApp } from './firebase.ts';
 import { catalogArtistId, catalogArtistSelector, mapCatalogArtist, mapCatalogChart, type CatalogArtist, type CatalogChart } from '../catalogData.ts';
 import { artistPhotoCandidates, rememberArtistPhotos } from '../catalogArtistPhotos.ts';
@@ -169,9 +169,9 @@ export const getCatalogArtist = async (id: string): Promise<CatalogArtist> => {
   if (!artist) throw new Error('Este artista não está disponível no catálogo.');
   return rememberArtist(artist);
 };
-export const getCatalogChart = async (id: string): Promise<CatalogChart> => {
+export const getCatalogChart = async (id: string, fresh = false): Promise<CatalogChart> => {
   const cached = documents.get(id);
-  if (cached && (cached.until > Date.now() || !navigator.onLine)) return cached.value;
+  if (!fresh && cached && (cached.until > Date.now() || !navigator.onLine)) return cached.value;
   if (!id || id.includes('/')) throw new Error('Identificação da cifra inválida.');
   if (!navigator.onLine) throw new Error('Você está offline. Abra as cifras já salvas na sua biblioteca.');
   const snapshot = await deadline(getDocFromServer(doc(firestore, 'cifras', id)));
@@ -180,6 +180,28 @@ export const getCatalogChart = async (id: string): Promise<CatalogChart> => {
   if (item.artistRef) rememberArtist(item.artistRef);
   remember(documents, id, item, 120);
   return item;
+};
+
+/** Only canonical text is updated; legacy content and every other catalog field are preserved. */
+export const saveCatalogChordPro = async (base: CatalogChart, chordPro: string): Promise<CatalogChart> => {
+  if (!navigator.onLine) throw new Error('Conecte-se para atualizar a cifra no catálogo.');
+  if (!base.id || base.id.includes('/') || !chordPro.trim()) throw new Error('A cifra do catálogo precisa ter conteúdo em ChordPro.');
+  if (chordPro.length > 300000 || new TextEncoder().encode(chordPro).length > 700000) throw new Error('O texto está grande demais para salvar no catálogo.');
+  const [{ cloudAuth }, { getAccountState }] = await Promise.all([import('./firebase.ts'), import('../account.ts')]);
+  const uid = getAccountState().user?.uid;
+  const assert = () => { if (!uid || cloudAuth.currentUser?.uid !== uid || getAccountState().user?.uid !== uid) throw new Error('A sessão mudou. Entre novamente para salvar.'); };
+  assert();
+  const result = await runTransaction(firestore, async transaction => {
+    assert(); const ref = doc(firestore, 'cifras', base.id); const snapshot = await transaction.get(ref); assert();
+    const current = snapshot.exists() ? mapCatalogChart(snapshot.id, snapshot.data()) : null;
+    if (!current) throw new Error('Esta cifra não está mais disponível no catálogo.');
+    if (current.chordPro !== base.chordPro && current.chordPro !== chordPro) throw new Error('Outra pessoa alterou esta cifra. Seu texto foi mantido. Recarregue a referência do catálogo e confira a versão atual antes de salvar novamente.');
+    transaction.update(ref, { chordPro });
+    return mapCatalogChart(base.id, { ...snapshot.data(), chordPro })!;
+  });
+  assert(); pages.clear(); documents.delete(base.id);
+  remember(documents, base.id, result, 120);
+  return result;
 };
 
 const pendingPhotos = new Map<string, Promise<void>>();

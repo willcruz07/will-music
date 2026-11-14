@@ -1,5 +1,7 @@
 # Biblioteca por conta e compartilhamento
 
+Extensão do diretório de músicos: convites também podem usar UID, sem e-mail do destinatário. Consultar [firebase-musicos.md](firebase-musicos.md) para os índices adicionais e as versões atualizadas dos fragmentos de regras.
+
 Implementação local. Nenhuma regra, índice ou informação foi publicada automaticamente no Firebase.
 
 ## Configuração necessária

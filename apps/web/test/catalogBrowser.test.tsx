@@ -7,7 +7,7 @@ import { Library } from '../src/pages/Library.tsx';
 vi.mock('../src/lib/account.ts', () => ({ useAccount: () => ({ user: null, ready: true, error: null }) }));
 vi.mock('../src/components/About.tsx', () => ({ AboutButton: () => null }));
 vi.mock('../src/lib/cloud/catalog.ts', () => ({
-  listCatalog: async () => ({ items: [{ id: 'integration-one', title: 'Canção do catálogo', artist: 'Artista', artistRef: { name: 'Artista', slug: 'artista', photo: 'https://example.com/photo.jpg' }, content: '[C]Minha canção', style: 'mpb', key: 'C' }], more: false, cursor: null }),
+  listCatalog: async () => ({ items: [{ id: 'integration-one', title: 'Canção do catálogo', artist: 'Artista', artistRef: { name: 'Artista', slug: 'artista', photo: 'https://example.com/photo.jpg' }, chordPro: '[C]Minha canção', style: 'mpb', key: 'C' }], more: false, cursor: null }),
   listCatalogArtists: async () => ({ items: [{ name: 'Artista Um', slug: 'artista-um', photo: 'https://example.com/photo.jpg' }], more: false, cursor: null }),
   countCatalogArtist: async () => 42,
   listCatalogStyles: async () => ({ items: ['gospel', 'mpb'], more: false, cursor: 'mpb' }),

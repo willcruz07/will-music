@@ -56,6 +56,8 @@ Testes adicionais cobrem callback inicial atrasado, retorno de popup antes do ob
 
 ## Perfil de usuário e avatar
 
+Leitura e edição canônicas do novo campo `chordPro`, atualização do documento original e permissões de escrita estão descritas em [firebase-catalogo-edicao.md](firebase-catalogo-edicao.md).
+
 Após confirmar a sessão Google, o aplicativo cruza o UID com `users/{uid}` em uma transação. Um perfil novo recebe `name`, `email`, `photoURL`, `notification`, `preferences` e timestamps de servidor em `createdAt`, `updatedAt` e `lastAuth`, seguindo o esquema do Alt7. Em um perfil existente, preserva nome/foto personalizados, preferências, notificações, data de criação e campos de privilégios; atualiza e-mail e datas de acesso, preenchendo nome/foto apenas quando ausentes. Não há busca por e-mail nem gravação em outro UID.
 
 A operação ocorre uma vez por usuário nesta sessão da aplicação, com deduplicação de chamadas simultâneas; renovação de token não repete a escrita após sucesso. Offline, aguarda reconexão. A falha do perfil não encerra a autenticação: a tela Minha conta mostra o motivo e permite nova tentativa. O servidor precisa autorizar o usuário a ler/criar/atualizar o próprio documento; as regras não foram alteradas pelo código.

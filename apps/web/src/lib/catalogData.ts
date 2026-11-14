@@ -5,10 +5,10 @@ import { isQuotaError } from './storage.ts';
 import { validArtistPhoto } from './catalogPhotoUrl.ts';
 
 export type CatalogArtist = { name: string; photo: string; slug: string; photoCandidates?: string[] };
-export type CatalogChart = { id: string; title: string; artist: string; artistRef?: CatalogArtist; content: string; style: string; key?: string };
+export type CatalogChart = { id: string; title: string; artist: string; artistRef?: CatalogArtist; chordPro: string; sourceField: 'chordPro' | 'content'; style: string; key?: string };
 const text = (value: unknown) => typeof value === 'string' ? value : '';
 const validKey = (value: string) => /^[A-G][#b]?m?$/u.test(value.trim()) ? value.trim() : undefined;
-const project = import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
+export const catalogProject = import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
 export const mapCatalogArtist = (data: Record<string, unknown>): CatalogArtist | null => {
   const raw = data.artist && typeof data.artist === 'object' ? data.artist as Record<string, unknown> : {};
   const name = text(raw.name) || text(data.artist);
@@ -36,29 +36,31 @@ export const mapCatalogChart = (id: string, data: Record<string, unknown>): Cata
   const artist = mapCatalogArtist(data);
   const title = text(data.title).trim();
   if (!title) return null;
-  const content = catalogContent(text(data.content));
+  // Canonical ChordPro is already formatted; only legacy content needs Alt7 annotation conversion.
+  const chordPro = text(data.chordPro);
+  const content = chordPro.trim() ? chordPro : catalogContent(text(data.content));
   const meta = parseChordPro(content).meta;
-  return { id, title, artist: artist?.name || '', ...(artist ? { artistRef: artist } : {}), content, style: text(data.style), key: validKey(text(data.key)) ?? validKey(meta.key ?? meta.k ?? '') };
+  return { id, title, artist: artist?.name || '', ...(artist ? { artistRef: artist } : {}), chordPro: content, sourceField: chordPro.trim() ? 'chordPro' : 'content', style: text(data.style), key: validKey(text(data.key)) ?? validKey(meta.key ?? meta.k ?? '') };
 };
 
 /** Stable identity prevents duplicate imports, including simultaneous saves in separate tabs. */
 export const catalogLocalId = async (remoteId: string): Promise<string> => {
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${project}/cifras/${remoteId}`));
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${catalogProject}/cifras/${remoteId}`));
   return `catalog-${Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('')}`;
 };
 export const findSavedCatalogChart = async (id: string): Promise<Song | undefined> => db.songs.get(await catalogLocalId(id));
 
 export const saveCatalogChart = async (item: CatalogChart, transpose = 0, fontSize = 16): Promise<Song> => {
-  if (!item.content.trim()) throw new Error('Esta cifra ainda não tem conteúdo disponível para salvar.');
+  if (!item.chordPro.trim()) throw new Error('Esta cifra ainda não tem conteúdo disponível para salvar.');
   const id = await catalogLocalId(item.id);
   return db.transaction('rw', db.songs, db.charts, async () => {
     const existing = await db.songs.get(id);
     if (existing) return existing; // Never overwrite the musician's local edits.
     const stamp = now();
     const song: Song = { id, title: item.title, artist: item.artist, key: item.key, durationSec: 0, favorite: false, analysisStatus: 'done', createdAt: stamp, updatedAt: stamp,
-      catalogSource: { project, collection: 'cifras', id: item.id, savedAt: stamp } };
+      catalogSource: { project: catalogProject, collection: 'cifras', id: item.id, savedAt: stamp } };
     await db.songs.add(song);
-    await db.charts.add({ id: `${id}-chart`, songId: id, chordPro: item.content, transpose, fontSize, origin: 'manual', createdAt: stamp, updatedAt: stamp });
+    await db.charts.add({ id: `${id}-chart`, songId: id, chordPro: item.chordPro, transpose, fontSize, origin: 'manual', createdAt: stamp, updatedAt: stamp });
     return song;
   }).catch(error => {
     if (isQuotaError(error)) throw new Error('O navegador recusou o armazenamento da cifra. Verifique o espaço disponível e as permissões de armazenamento do site e tente novamente.', { cause: error });

@@ -5,18 +5,18 @@ import { AccountAvatar } from '../src/components/AccountAvatar.tsx';
 import { loadMusicianAccount, saveAccountProfile, saveMusicianAccount } from '../src/lib/cloud/users.ts';
 import { emptyMusicianProfile } from '../src/lib/musicianProfile.ts';
 
-const fake = vi.hoisted(() => ({ auth: { currentUser: { uid: 'uid-one', email: 'will@example.com', displayName: 'Will Cruz', photoURL: 'https://example.com/google-photo.jpg' } }, stored: null as Record<string, unknown> | null, set: vi.fn(), update: vi.fn(), doc: vi.fn((...args: unknown[]) => args), transaction: vi.fn() }));
+const fake = vi.hoisted(() => ({ auth: { currentUser: { uid: 'uid-one', email: 'will@example.com', displayName: 'Will Cruz', photoURL: 'https://example.com/google-photo.jpg' } }, stored: null as Record<string, unknown> | null, set: vi.fn(), update: vi.fn(), doc: vi.fn((...args: unknown[]) => args), transaction: vi.fn(), deleted: vi.fn() }));
 vi.mock('../src/lib/cloud/firebase.ts', () => ({ cloudApp: {}, cloudAuth: fake.auth }));
 vi.mock('firebase/firestore', () => ({
   getFirestore: () => 'database', doc: fake.doc, serverTimestamp: () => 'server-time',
   getDocFromServer: async () => ({ exists: () => fake.stored !== null, data: () => fake.stored }),
   runTransaction: async (_: unknown, action: (tx: unknown) => unknown) => {
     fake.transaction();
-    return action({ get: async () => ({ exists: () => fake.stored !== null, data: () => fake.stored }), set: fake.set, update: fake.update });
+    return action({ get: async () => ({ exists: () => fake.stored !== null, data: () => fake.stored }), set: fake.set, update: fake.update, delete: fake.deleted });
   },
 }));
 const googleUser = { uid: 'uid-one', displayName: 'Will Cruz', email: 'will@example.com', photoURL: 'https://example.com/google-photo.jpg' } as User;
-beforeEach(() => { fake.auth.currentUser = { uid: 'uid-one', email: 'will@example.com', displayName: 'Will Cruz', photoURL: 'https://example.com/google-photo.jpg' }; fake.stored = null; fake.set.mockClear(); fake.update.mockClear(); fake.doc.mockClear(); fake.transaction.mockClear(); });
+beforeEach(() => { fake.auth.currentUser = { uid: 'uid-one', email: 'will@example.com', displayName: 'Will Cruz', photoURL: 'https://example.com/google-photo.jpg' }; fake.stored = null; fake.set.mockClear(); fake.update.mockClear(); fake.doc.mockClear(); fake.transaction.mockClear(); fake.deleted.mockClear(); });
 
 describe('users collection reconciliation', () => {
   it('creates the canonical UID document with Google data and server timestamps', async () => {
@@ -48,6 +48,16 @@ describe('users collection reconciliation', () => {
 });
 
 describe('private musician profile writes', () => {
+  it('publishes only an opted-in projection and deletes it when the user opts out', async () => {
+    fake.stored = { name: 'Will', photoURL: googleUser.photoURL, owner: true, email: googleUser.email };
+    const profile = { ...emptyMusicianProfile(), nickname: 'Wellen', discoverable: true };
+    await saveMusicianAccount('uid-one', { name: 'Will', musicianProfile: profile });
+    const published = fake.set.mock.calls.find(call => (call[0] as string[])[1] === 'wmMusicians')![1];
+    expect(published).toMatchObject({ name: 'Wellen', photo: googleUser.photoURL });
+    expect(published).not.toHaveProperty('email'); expect(published).not.toHaveProperty('owner');
+    await saveMusicianAccount('uid-one', { name: 'Will', musicianProfile: { ...profile, discoverable: false } });
+    expect(fake.deleted).toHaveBeenCalledWith(['database', 'wmMusicians', 'uid-one']);
+  });
   it('updates only name and musical details, preserving roles and contribution counters', async () => {
     fake.stored = { name: 'Anterior', owner: true, isUserPremium: true, willMusicStats: { contributions: 12 }, preferences: { pushEnabled: false } };
     const profile = { ...emptyMusicianProfile(), nickname: 'Will', instruments: ['Teclado'], styles: ['Jazz'], acceptsInvites: true };

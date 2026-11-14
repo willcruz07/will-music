@@ -3,7 +3,7 @@ import type { Chart, Setlist, Song } from './db.ts';
 export type PersonalChart = { song: Song; chart: Chart };
 export type SharedItem = { id: string; order: number; song: Song; chart: Chart; targetKey?: string; transpose?: number; note?: string };
 export type SharedSetlist = { id: string; inviteId: string; ownerUid: string; ownerName: string; ownerPhoto: string; name: string; version: number; items: SharedItem[]; updatedAt: string };
-export type SetlistInvite = { id: string; shareId: string; senderUid: string; senderName: string; senderPhoto: string; recipientEmail: string; recipientUid?: string; name: string; itemCount: number; offeredVersion: number; acceptedVersion: number; declinedVersion: number; status: 'pending' | 'accepted' | 'declined'; updatedAt: string };
+export type SetlistInvite = { id: string; shareId: string; senderUid: string; senderName: string; senderPhoto: string; recipientEmail: string; recipientUid?: string; recipientName?: string; name: string; itemCount: number; offeredVersion: number; acceptedVersion: number; declinedVersion: number; status: 'pending' | 'accepted' | 'declined'; updatedAt: string };
 export type CloudEntity = { revision: number; deleted: boolean; payload: PersonalChart | Setlist | null };
 export const LIBRARY_CHANGED = 'wm-library-changed';
 export const notifyLibraryChanged = () => window.dispatchEvent(new Event(LIBRARY_CHANGED));

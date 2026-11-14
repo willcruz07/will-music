@@ -1,6 +1,6 @@
 import { applyAccountDisplayName, getAccountState } from './account.ts';
 import { db, type LibraryDatabase } from './db.ts';
-import { emptyMusicianProfile, validateMusicianDetails, type MusicianAccount, type MusicianDetails } from './musicianProfile.ts';
+import { emptyMusicianProfile, readMusicianProfile, validateMusicianDetails, type MusicianAccount, type MusicianDetails } from './musicianProfile.ts';
 import { isQuotaError } from './storage.ts';
 
 const KEY = 'wm-musician-profile';
@@ -18,7 +18,7 @@ const changed = () => window.dispatchEvent(new Event(MUSICIAN_PROFILE_CHANGED));
 const assertAccount = (uid: string) => { if (getAccountState().user?.uid !== uid) throw new Error('A conta mudou durante a operação.'); };
 const cached = async (local: LibraryDatabase, uid: string): Promise<CachedMusician | null> => {
   const value = (await local.settings.get(KEY))?.value as CachedMusician | undefined;
-  return value?.uid === uid ? value : null;
+  return value?.uid === uid ? { ...value, account: { ...value.account, musicianProfile: readMusicianProfile(value.account.musicianProfile) } } : null;
 };
 export const getCachedMusician = (uid: string) => cached(db, uid);
 const flights = new Map<string, Promise<void>>();

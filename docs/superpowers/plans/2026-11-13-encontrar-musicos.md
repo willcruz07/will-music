@@ -1,0 +1,10 @@
+# Encontrar músicos
+
+Proposta aprovada pelo usuário: cards compactos, filtros por UF/cidade/instrumento/estilo, perfil musical e convite para setlist, com participação opcional. Sem feed, sem commits e sem deploy.
+
+1. Acrescentar `musicianProfile.discoverable` (false por padrão e em perfis legados). Gravar/remover uma projeção explícita em `wmMusicians/{uid}` na mesma transação do perfil privado. Publicar apenas nome de apresentação, foto, apresentação, localização, instrumentos, estilos, experiência, redes e disponibilidade; não publicar e-mail, credenciais, estatísticas ou privilégios.
+2. Consultas paginadas, 20 por página, filtro no servidor e busca por prefixo de nome normalizado. Gerar tags combinadas de instrumento/estilo para uma única condição array-contains. Fornecer índices para as combinações geográficas. Não baixar o diretório inteiro nem persistir perfis de terceiros offline.
+3. Rotas `/musicos` e `/musicos/:id`, atalhos na biblioteca, conta e Palco. Filtros em sheet, skeletons, erro recuperável, estados vazios e exigência de conexão. Perfil com links HTTPS e convite usando uma setlist própria já salva.
+4. Convite por UID, sem descobrir/expor e-mail: documentos `wmInvites/{shareId}__uid_{uid}` com `recipientEmail: ''`, `recipientUid` e nome de apresentação. Preservar convites anteriores por e-mail; central observa ambos, deduplicando por documento. Permissões e download verificam UID ou e-mail; o servidor valida visibilidade/disponibilidade no envio novo. Atualizações de convites aceitos continuam permitidas após retirada da descoberta.
+5. Regras locais de projeção pública exata por UID, sem escrita em perfis alheios. Privacidade/despublicação verificadas por getAfter. Atualizar fragmentos e índices, documentar a configuração necessária sem aplicar no Firebase.
+6. Verificar projeção sem dados privados, legado opt-out, filtros/paginação, envio UID, recebimento e permissões do destinatário, retirada de publicação e UI. Tipos/build e testes direcionados, sem navegador ou contas reais nesta etapa.

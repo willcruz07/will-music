@@ -38,6 +38,7 @@ export const Setlists = () => {
   return <section>
     <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-3xl font-bold tracking-tight">Palco</h1><Button onClick={() => { setName(''); setCreating(true); }}><Plus className="size-4" /> Nova setlist</Button></div>
     <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Organize suas cifras para o ensaio ou apresentação. Escolha a ordem e leia todo o repertório em sequência, sem sair da tela.</p>
+    <Link to="/musicos" className="mt-2 inline-flex min-h-10 items-center text-sm font-semibold text-chord">Encontrar músicos para compartilhar seu repertório →</Link>
     {error && !creating && <div role="alert" className="mt-4 rounded-xl border border-danger/30 p-3"><p className="text-sm">{error}</p><Button variant="outline" className="mt-2" onClick={() => setRevision(v => v + 1)}>Tentar novamente</Button></div>}
     {!lists && !error && <p role="status" className="mt-6 text-sm text-muted-foreground">Carregando repertórios…</p>}
     {lists?.length === 0 && !shared.length && !error && <LibraryEmptyState section="Palco" title="Prepare seu próximo repertório" description="Crie uma setlist e reúna as cifras salvas que você quer tocar. Depois, ajuste a sequência e abra a leitura com foco na música."><Button onClick={() => { setName(''); setCreating(true); }}>Criar primeira setlist</Button><Link to="/?aba=cifras" className="inline-flex min-h-11 items-center px-3 text-sm font-semibold text-chord">Ver minhas cifras</Link></LibraryEmptyState>}

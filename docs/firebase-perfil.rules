@@ -7,8 +7,8 @@ function wmProfileOwner(uid) {
 }
 function wmProfileUrl(value) { return value is string && value.size() <= 300 && (value == '' || value.matches('^https://.+')); }
 function wmMusicianValid(p) {
-  return p is map && p.keys().hasAll(['nickname', 'bio', 'location', 'instruments', 'styles', 'experience', 'acceptsInvites', 'socials'])
-    && p.keys().hasOnly(['nickname', 'bio', 'location', 'instruments', 'styles', 'experience', 'acceptsInvites', 'socials'])
+  return p is map && p.keys().hasAll(['nickname', 'bio', 'location', 'instruments', 'styles', 'experience', 'acceptsInvites', 'discoverable', 'socials'])
+    && p.keys().hasOnly(['nickname', 'bio', 'location', 'instruments', 'styles', 'experience', 'acceptsInvites', 'discoverable', 'socials'])
     && p.nickname is string && p.nickname.size() <= 40 && p.bio is string && p.bio.size() <= 600
     && p.location is map && p.location.keys().hasOnly(['city', 'region', 'country'])
     && p.location.city is string && p.location.city.size() <= 80
@@ -18,13 +18,28 @@ function wmMusicianValid(p) {
     && p.instruments.hasOnly(['Voz', 'Violão', 'Guitarra', 'Teclado', 'Piano', 'Cavaquinho', 'Baixo', 'Bateria', 'Percussão', 'Violino', 'Saxofone', 'Flauta', 'Acordeon', 'Ukulele', 'Outros'])
     && p.styles is list && p.styles.size() <= 18
     && p.styles.hasOnly(['Gospel', 'Adoração', 'MPB', 'Samba', 'Pagode', 'Bossa nova', 'Jazz', 'Blues', 'Rock', 'Pop', 'Soul', 'Funk', 'Sertanejo', 'Forró', 'Reggae', 'Clássica', 'Instrumental', 'Outros'])
-    && p.experience in ['', 'starting', 'learning', 'experienced', 'professional'] && p.acceptsInvites is bool
+    && p.experience in ['', 'starting', 'learning', 'experienced', 'professional'] && p.acceptsInvites is bool && p.discoverable is bool
     && p.socials is map && p.socials.keys().hasOnly(['instagram', 'youtube', 'tiktok', 'facebook', 'website'])
     && wmProfileUrl(p.socials.instagram) && wmProfileUrl(p.socials.youtube)
     && wmProfileUrl(p.socials.tiktok) && wmProfileUrl(p.socials.facebook) && wmProfileUrl(p.socials.website);
 }
 function wmProfilePreferenceMatches(uid, p) {
   return getAfter(/databases/$(database)/documents/wmInvitePreferences/$(request.auth.token.email.lower())).data.acceptsInvites == p.acceptsInvites;
+}
+function wmPublicProfileMatches(d, u) {
+  let p = u.musicianProfile;
+  let photo = u.get('photoURL', '');
+  return d.name == (p.nickname != '' ? p.nickname : u.name)
+    && d.photo == (photo is string && photo.lower().matches('^https://.+') && photo.size() <= 2048 ? photo : '')
+    && d.bio == p.bio && d.location == p.location && d.instruments == p.instruments
+    && d.styles == p.styles && d.experience == p.experience && d.socials == p.socials
+    && d.acceptsInvites == p.acceptsInvites;
+}
+function wmDirectoryConsistent(uid, u) {
+  return u.get('musicianProfile', {}).get('discoverable', false) == true
+    ? (existsAfter(/databases/$(database)/documents/wmMusicians/$(uid))
+      && wmPublicProfileMatches(getAfter(/databases/$(database)/documents/wmMusicians/$(uid)).data, u))
+    : !existsAfter(/databases/$(database)/documents/wmMusicians/$(uid));
 }
 match /users/{uid} {
   allow get: if wmProfileOwner(uid);
@@ -38,8 +53,10 @@ match /users/{uid} {
     && request.resource.data.lastAuth == request.time && request.resource.data.notification == []
     && request.resource.data.preferences == { 'pushEnabled': true, 'publicSetlistDefault': true, 'collabSetlistDefault': false }
     && wmMusicianValid(request.resource.data.musicianProfile)
+    && wmDirectoryConsistent(uid, request.resource.data)
     && wmProfilePreferenceMatches(uid, request.resource.data.musicianProfile);
   allow update: if wmProfileOwner(uid)
+    && wmDirectoryConsistent(uid, request.resource.data)
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'email', 'photoURL', 'musicianProfile', 'updatedAt', 'lastAuth'])
     && request.resource.data.updatedAt == request.time
     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['name']) || (request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 90))
@@ -50,6 +67,21 @@ match /users/{uid} {
       || (wmMusicianValid(request.resource.data.musicianProfile) && wmProfilePreferenceMatches(uid, request.resource.data.musicianProfile)));
   // willMusicStats, roles, owner, premium, notifications and preferences are not writable here.
   allow delete: if false;
+}
+match /wmMusicians/{uid} {
+  allow get: if request.auth != null && request.auth.token.email_verified == true;
+  allow list: if request.auth != null && request.auth.token.email_verified == true && request.query.limit <= 20;
+  allow create, update: if wmProfileOwner(uid)
+    && request.resource.data.keys().hasAll(['name', 'photo', 'bio', 'location', 'instruments', 'styles', 'experience', 'socials', 'acceptsInvites', 'searchName', 'tags', 'updatedAt'])
+    && request.resource.data.keys().hasOnly(['name', 'photo', 'bio', 'location', 'instruments', 'styles', 'experience', 'socials', 'acceptsInvites', 'searchName', 'tags', 'updatedAt'])
+    && getAfter(/databases/$(database)/documents/users/$(uid)).data.musicianProfile.discoverable == true
+    && wmPublicProfileMatches(request.resource.data, getAfter(/databases/$(database)/documents/users/$(uid)).data)
+    && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 90
+    && request.resource.data.searchName is string && request.resource.data.searchName.size() <= 100
+    && request.resource.data.tags is list && request.resource.data.tags.size() <= 303
+    && request.resource.data.updatedAt == request.time;
+  allow delete: if wmProfileOwner(uid)
+    && getAfter(/databases/$(database)/documents/users/$(uid)).data.get('musicianProfile', {}).get('discoverable', false) == false;
 }
 match /wmInvitePreferences/{email} {
   // Exact-address lookups only. No profile details, UID or directory listing.

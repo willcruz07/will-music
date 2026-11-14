@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import { cloudApp, cloudAuth } from './firebase.ts';
 import { emptyMusicianProfile, readContributions, readMusicianProfile, validateMusicianDetails, type MusicianAccount, type MusicianDetails } from '../musicianProfile.ts';
 import { normalizeInviteEmail } from '../sharingTypes.ts';
+import { publicMusicianData } from '../musicians.ts';
 
 export type AccountProfile = { name: string; email: string; photo: string | null };
 const nonEmpty = (value: unknown) => typeof value === 'string' && value.trim() ? value : '';
@@ -33,6 +34,10 @@ export const saveAccountProfile = async (user: User): Promise<AccountProfile> =>
       transaction.update(ref, patch);
     }
     if (user.email) transaction.set(doc(getFirestore(cloudApp), 'wmInvitePreferences', normalizeInviteEmail(user.email)), { acceptsInvites: readMusicianProfile(stored.musicianProfile).acceptsInvites });
+    const publicRef = doc(getFirestore(cloudApp), 'wmMusicians', user.uid);
+    const musical = readMusicianProfile(stored.musicianProfile);
+    if (musical.discoverable) transaction.set(publicRef, { ...publicMusicianData({ name: profile.name, musicianProfile: musical }, profile.photo), updatedAt: serverTimestamp() });
+    else transaction.delete(publicRef);
     return profile;
   });
 };
@@ -59,6 +64,9 @@ export const saveMusicianAccount = async (uid: string, input: MusicianDetails): 
     if (snapshot.exists()) transaction.update(ref, patch);
     else transaction.set(ref, { ...patch, email: user.email, photoURL: user.photoURL || '', createdAt: serverTimestamp(), lastAuth: serverTimestamp(), notification: [], preferences: { pushEnabled: true, publicSetlistDefault: true, collabSetlistDefault: false } });
     transaction.set(doc(firestore, 'wmInvitePreferences', email), { acceptsInvites: details.musicianProfile.acceptsInvites });
+    const publicRef = doc(firestore, 'wmMusicians', uid);
+    if (details.musicianProfile.discoverable) transaction.set(publicRef, { ...publicMusicianData(details, snapshot.exists() ? nonEmpty(snapshot.data().photoURL) : user.photoURL), updatedAt: serverTimestamp() });
+    else transaction.delete(publicRef);
   });
   currentProfileUser(uid);
 };

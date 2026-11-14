@@ -11,6 +11,8 @@ import { createHistory } from '../lib/history.ts';
 import { Button, IconButton } from '../ui/Button.tsx';
 import { confirmDialog } from '../ui/Dialog.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
+import { useCatalogPublication } from '../lib/useCatalogPublication.ts';
+import { CatalogPublication } from '../components/CatalogPublication.tsx';
 
 type Format = 'cifra' | 'chordpro';
 const FORMAT_KEY = 'wm-edit-format';
@@ -42,6 +44,12 @@ export const EditChart = () => {
   const [picking, setPicking] = useState<{ line: number; char: number } | null>(null);
   const [inserting, setInserting] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingLock = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const publication = useCatalogPublication(song?.catalogSource, loaded);
   const [, force] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const ONLY_CHORDPRO = 'Esta cifra tem trechos que só cabem em ChordPro (acordes que o app não reconhece, ou linhas de letra que parecem acordes), então ela abre só em ChordPro para nada se perder.';
@@ -58,8 +66,8 @@ export const EditChart = () => {
       setHasAnalysis(!!analysis);
       const text = chart?.chordPro ?? '';
       // The chord-above layout is used only when the chart comes back from it exactly.
-      const f = readFormat() === 'cifra' && !isLossless(text) ? 'chordpro' : readFormat();
-      if (f !== readFormat()) setNotice(ONLY_CHORDPRO);
+      const f = s?.catalogSource || (readFormat() === 'cifra' && !isLossless(text)) ? 'chordpro' : readFormat();
+      if (!s?.catalogSource && f !== readFormat()) setNotice(ONLY_CHORDPRO);
       setFormat(f);
       const shown = fromChordPro(text, f);
       history.current = createHistory(shown);
@@ -70,21 +78,26 @@ export const EditChart = () => {
   }, [id]);
 
   const update = (next: string) => {
+    if (savingLock.current) return;
     history.current.set(next);
     setDraft(next);
   };
   const undo = () => {
+    if (savingLock.current) return;
     history.current.undo();
     setDraft(history.current.value);
     force((n) => n + 1);
   };
   const redo = () => {
+    if (savingLock.current) return;
     history.current.redo();
     setDraft(history.current.value);
     force((n) => n + 1);
   };
 
   const switchFormat = (next: Format) => {
+    if (savingLock.current) return;
+    if (song?.catalogSource && next !== 'chordpro') return;
     if (next === format) return;
     if (next === 'cifra' && !isLossless(chordPro)) {
       setNotice(ONLY_CHORDPRO);
@@ -104,15 +117,17 @@ export const EditChart = () => {
 
   const save = useCallback(async () => {
     // Nothing to save before the chart has loaded or when nothing changed (Ctrl+S included).
-    if (!loaded || chordPro === saved) return;
-    await saveEditedChart(id, chordPro);
-    setSaved(chordPro);
-    navigate(`/musica/${id}`, { replace: true });
-  }, [id, chordPro, saved, loaded, navigate]);
+    if (!loaded || (chordPro === saved && !publication.needsMigration) || savingLock.current) return;
+    savingLock.current = true; setSaving(true); setSaveError(null);
+    try { await publication.save(chordPro, () => saveEditedChart(id, chordPro)); if (mounted.current) { setSaved(chordPro); navigate(`/musica/${id}`, { replace: true }); } }
+    catch (error) { setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar. Seu texto foi mantido.'); }
+    finally { savingLock.current = false; setSaving(false); }
+  }, [id, chordPro, saved, loaded, navigate, publication.save]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
+      if (savingLock.current) { e.preventDefault(); return; }
       // Undo inside the chord library's own field belongs to that field.
       if (e.target instanceof HTMLInputElement) return;
       const k = e.key.toLowerCase();
@@ -138,6 +153,7 @@ export const EditChart = () => {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
   const leave = () => {
+    if (savingLock.current) return;
     if (!dirty) return navigate(`/musica/${id}`);
     void confirmDialog({ title: 'Sair sem salvar?', message: 'As alterações desta cifra serão perdidas.', confirmLabel: 'Sair sem salvar', cancelLabel: 'Continuar editando' }).then((ok) => ok && navigate(`/musica/${id}`));
   };
@@ -167,7 +183,7 @@ export const EditChart = () => {
   const editor = (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" onKeyDown={rovingKeys} aria-label="Formato do texto">
+        {!song.catalogSource && <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" onKeyDown={rovingKeys} aria-label="Formato do texto">
           {(
             [
               ['cifra', 'Acordes em cima'],
@@ -178,13 +194,15 @@ export const EditChart = () => {
               {label}
             </button>
           ))}
-        </div>
+        </div>}
+        {song.catalogSource && <span className="text-sm font-semibold text-chord">Editor ChordPro</span>}
         <Button variant="outline" className="min-h-9 px-3" onClick={() => setInserting(true)}>
           <Music2 className="size-4" /> Inserir acorde
         </Button>
       </div>
       <textarea
         ref={box}
+        disabled={saving}
         aria-label={format === 'cifra' ? 'Cifra com os acordes em cima da letra' : 'Cifra em ChordPro'}
         value={draft}
         onChange={(e) => {
@@ -272,8 +290,8 @@ export const EditChart = () => {
         <Button variant="outline" onClick={leave}>
           Cancelar
         </Button>
-        <Button onClick={() => void save()} disabled={!dirty}>
-          Salvar
+        <Button onClick={() => void save()} disabled={(!dirty && !publication.needsMigration) || saving || publication.blocked}>
+          {saving ? 'Salvando…' : 'Salvar'}
         </Button>
       </div>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -294,6 +312,8 @@ export const EditChart = () => {
           {notice}
         </p>
       )}
+      <div className="mt-3"><CatalogPublication value={publication} disabled={saving} /></div>
+      {saveError && <p role="alert" className="mt-3 text-sm text-danger">{saveError}</p>}
 
       <div className="mt-4 flex gap-2 md:hidden" role="tablist" onKeyDown={rovingKeys}>
         {(['texto', 'ver'] as const).map((t) => (

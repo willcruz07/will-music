@@ -1,6 +1,7 @@
-import { collection, doc, getDocFromServer, getDocsFromServer, getFirestore, onSnapshot, orderBy, query, runTransaction, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocFromServer, getDocsFromServer, getFirestore, onSnapshot, or, orderBy, query, runTransaction, where, writeBatch } from 'firebase/firestore';
 import { cloudApp, cloudAuth } from './firebase.ts';
 import { getAccountState } from '../account.ts';
+import { readPublicMusician } from '../musicians.ts';
 import { db, now, type Setlist } from '../db.ts';
 import { checkedPersonalChart, checkedSetlist, cleanWire, fingerprint, invitationNeedsAction, normalizeInviteEmail, notifyLibraryChanged, personalChart, type SetlistInvite, type SharedItem, type SharedSetlist } from '../sharingTypes.ts';
 
@@ -15,7 +16,8 @@ const sameUser = (uid: string) => { if (getAccountState().user?.uid !== uid || c
 export const shareIdFor = (uid: string, listId: string) => `${uid}__${encodeURIComponent(listId)}`;
 export const sharingError = (error: unknown) => {
   console.error('Compartilhamento de setlist falhou', error);
-  const code = (error as { code?: string })?.code;
+  const rawCode = (error as { code?: unknown })?.code;
+  const code = typeof rawCode === 'string' ? rawCode : undefined;
   if (code?.includes('permission-denied')) return 'O Firebase não autorizou esta operação. As regras de compartilhamento precisam estar configuradas; seus dados locais foram mantidos.';
   if (code?.includes('failed-precondition')) return 'Falta um índice no Firebase para esta consulta. O console mostra o link de criação.';
   return error instanceof Error ? error.message : 'Não foi possível concluir esta operação.';
@@ -23,12 +25,18 @@ export const sharingError = (error: unknown) => {
 export const readInvite = (id: string, value: unknown): SetlistInvite => {
   const data = value as SetlistInvite;
   if (!data || typeof data.shareId !== 'string' || typeof data.senderUid !== 'string' || typeof data.recipientEmail !== 'string' || typeof data.name !== 'string' || !['pending', 'accepted', 'declined'].includes(data.status) || !Number.isInteger(data.offeredVersion)) throw new Error('Convite inválido.');
+  if (!data.recipientEmail && (typeof data.recipientUid !== 'string' || !data.recipientUid)) throw new Error('Destinatário do convite inválido.');
   return { ...data, id, senderName: typeof data.senderName === 'string' ? data.senderName : 'Músico', senderPhoto: typeof data.senderPhoto === 'string' ? data.senderPhoto : '', acceptedVersion: data.acceptedVersion || 0, declinedVersion: data.declinedVersion || 0 };
 };
-export const watchInvites = (email: string, receive: (items: SetlistInvite[]) => void, fail: (error: unknown) => void) => onSnapshot(
-  query(collection(firestore, 'wmInvites'), where('recipientEmail', '==', normalizeInviteEmail(email)), orderBy('updatedAt', 'desc')),
+export const isInviteRecipient = (invite: SetlistInvite, uid: string, email: string): boolean => invite.recipientUid === uid || (!!invite.recipientEmail && normalizeInviteEmail(email) === invite.recipientEmail);
+export const watchInvites = (email: string, receive: (items: SetlistInvite[]) => void, fail: (error: unknown) => void) => {
+  const uid = getAccountState().user?.uid;
+  if (!uid || cloudAuth.currentUser?.uid !== uid) throw new Error('Sua sessão mudou. Entre novamente.');
+  return onSnapshot(
+  query(collection(firestore, 'wmInvites'), or(where('recipientEmail', '==', normalizeInviteEmail(email)), where('recipientUid', '==', uid)), orderBy('updatedAt', 'desc')),
   snapshot => { try { receive(snapshot.docs.map(item => readInvite(item.id, item.data()))); } catch (error) { fail(error); } }, fail,
-);
+  );
+};
 
 export const publishSetlist = async (list: Setlist): Promise<{ shareId: string; version: number; count: number }> => {
   const user = requireUser(); const local = db;
@@ -96,6 +104,27 @@ export const updateSharedSetlist = async (list: Setlist): Promise<number> => {
   }
   return published.version;
 };
+/** Directory invitations target a UID; no recipient email is read or published. */
+export const sendMusicianSetlistInvite = async (list: Setlist, recipientUid: string): Promise<void> => {
+  const user = requireUser();
+  if (!recipientUid || recipientUid === user.uid || recipientUid.includes('/')) throw new Error('Escolha outro músico para convidar.');
+  const published = await publishSetlist(list); sameUser(user.uid);
+  const ref = doc(firestore, 'wmInvites', `${published.shareId}__uid_${recipientUid}`);
+  await runTransaction(firestore, async transaction => {
+    const previous = await transaction.get(ref);
+    const profile = await transaction.get(doc(firestore, 'wmMusicians', recipientUid)); sameUser(user.uid);
+    if (!profile.exists()) throw new Error('Este músico retirou o perfil da busca.');
+    const musician = readPublicMusician(recipientUid, profile.data());
+    if (!musician.acceptsInvites) throw new Error('Esta pessoa não está recebendo novos convites de setlists.');
+    const existing = previous.exists() ? readInvite(ref.id, previous.data()) : null;
+    transaction.set(ref, {
+      shareId: published.shareId, senderUid: user.uid, senderName: user.name || 'Músico', senderPhoto: user.photo || '',
+      recipientEmail: '', recipientUid, recipientName: musician.name, name: list.name, itemCount: published.count,
+      offeredVersion: published.version, acceptedVersion: existing?.acceptedVersion ?? 0, declinedVersion: 0,
+      status: existing?.status === 'accepted' ? 'accepted' : 'pending', updatedAt: now(),
+    });
+  });
+};
 export const sentSetlistInvites = async (listId: string): Promise<SetlistInvite[]> => {
   const user = requireUser();
   const result = await getDocsFromServer(query(collection(firestore, 'wmInvites'), where('senderUid', '==', user.uid), where('shareId', '==', shareIdFor(user.uid, listId))));
@@ -103,7 +132,7 @@ export const sentSetlistInvites = async (listId: string): Promise<SetlistInvite[
 };
 export const downloadSharedVersion = async (invite: SetlistInvite): Promise<SharedSetlist> => {
   const user = requireUser();
-  if (normalizeInviteEmail(user.email) !== invite.recipientEmail) throw new Error('Este convite pertence a outra conta.');
+  if (!isInviteRecipient(invite, user.uid, user.email)) throw new Error('Este convite pertence a outra conta.');
   const [header, snapshot] = await Promise.all([
     getDocFromServer(doc(firestore, 'wmShares', invite.shareId, 'versions', String(invite.offeredVersion))),
     getDocsFromServer(query(collection(firestore, 'wmShares', invite.shareId, 'versions', String(invite.offeredVersion), 'items'), orderBy('order'))),
