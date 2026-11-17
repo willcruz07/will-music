@@ -1,5 +1,5 @@
 import { isIOS } from './ios.ts';
-import { isMobileStudio, MOBILE_TRACKS_NOTICE } from './studioDevice.ts';
+import { isMobileStudio, mobileLiteSeparationEnabled, MOBILE_TRACKS_NOTICE } from './studioDevice.ts';
 import { MODELS, type ModelId, SEPARATION_GEOMETRY, STEM_MODES, type StemMode, modelVersion, toStereoPlanar } from '@will-music/engine';
 import type { SeparationResponse, SeparationTracks } from '../worker/separationProtocol.ts';
 import { type StemName, type StemsRecord, db, now } from './db.ts';
@@ -20,14 +20,19 @@ export const MODE_INFO: Record<StemMode, { label: string; description: string; m
   const demucs: ModelId[] = ['demucs6s'];
   return {
     vocals: { label: 'Voz e instrumental', description: 'Voz principal, vocais de apoio e instrumental. Para karaokê e para ensaiar o canto.', models: kara2, downloadBytes: bytes(kara2), effort: 'alguns minutos' },
-    four: { label: '4 faixas', description: 'Voz, bateria, baixo e outros. Para tocar junto tirando o seu instrumento.', models: demucs, downloadBytes: bytes(demucs), effort: 'vários minutos' },
+    four: isMobileStudio()
+      // Phones: the light SCNet model on the processor (WebGPU and the 285 MB model do not fit there).
+      ? { label: '4 faixas (modo leve)', description: 'Voz, bateria, baixo e outros, com um modelo reduzido para o celular. Para 6 faixas e melhor desempenho, use um computador.', models: ['scnetTran'], downloadBytes: bytes(['scnetTran']), effort: 'vários minutos (no celular é mais lento)' }
+      : { label: '4 faixas', description: 'Voz, bateria, baixo e outros. Para tocar junto tirando o seu instrumento.', models: demucs, downloadBytes: bytes(demucs), effort: 'vários minutos' },
     six: { label: '6 faixas', description: 'Voz, bateria, baixo, violão/guitarra, piano e outros. Para estudar cada instrumento.', models: demucs, downloadBytes: bytes(demucs), effort: 'vários minutos' },
     full: { label: 'Completa', description: 'As 6 faixas com a voz dividida em principal e apoio (7 faixas). O máximo de controle.', models: [...demucs, ...kara2], downloadBytes: bytes([...demucs, ...kara2]), effort: 'o dobro do tempo' },
   };
 })();
 
 // The study player uses six tracks. Vocal-specific modes remain available to the vocal division features.
-export const availableModes = (): StemMode[] => ['six'];
+export const availableModes = (): StemMode[] => (isMobileStudio() ? (mobileLiteSeparationEnabled() ? ['four'] : []) : ['six']);
+/** Phones separate with the light SCNet model on the processor (WASM), never with WebGPU. */
+const usesLightModel = (mode: StemMode): boolean => isMobileStudio() && mode === 'four' && mobileLiteSeparationEnabled();
 
 export const decodeForSeparation = async (blob: Blob): Promise<{ planar: Float32Array; samples: number }> => {
   const context = new OfflineAudioContext(2, 1, SEPARATION_GEOMETRY.sampleRate);
@@ -37,7 +42,9 @@ export const decodeForSeparation = async (blob: Blob): Promise<{ planar: Float32
 
 export const runSeparationInWorker = (planar: Float32Array, samples: number, mode: StemMode, onProgress: (p: SeparationProgress) => void, signal?: AbortSignal): Promise<SeparationTracks> =>
   new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('../worker/separation.worker.ts', import.meta.url), { type: 'module' });
+    const worker = usesLightModel(mode)
+      ? new Worker(new URL('../worker/separationLite.worker.ts', import.meta.url), { type: 'module' })
+      : new Worker(new URL('../worker/separation.worker.ts', import.meta.url), { type: 'module' });
     const stop = () => {
       worker.terminate();
       reject(new DOMException('Separação cancelada.', 'AbortError'));
@@ -96,10 +103,12 @@ type Deps = {
 
 /** Separates and stores MP3 tracks; a quota refusal returns the completed tracks for session-only playback. */
 export const separateSong = async (songId: string, onProgress: (p: SeparationProgress) => void, deps: Deps = {}): Promise<{ record: StemsRecord; persisted: boolean }> => {
-  if (isMobileStudio()) throw new Error(MOBILE_TRACKS_NOTICE);
-  const mode = deps.mode ?? 'six';
-  const gpu = 'gpu' in deps ? deps.gpu : (navigator as Navigator & { gpu?: GpuLike }).gpu;
-  if (!(await hasUsableWebGpu(gpu))) throw new Error(NO_WEBGPU);
+  const mode = deps.mode ?? (isMobileStudio() ? 'four' : 'six');
+  if (isMobileStudio() && !usesLightModel(mode)) throw new Error(MOBILE_TRACKS_NOTICE);
+  if (!usesLightModel(mode)) {
+    const gpu = 'gpu' in deps ? deps.gpu : (navigator as Navigator & { gpu?: GpuLike }).gpu;
+    if (!(await hasUsableWebGpu(gpu))) throw new Error(NO_WEBGPU);
+  }
   const audio = await db.audio.get(songId);
   if (!audio) throw new Error('Esta música não tem áudio para separar.');
   // Room for the models not on the device yet plus the new tracks (MP3 at 192 kbps), with a margin.

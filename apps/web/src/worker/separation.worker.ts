@@ -2,6 +2,7 @@
 import {
   DEMUCS,
   MODELS,
+  type ModelId,
   SEPARATION_GEOMETRY as G,
   type StemMode,
   applyMasks,
@@ -18,7 +19,7 @@ import {
 } from '@will-music/engine';
 import * as ort from 'onnxruntime-web/webgpu';
 import { createAlignedMp3 } from '../lib/mp3.ts';
-import { fetchModel } from '../lib/models.ts';
+import { ensureModel, fetchModel } from '../lib/models.ts';
 import type { SeparationRequest, SeparationResponse, SeparationTracks } from './separationProtocol.ts';
 
 ort.env.logLevel = 'error';
@@ -84,11 +85,19 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
     const ids = [...(needsDemucs ? (['demucs6s'] as const) : []), ...(needsKara2 ? (['kara2Core', 'kara2Data'] as const) : [])];
     const totalBytes = ids.reduce((n, id) => n + MODELS[id].bytes, 0);
     let base = 0;
+    // Bytes kept only for a model the cache refused to store, so it is not downloaded a second time.
+    const kept = new Map<ModelId, Uint8Array>();
     const load = async (id: (typeof ids)[number]) => {
       stage = `baixar o modelo ${MODELS[id].file}`;
-      const bytes = await fetchModel(id, (loaded) => post({ type: 'progress', stage: 'models', done: base + loaded, total: totalBytes }));
+      const bytes = await ensureModel(id, (loaded) => post({ type: 'progress', stage: 'models', done: base + loaded, total: totalBytes }));
+      if (bytes) kept.set(id, bytes);
       base += MODELS[id].bytes;
-      return bytes;
+    };
+    // Each model is read back (from the cache, or the kept copy) only when its turn comes.
+    const take = async (id: ModelId): Promise<Uint8Array> => {
+      const bytes = kept.get(id);
+      kept.delete(id);
+      return bytes ?? fetchModel(id);
     };
     const demucsPlan = needsDemucs ? planChunks(samples, DEMUCS.SEGMENT, DEMUCS.OVERLAP) : [];
     const karaPlan = needsKara2 ? planChunks(samples) : [];
@@ -100,6 +109,8 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
     // minutes of separation), but each one is read back from the cache only when its turn comes, so the
     // "full" mode never holds both models (~525 MB) at once.
     for (const id of ids) await load(id);
+    // Block 0: the models are ready and the first one is going to the graphics card (it takes a few seconds).
+    post({ type: 'progress', stage: 'separate', done: 0, total: totalChunks });
 
     try {
       // Demucs first: it reads the mix without changing it (kara2 turns the mix buffer into the instrumental).
@@ -107,7 +118,7 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
         const demucsMode = mode as Exclude<StemMode, 'vocals'>;
         // Already optimized offline; re-optimizing it in the browser only spikes memory.
         stage = 'carregar o modelo de 4/6 faixas na placa de vídeo';
-        let model: Uint8Array | null = await fetchModel('demucs6s');
+        let model: Uint8Array | null = await take('demucs6s');
         const session = await ort.InferenceSession.create(model, { executionProviders: webgpu(device), graphOptimizationLevel: 'disabled' });
         model = null;
         try {
@@ -136,8 +147,8 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
 
       if (needsKara2) {
         stage = 'carregar o modelo de voz na placa de vídeo';
-        let core: Uint8Array | null = await fetchModel('kara2Core');
-        let data: Uint8Array | null = await fetchModel('kara2Data');
+        let core: Uint8Array | null = await take('kara2Core');
+        let data: Uint8Array | null = await take('kara2Data');
         const session = await ort.InferenceSession.create(core, { executionProviders: webgpu(device), externalData: [{ path: MODELS.kara2Data.file, data }] });
         // The runtime keeps its own copy: release ours (~240 MB) before the chunk loop.
         core = null;

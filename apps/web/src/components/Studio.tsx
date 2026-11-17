@@ -22,7 +22,7 @@ import { ChordsSkeleton, ChordShapeSkeleton, TracksSkeleton } from './StudioSkel
 import { ChartChordShapes } from './ChartChordShapes.tsx';
 import { chartChords, readInstrument } from './ChordPanel.tsx';
 import { PrintChartButton } from './PrintChartButton.tsx';
-import { isMobileStudio, MOBILE_LYRICS_NOTICE } from '../lib/studioDevice.ts';
+import { isMobileStudio, MOBILE_LYRICS_NOTICE, MOBILE_MODELS_NOTICE } from '../lib/studioDevice.ts';
 
 type Props = {
   song: Song; chart?: Chart; analysis?: Analysis; progress: PipelineProgress | null;
@@ -125,7 +125,7 @@ export const Studio = (props: Props) => {
         {!mobile && !lyricsLoading && !analysis?.lyrics && analysis && <p className="mt-5 text-sm text-muted-foreground">A transcrição não trouxe letra. Você pode editar o texto ou tentar a análise novamente.</p>}
       </section>
       <section id="studio-chords" role="tabpanel" aria-labelledby="studio-tab-chords" hidden={tab !== 'chords'}>
-        {mobile && <MobileNotice text="Neste aparelho, a análise identifica tom e acordes no áudio original. A transcrição da letra e a separação de faixas ficam disponíveis no computador para evitar tarefas de uso elevado de memória no celular ou tablet." />}
+        {mobile && <MobileNotice text={`Neste aparelho, a análise identifica tom e acordes no áudio original e busca a letra no LRCLIB. ${MOBILE_MODELS_NOTICE}`} />}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">Harmonia da música</h2><span className="text-xs text-muted-foreground">Sequência por tempo</span></div>
         {chordsLoading ? <div role="status"><p className="text-sm text-muted-foreground">{chordTask?.label ?? 'Identificando tom e acordes…'}</p><ProgressBar fraction={chordTask?.fraction} /><ChordsSkeleton /></div> : <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">{chords.map((c, i) => <button key={`${c.start}-${i}`} type="button" aria-current={i === props.currentIndex ? 'true' : undefined} onClick={() => props.onSeek(c.start)} className={`rounded-xl border p-4 text-left transition-colors ${i === props.currentIndex ? 'border-primary bg-primary/15' : 'border-border bg-surface/60 hover:border-primary/50'}`}><span className="block text-xs tabular-nums text-muted-foreground">{clock(c.start)} — {clock(c.end)}</span><span className="mt-2 block text-lg font-semibold text-chord">{name(c.raw)}</span></button>)}</div>
@@ -134,7 +134,7 @@ export const Studio = (props: Props) => {
       </section>
       <section id="studio-tracks" role="tabpanel" aria-labelledby="studio-tab-tracks" hidden={tab !== 'tracks'}>
         <h2 className="mb-5 text-lg font-semibold">Tracks</h2>
-        {tracksLoading ? <><p className="text-sm text-muted-foreground" role="status">{tracksTask?.label ?? 'Preparando faixas…'}</p><ProgressBar fraction={tracksTask?.fraction} /><p className="text-xs text-muted-foreground">{tracksTask?.detail}</p><TracksSkeleton /></> : <StemsPanel stems={stems} title={song.title} hasAudio automaticMix mixer={tab === 'tracks' && !progress ? <StudioMixer stems={stems} onSeek={props.onSeek} getTime={props.getTime} /> : undefined} />}
+        {tracksLoading ? <><p className="text-sm text-muted-foreground" role="status">{tracksTask?.label ?? 'Preparando faixas…'}</p><ProgressBar fraction={tracksTask?.fraction} /><p className="text-xs text-muted-foreground tabular-nums">{tracksTask?.detail}</p><TracksSkeleton /></> : <StemsPanel stems={stems} title={song.title} hasAudio automaticMix mixer={tab === 'tracks' && !progress ? <StudioMixer stems={stems} onSeek={props.onSeek} getTime={props.getTime} /> : undefined} />}
       </section>
       <section id="studio-scores" role="tabpanel" aria-labelledby="studio-tab-scores" hidden={tab !== 'scores'}>
         {mobile && <MobileNotice text="A geração de partituras depende das faixas separadas e também pode exigir muita memória. Recomendamos gerar no computador. Partituras já salvas podem ser abertas na biblioteca." />}

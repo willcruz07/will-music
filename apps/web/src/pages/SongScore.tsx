@@ -29,6 +29,7 @@ import { useStems } from '../lib/useStems.ts';
 import { Button } from '../ui/Button.tsx';
 import { rovingKeys } from '../lib/a11y.ts';
 import { PrintScoreButton } from '../components/PrintScoreButton.tsx';
+import { EditScoreButton } from '../components/sheet/EditScoreButton.tsx';
 
 const progressLabel = (p: ScoreProgress) =>
   p.stage === 'decode' ? 'Preparando o áudio' : p.stage === 'models' ? 'Baixando o modelo de notas' : `Escutando as notas (${p.done} de ${p.total})`;
@@ -312,6 +313,7 @@ const SongScorePage = ({ id }: { id: string }) => {
             <Download className="size-4" /> Baixar MusicXML
           </Button>
           {xml && <PrintScoreButton xml={xml} title={`${song.title} — ${info.label}`} />}
+          {xml && <EditScoreButton type={type} song={song} analysis={analysis} score={score} />}
           <Button variant="ghost" onClick={generate} disabled={!!progress || !audioUrl}>
             <RefreshCw className="size-4" /> Gerar de novo
           </Button>

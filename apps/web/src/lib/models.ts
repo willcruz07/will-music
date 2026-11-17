@@ -113,6 +113,23 @@ export const fetchModel = async (
   return new Uint8Array(await stored.arrayBuffer());
 };
 
+/**
+ * Makes sure a model is on the device without reading it back: a cached model costs only a lookup. Returns the
+ * bytes only when the cache refused to store them, so the caller can keep that copy instead of downloading again.
+ */
+export const ensureModel = async (
+  id: ModelId,
+  onProgress?: (loaded: number, total: number) => void,
+  fetchFn: typeof fetch = fetch,
+): Promise<Uint8Array<ArrayBuffer> | null> => {
+  const cache = await caches.open(CACHE_NAME);
+  if (await cache.match(MODELS[id].url)) {
+    onProgress?.(MODELS[id].bytes, MODELS[id].bytes);
+    return null;
+  }
+  return cacheModel(id, onProgress, fetchFn);
+};
+
 export const listCachedModels = async (): Promise<{ id: ModelId; bytes: number }[]> => {
   const cache = await caches.open(CACHE_NAME);
   const urls = new Set((await cache.keys()).map((r) => r.url));

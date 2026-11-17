@@ -65,7 +65,28 @@ export const parseLrc = (text: string): LyricLine[] => {
   return lines.sort((a, b) => a.start - b.start);
 };
 
-export const distributePlainLyrics = (plain: string, durationSec: number): LyricLine[] => {
+/**
+ * Lyrics from LRCLIB for an analysis, without any model: synced lines when available, plain lyrics spread over the
+ * song otherwise. Null when nothing from the same artist was found (or offline).
+ */
+export const findSongLyrics = async (
+  title: string,
+  artist: string,
+  durationSec: number,
+  fetchFn: typeof fetch = fetch,
+): Promise<{ source: 'lrclib'; lrclibId: number; lines: LyricLine[]; warning?: string } | null> => {
+  if (!title.trim() || (typeof navigator !== 'undefined' && !navigator.onLine)) return null;
+  const picked = pickBestLyrics(await searchLyrics(title.trim(), artist.trim(), fetchFn), durationSec, artist.trim());
+  if (!picked) return null;
+  const { result } = picked;
+  const synced = result.syncedLyrics ? parseLrc(result.syncedLyrics) : [];
+  const lines = synced.length ? synced : distributePlainLyrics(result.plainLyrics ?? '', durationSec);
+  if (!lines.length) return null;
+  const warning = picked.warning ?? (synced.length ? undefined : 'A letra veio sem tempos; as linhas foram distribuídas ao longo da música.');
+  return { source: 'lrclib', lrclibId: result.id, lines, ...(warning ? { warning } : {}) };
+};
+
+export const distributePlainLyrics =(plain: string, durationSec: number): LyricLine[] => {
   const texts = plain.split(/\r?\n/u).map((l) => l.trim()).filter(Boolean);
   const from = 0.1 * durationSec;
   const span = 0.8 * durationSec;

@@ -5,6 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { lvChordiaExperiment } from '../../tools/lv-chordia/vite-plugin.ts';
+import { alphaTab } from '@coderline/alphatab-vite';
 
 // The app version shown in the header comes from this package.json: change "version" there to release a new one.
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
@@ -16,6 +17,8 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     lvChordiaExperiment(),
+    // Score editor: copies the notation font and the SoundFont, and emits alphaTab's worker and audio worklet.
+    alphaTab(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -50,7 +53,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,jpeg,webp,woff2,wasm}'],
         // The WebGPU runtime is only needed to separate tracks: fetch it on first use, then keep it.
         globIgnores: ['**/ort-wasm-simd-threaded.jsep-*.wasm', '**/ort-wasm-simd-threaded.asyncify-*.wasm', '**/ort-wasm-simd-threaded.jspi-*.wasm'],
-        runtimeCaching: [{ urlPattern: /\.wasm$/, handler: 'CacheFirst', options: { cacheName: 'wm-runtime-wasm' } }],
+        runtimeCaching: [
+          { urlPattern: /\.wasm$/, handler: 'CacheFirst', options: { cacheName: 'wm-runtime-wasm' } },
+          // Instrument sounds of the score player: fetched on first use, then kept for offline study.
+          { urlPattern: /\/soundfont\/.*\.sf2$/, handler: 'CacheFirst', options: { cacheName: 'wm-soundfont' } },
+        ],
         maximumFileSizeToCacheInBytes: 40 * 1024 * 1024,
       },
     }),

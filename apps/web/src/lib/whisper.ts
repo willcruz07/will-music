@@ -3,6 +3,7 @@ import { db } from './db.ts';
 import { notifyModelsChanged } from './modelsReminder.ts';
 import { findVoiceTracks, getStems } from './stems.ts';
 import { getSessionStems } from './sessionStems.ts';
+import type { TimedWord } from './lyricsAlign.ts';
 import { type TranscribeProgress, type WhisperChunk, isUsefulTranscript, leadingSilence, transcriptToLines, wordsToSegments } from './transcript.ts';
 import type { LyricLine, StemsRecord } from './db.ts';
 import { type WhisperDevice, detectWhisperDevice, whisperCacheReady } from './whisperModel.ts';
@@ -21,15 +22,44 @@ const decodeMono16k = async (blob: Blob): Promise<Float32Array> => {
   return out;
 };
 
+const newWhisperWorker = () => new Worker(new URL('../worker/whisper.worker.ts', import.meta.url), { type: 'module' });
+
+/** A Whisper worker loading its model ahead of time; `transcribeSong` takes it over when the audio is ready. */
+export type WhisperWarm = {
+  /** Receives the worker's messages until a transcription takes it over (model download progress). */
+  listen: (fn: ((msg: WhisperResponse) => void) | null) => void;
+  /** The worker, once: null when already taken or broken. */
+  take: () => Worker | null;
+  dispose: () => void;
+};
+
+/** Starts loading the lyrics model in its own worker (desktop), so the transcription does not wait for it later. */
+export const warmWhisper = (): WhisperWarm | null => {
+  if (isMobileStudio()) return null;
+  const worker = newWhisperWorker();
+  let listener: ((msg: WhisperResponse) => void) | null = null;
+  let available = true;
+  worker.onmessage = (event: MessageEvent<WhisperResponse>) => listener?.(event.data);
+  worker.onerror = () => { available = false; worker.terminate(); };
+  const request: WhisperRequest = { type: 'warm' };
+  worker.postMessage(request);
+  return {
+    listen: (fn) => { listener = fn; },
+    take: () => { if (!available) return null; available = false; listener = null; return worker; },
+    dispose: () => { available = false; worker.terminate(); },
+  };
+};
+
 const runWhisper = (
   audio: Float32Array,
   cached: boolean,
   onProgress: (p: TranscribeProgress) => void,
   signal?: AbortSignal,
+  warm?: WhisperWarm,
 ): Promise<{ chunks: WhisperChunk[]; device: string; words: boolean }> =>
   new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(signal.reason);
-    const worker = new Worker(new URL('../worker/whisper.worker.ts', import.meta.url), { type: 'module' });
+    const worker = warm?.take() ?? newWhisperWorker();
     const cleanup = () => { signal?.removeEventListener('abort', abort); worker.terminate(); };
     const abort = () => { cleanup(); reject(signal?.reason ?? new DOMException('Transcrição cancelada.', 'AbortError')); };
     signal?.addEventListener('abort', abort, { once: true });
@@ -38,6 +68,7 @@ const runWhisper = (
       // A model already on the device also reports file progress while it is read: that is not a download.
       if (msg.type === 'progress') return onProgress(cached ? { stage: 'load' } : { stage: 'download', loaded: msg.loaded, total: msg.total });
       if (msg.type === 'transcribing') return onProgress({ stage: 'listen', done: msg.done, total: msg.total, heard: msg.heard });
+      if (msg.type === 'warmed') return;
       cleanup();
       if (msg.type === 'result') resolve(msg);
       else reject(new Error(msg.type === 'error' ? msg.message : 'A transcrição falhou.'));
@@ -62,7 +93,7 @@ export const whisperCached = async (device?: WhisperDevice): Promise<boolean> =>
 export const preloadWhisper = (onProgress: (loaded: number, total: number) => void): Promise<void> =>
   new Promise((resolve, reject) => {
     if (isMobileStudio()) return reject(new Error(MOBILE_LYRICS_NOTICE));
-    const worker = new Worker(new URL('../worker/whisper.worker.ts', import.meta.url), { type: 'module' });
+    const worker = newWhisperWorker();
     worker.onmessage = async (event: MessageEvent<WhisperResponse>) => {
       const msg = event.data;
       if (msg.type === 'progress') return onProgress(msg.loaded, msg.total);
@@ -89,8 +120,8 @@ export const preloadWhisper = (onProgress: (loaded: number, total: number) => vo
 export const transcribeSong = async (
   songId: string,
   onProgress: (p: TranscribeProgress) => void,
-  source?: { stems?: StemsRecord; original?: boolean; signal?: AbortSignal },
-): Promise<{ lines: LyricLine[]; usedVocals: boolean }> => {
+  source?: { stems?: StemsRecord; original?: boolean; signal?: AbortSignal; warm?: WhisperWarm },
+): Promise<{ lines: LyricLine[]; usedVocals: boolean; /** Each word's start time, when Whisper gave word timestamps. */ words?: TimedWord[] }> => {
   if (isMobileStudio()) throw new Error(MOBILE_LYRICS_NOTICE);
   source?.signal?.throwIfAborted();
   const cached = await whisperCached();
@@ -113,12 +144,13 @@ export const transcribeSong = async (
   // Skip the silent intro: Whisper tends to loop on a made-up phrase over silence. Timestamps are shifted back.
   source?.signal?.throwIfAborted();
   const offset = leadingSilence(audio, RATE);
-  const { chunks: raw, words } = await runWhisper(offset ? audio.slice(Math.round(offset * RATE)) : audio, cached, onProgress, source?.signal);
+  const { chunks: raw, words } = await runWhisper(offset ? audio.slice(Math.round(offset * RATE)) : audio, cached, onProgress, source?.signal, source?.warm);
   const chunks = words ? wordsToSegments(raw) : raw;
   const lines = transcriptToLines(chunks.map((c) => ({
     text: c.text,
     timestamp: [c.timestamp[0] + offset, c.timestamp[1] === null ? null : c.timestamp[1] + offset] as WhisperChunk['timestamp'],
   })));
   if (!isUsefulTranscript(lines)) throw new Error('Não deu para entender a letra neste áudio.');
-  return { lines, usedVocals: vocalTracks.length > 0 };
+  const timed = words ? raw.filter((c) => c.text.trim()).map((c) => ({ start: c.timestamp[0] + offset, text: c.text })) : undefined;
+  return { lines, usedVocals: vocalTracks.length > 0, ...(timed?.length ? { words: timed } : {}) };
 };

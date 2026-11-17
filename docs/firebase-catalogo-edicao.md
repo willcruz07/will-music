@@ -1,5 +1,7 @@
 # Edição canônica de cifras do catálogo
 
+> **Substituído em 16/11/2026** por [firebase-catalogo-comunidade.md](firebase-catalogo-comunidade.md): o will-music não altera mais a cifra principal; correções viram opções da comunidade.
+
 ## Leitura e edição
 
 O adaptador retorna sempre `chordPro`, priorizando o campo `cifras/{id}.chordPro` quando é texto não vazio. Apenas documentos antigos usam `content`, convertido das anotações Alt7 para ChordPro na entrada. O campo legado não circula mais como conteúdo do modelo de leitura/edição do aplicativo. Formatação de ChordPro já existente é preservada.

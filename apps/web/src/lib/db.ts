@@ -17,7 +17,7 @@ export type Song = {
   /** User folder in the chart library (e.g. Culto, Natal, Ensaio). */
   folder?: string;
   /** Provenance only; saved charts remain independent, locally editable documents. */
-  catalogSource?: { project: string; collection: 'cifras'; id: string; savedAt: string };
+  catalogSource?: { project: string; collection: 'cifras'; id: string; savedAt: string; /** Community option this copy came from (`<uid>_<optionId>`). */ optionKey?: string };
   favorite: boolean;
   analysisStatus: AnalysisStatus;
   analysisError?: string;
@@ -106,6 +106,9 @@ export type LibraryDatabase = Dexie & {
   settings: EntityTable<{ key: string; value: unknown }, 'key'>;
   scores: EntityTable<ScoreRecord, 'songId'>;
   sharedSetlists: EntityTable<import('./sharingTypes.ts').SharedSetlist, 'id'>;
+  /** Written scores (editor) and scores opened from a teacher's link. */
+  sheets: EntityTable<import('./sheet/model.ts').Sheet, 'id'>;
+  sharedSheets: EntityTable<import('./sheet/store.ts').SharedSheetRecord, 'id'>;
 };
 
 export const createLibraryDatabase = (name: string): LibraryDatabase => {
@@ -132,6 +135,7 @@ db.version(6).stores({ stems: null });
 // v7: app settings that must survive (e.g. the connected device folder handle).
 db.version(7).stores({ settings: 'key' });
 db.version(8).stores({ sharedSetlists: 'id, ownerUid, updatedAt' });
+db.version(9).stores({ sheets: 'id, updatedAt, songId', sharedSheets: 'id, openedAt' });
 
 // Public readers always receive a Blob, including the binary fallback used for refused Blob writes.
 // No schema upgrade is needed: only the non-indexed audio payload changes representation.

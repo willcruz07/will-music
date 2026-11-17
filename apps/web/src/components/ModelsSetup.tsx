@@ -1,3 +1,4 @@
+import { ProgressBar } from './AnalysisProgress.tsx';
 import { Check, Download, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MODELS, type ModelId } from '@will-music/engine';
@@ -179,7 +180,7 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
                 Para analisar músicas, o app usa modelos de inteligência artificial que rodam no seu aparelho.
                 {pending.length > 0 ? ` Instale agora (cerca de ${mb(total)}, melhor no Wi-Fi):` : ' Todos os escolhidos já estão no aparelho.'}
               </p>
-              {isMobileStudio() && <p className="mt-3 text-sm text-muted-foreground">No celular ou tablet, preparamos apenas a identificação de acordes e tom. Use um computador para transcrever letras e para maior estabilidade ao separar faixas.</p>}
+              {isMobileStudio() && <p className="mt-3 text-sm text-muted-foreground">No celular ou tablet, os modelos são reduzidos para caber na memória: preparamos a identificação de acordes e tom; a letra vem do LRCLIB e a separação usa um modelo leve de 4 faixas, baixado quando você pedir. Para melhor desempenho, transcrição com Whisper e 6 faixas, use um computador.</p>}
               <ul className="mt-3 space-y-2">
                 {itemsForDevice().map((item) => {
                   const done = ready.has(item.id);
@@ -203,10 +204,11 @@ const SetupSheet = ({ initialReady, onReady, onClose }: { initialReady: Set<Item
               <StorageProtection />
               {phase.kind === 'installing' && (
                 <div className="mt-4" role="status">
-                  <p className="text-sm">{phase.label}</p>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${Math.round(phase.fraction * 100)}%` }} />
+                  <div className="flex items-baseline gap-2">
+                    <p key={phase.item} className="progress-fade min-w-0 flex-1 text-sm tabular-nums">{phase.label}</p>
+                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{Math.round(phase.fraction * 100)}%</span>
                   </div>
+                  <ProgressBar fraction={phase.fraction} className="mt-2 h-2" />
                 </div>
               )}
               <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

@@ -13,6 +13,7 @@ import { ScoreView } from './ScoreView.tsx';
 import { chartLineStarts, lyricTexts } from '../lib/lineTimes.ts';
 import { ScoreSkeleton } from './StudioSkeletons.tsx';
 import { PrintScoreButton } from './PrintScoreButton.tsx';
+import { EditScoreButton } from './sheet/EditScoreButton.tsx';
 
 export const StudioScores = ({ song, analysis, chart, tracks, active, waiting, onBusyChange }: {
   song: Song; analysis?: Analysis; chart?: Chart; tracks?: StemsRecord['tracks']; active: boolean; waiting: boolean; onBusyChange?: (busy: boolean) => void;
@@ -79,6 +80,7 @@ export const StudioScores = ({ song, analysis, chart, tracks, active, waiting, o
         <div className="mt-4 flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => downloadText(xml, `${song.title} (${info.label}).musicxml`, 'application/vnd.recordare.musicxml+xml')}><Download className="size-4" /> Exportar MusicXML</Button>
           <PrintScoreButton xml={xml} title={`${song.title} — ${info.label}`} />
+          <EditScoreButton type={type} song={song} analysis={analysis} score={score} />
         </div>
         {savedId && <p className="mt-3 text-sm" role="status">Todas as partes prontas foram salvas sem áudio. <Link to={`/?aba=partituras`} className="text-chord underline">Ver na biblioteca</Link> · <Link to={`/musica/${savedId}/partitura`} className="text-chord underline">Abrir partituras</Link></p>}
         <p className="mt-3 text-xs text-muted-foreground">Rascunho em 4/4, com andamento estimado quando não informado. Confira notas, ritmo e compasso; o MusicXML pode ser revisado no MuseScore.</p>

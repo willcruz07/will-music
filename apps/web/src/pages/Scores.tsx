@@ -7,6 +7,7 @@ import { LibraryCard, LibraryBadge } from '../components/LibraryCard.tsx';
 import { LibraryEmptyState } from '../components/LibraryEmptyState.tsx';
 import { isMobileStudio } from '../lib/studioDevice.ts';
 import { Button } from '../ui/Button.tsx';
+import { SheetLibrary } from '../components/sheet/SheetLibrary.tsx';
 
 export const Scores = ({ embedded = false, query = '', onDeleted, onClearSearch, revision = 0 }: { embedded?: boolean; query?: string; onDeleted?: () => void; onClearSearch?: () => void; revision?: number }) => {
   const [songs, setSongs] = useState<Song[] | null>(null);
@@ -32,6 +33,7 @@ export const Scores = ({ embedded = false, query = '', onDeleted, onClearSearch,
       {!embedded && <p className="mt-2 max-w-2xl text-muted-foreground">
         Partituras salvas, prontas para abrir sem reprocessar o áudio. Gere novas partes na aba Partituras do Estúdio.
       </p>}
+      <SheetLibrary query={query} />
       {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
       {!error && songs && visible.length === 0 && (
         <LibraryEmptyState section="Partituras" title={ready.size && query.trim() ? 'Nenhuma partitura com este nome' : 'Suas partituras, prontas para estudar'}

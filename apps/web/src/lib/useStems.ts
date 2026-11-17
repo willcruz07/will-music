@@ -5,7 +5,7 @@ import type { StemsRecord } from './db.ts';
 import { exportMixMp3 } from './exportMix.ts';
 import { isRunning } from './jobs.ts';
 import { getSessionStems, retainSessionStems, setSessionStems } from './sessionStems.ts';
-import { isMobileStudio, MOBILE_TRACKS_NOTICE } from './studioDevice.ts';
+import { isMobileStudio } from './studioDevice.ts';
 import { type MixTrack, mixVolumes } from './mixer.ts';
 import { type SeparationProgress, deleteStemSet, listStemSets, selectStemSet, separateSong } from './stems.ts';
 
@@ -27,12 +27,13 @@ export const useStems = (songId: string, originalUrl?: string, autoMix = false) 
   const [temporaryTracks, setTemporaryTracks] = useState(false);
 
   const load = useCallback(async () => {
-    if (isMobileStudio()) return; // Keep original playback; do not load large stored stem sets into memory.
+    // Phones only play the tracks separated in this session (light model); stored sets are not loaded into memory.
+    const mobile = isMobileStudio();
     const current = generation.current;
-    const sets = await listStemSets(songId);
+    const sets = mobile ? [] : await listStemSets(songId);
     if (generation.current !== current) return;
     const temporary = getSessionStems(songId);
-    const record = temporary ?? sets.find((set) => set.mode === 'six');
+    const record = temporary ?? (mobile ? undefined : sets.find((set) => set.mode === 'six'));
     setTemporaryTracks(!!temporary);
     setModes([...new Set([...sets.map((s) => s.mode), ...(temporary ? [temporary.mode] : [])])]);
     setActive(record ?? null);
@@ -65,8 +66,7 @@ export const useStems = (songId: string, originalUrl?: string, autoMix = false) 
   }, [load]);
 
   const separate = useCallback(
-    async (mode: StemMode = 'six') => {
-      if (isMobileStudio()) { setError(MOBILE_TRACKS_NOTICE); return; }
+    async (mode: StemMode = isMobileStudio() ? 'four' : 'six') => {
       if (abort.current || isRunning(songId)) return; // the pipeline owns separation while analyzing
       setError(null);
       const controller = new AbortController();

@@ -1,6 +1,8 @@
+import { createSeparationReporter } from '../../lib/separationProgress.ts';
+import { ProgressBar } from '../AnalysisProgress.tsx';
 import type { StemMode } from '@will-music/engine';
 import { Download, Layers, Trash2, X } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { formatBytes, hasPredictableQuota, storageStatus } from '../../lib/storage.ts';
 import { StorageProtection } from '../StorageProtection.tsx';
 import { downloadBlob } from '../../lib/download.ts';
@@ -10,7 +12,7 @@ import { Button } from '../../ui/Button.tsx';
 import { confirmDialog } from '../../ui/Dialog.tsx';
 import { Mixer } from '../Mixer.tsx';
 import { TracksSkeleton } from '../StudioSkeletons.tsx';
-import { isMobileStudio, MOBILE_TRACKS_NOTICE } from '../../lib/studioDevice.ts';
+import { isMobileStudio, mobileLiteSeparationEnabled, MOBILE_LITE_WARNING, MOBILE_TRACKS_NOTICE, setMobileLiteSeparation } from '../../lib/studioDevice.ts';
 
 const mb = (n: number) => Math.round(n / 1e6);
 
@@ -42,7 +44,21 @@ export const StemsPanel = ({ stems, title, hasAudio, mixer, automaticMix = false
   const [choosing, setChoosing] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  if (isMobileStudio()) return <p className="rounded-xl border border-border bg-surface p-4 text-sm leading-relaxed text-muted-foreground">{MOBILE_TRACKS_NOTICE}</p>;
+  const mobile = isMobileStudio();
+  const [liteEnabled, setLiteEnabled] = useState(mobileLiteSeparationEnabled);
+  // Time per separated block, to show how long the rest will take (and to measure phones).
+  const timing = useRef<{ started: number; done: number; at: number } | null>(null);
+  // One reporter per separation (it keeps the download speed and block times).
+  const reporter = useRef<ReturnType<typeof createSeparationReporter> | null>(null);
+  if (!progress) reporter.current = null; else reporter.current ??= createSeparationReporter();
+  const report = reporter.current;
+  // Computed once per message, so a re-render never stretches the time estimate.
+  const view = useMemo(() => (progress && report ? report(progress) : null), [progress, report]);
+  useEffect(() => {
+    if (!progress || progress.stage !== 'separate') { if (!progress) timing.current = null; return; }
+    if (!timing.current) timing.current = { started: performance.now(), done: progress.done, at: performance.now() };
+    else if (progress.done !== timing.current.done) timing.current = { ...timing.current, done: progress.done, at: performance.now() };
+  }, [progress?.stage, progress?.done]);
   const exportButton = <Button variant={automaticMix ? 'primary' : 'outline'} disabled={!!exporting} onClick={() => {
     setExportError(null); setExporting('Preparando');
     void exportMix(setExporting).then(blob => downloadBlob(blob, `${title || 'música'} (mixagem).mp3`))
@@ -52,17 +68,17 @@ export const StemsPanel = ({ stems, title, hasAudio, mixer, automaticMix = false
   if (!hasAudio) return <p className="text-sm text-muted-foreground">Esta música não tem áudio para separar.</p>;
 
   if (progress) {
-    const pct = Math.round((progress.done / Math.max(1, progress.total)) * 100);
     return (
       <div role="status" aria-live="polite">
-        <p className="text-sm font-semibold">
-          {MODE_INFO[progress.mode].label}:{' '}
-          {progress.stage === 'models' ? `baixando o modelo (${mb(progress.done)} de ${mb(progress.total)} MB)` : `separando (${progress.done} de ${progress.total})`}
-        </p>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${pct}%` }} />
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">Pode continuar tocando e lendo a cifra. Se sair desta tela, a separação para.</p>
+        <p className="text-sm font-semibold">{MODE_INFO[progress.mode].label}: {view?.label}</p>
+        {view?.detail && <p key={view.label} className="progress-fade mt-0.5 text-xs text-muted-foreground tabular-nums">{view.detail}</p>}
+        {mobile && progress.stage === 'separate' && timing.current && timing.current.done > 0 && (() => {
+          const perBlock = (timing.current.at - timing.current.started) / 1000 / timing.current.done;
+          const left = Math.max(0, progress.total - progress.done) * perBlock;
+          return <p className="mt-1 text-xs text-muted-foreground">~{Math.round(perBlock)} s por bloco de 11 s · faltam cerca de {left >= 90 ? `${Math.round(left / 60)} min` : `${Math.round(left)} s`}</p>;
+        })()}
+        <ProgressBar fraction={view?.fraction} className="mt-2 h-2" />
+        <p className="mt-2 text-xs text-muted-foreground">Pode continuar tocando e lendo a cifra. Se sair desta tela, a separação para.{mobile ? ' No celular o modelo é reduzido e o processamento é mais lento; mantenha a tela aberta.' : ''}</p>
         <Button variant="ghost" className="mt-1" onClick={cancel}>
           <X className="size-4" /> Cancelar
         </Button>
@@ -115,9 +131,17 @@ export const StemsPanel = ({ stems, title, hasAudio, mixer, automaticMix = false
           {error}
         </p>
       )}
-      {!hasStems || choosing ? (
+      {mobile && !liteEnabled && !hasStems ? (
+        <div className="space-y-3">
+          <p className="rounded-xl border border-border bg-surface p-3 text-sm leading-relaxed text-muted-foreground">{MOBILE_TRACKS_NOTICE}</p>
+          <p className="text-sm text-muted-foreground">{MOBILE_LITE_WARNING}</p>
+          <Button variant="outline" onClick={() => { setMobileLiteSeparation(true); setLiteEnabled(true); }}>Ativar separação leve (experimental)</Button>
+        </div>
+      ) : !hasStems || choosing ? (
         <>
-          <p className="mb-2 text-sm text-muted-foreground">A música é separada em voz, bateria, baixo, guitarra, piano e outros. O modelo é baixado uma vez e reutilizado nas próximas músicas. A separação precisa de WebGPU.</p>
+          {mobile
+            ? <><p className="mb-2 rounded-xl border border-border bg-surface p-3 text-sm leading-relaxed text-muted-foreground">{MOBILE_TRACKS_NOTICE}</p><p className="mb-2 text-xs text-muted-foreground">{MOBILE_LITE_WARNING} <button type="button" className="font-semibold text-chord underline" onClick={() => { setMobileLiteSeparation(false); setLiteEnabled(false); }}>Desativar</button></p></>
+            : <p className="mb-2 text-sm text-muted-foreground">A música é separada em voz, bateria, baixo, guitarra, piano e outros. O modelo é baixado uma vez e reutilizado nas próximas músicas. A separação precisa de WebGPU.</p>}
           {chooser}
           <StorageNote />
           {hasStems && (

@@ -1,7 +1,8 @@
-import { collection, documentId, endAt, getCountFromServer, getDocFromServer, getDocsFromServer, getFirestore, doc, limit, orderBy, query, runTransaction, startAfter, startAt, where, type QueryConstraint, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
+import { collection, documentId, endAt, getCountFromServer, getDocFromServer, getDocsFromServer, getFirestore, doc, limit, orderBy, query, startAfter, updateDoc, setDoc, deleteField, serverTimestamp, FieldPath, startAt, where, type QueryConstraint, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { cloudApp } from './firebase.ts';
 import { catalogArtistId, catalogArtistSelector, mapCatalogArtist, mapCatalogChart, type CatalogArtist, type CatalogChart } from '../catalogData.ts';
 import { artistPhotoCandidates, rememberArtistPhotos } from '../catalogArtistPhotos.ts';
+import { duplicateOf, itemLabel, MAIN_KEY, MAX_AUTHORS, MAX_CHORDPRO, MAX_COMMENT, MAX_DOC_BYTES, MAX_OPTIONS_PER_AUTHOR, newOptionId, optionKey, slugify, type CatalogAuthor } from '../communityCatalog.ts';
 
 export type CatalogPage = { items: CatalogChart[]; cursor: QueryDocumentSnapshot<DocumentData> | null; more: boolean };
 export type CatalogField = 'title' | 'artist';
@@ -182,26 +183,125 @@ export const getCatalogChart = async (id: string, fresh = false): Promise<Catalo
   return item;
 };
 
-/** Only canonical text is updated; legacy content and every other catalog field are preserved. */
-export const saveCatalogChordPro = async (base: CatalogChart, chordPro: string): Promise<CatalogChart> => {
-  if (!navigator.onLine) throw new Error('Conecte-se para atualizar a cifra no catálogo.');
-  if (!base.id || base.id.includes('/') || !chordPro.trim()) throw new Error('A cifra do catálogo precisa ter conteúdo em ChordPro.');
-  if (chordPro.length > 300000 || new TextEncoder().encode(chordPro).length > 700000) throw new Error('O texto está grande demais para salvar no catálogo.');
+// ---------------------------------------------------------------------------------------------------------
+// Community: options, ratings and public charts. Writes touch only `chordOptions.<uid>` / `chordRatings.<uid>`
+// of an existing document (never chordPro/content/title/artist/style/key of someone else's chart).
+
+const signedIn = async (): Promise<CatalogAuthor> => {
   const [{ cloudAuth }, { getAccountState }] = await Promise.all([import('./firebase.ts'), import('../account.ts')]);
-  const uid = getAccountState().user?.uid;
-  const assert = () => { if (!uid || cloudAuth.currentUser?.uid !== uid || getAccountState().user?.uid !== uid) throw new Error('A sessão mudou. Entre novamente para salvar.'); };
-  assert();
-  const result = await runTransaction(firestore, async transaction => {
-    assert(); const ref = doc(firestore, 'cifras', base.id); const snapshot = await transaction.get(ref); assert();
-    const current = snapshot.exists() ? mapCatalogChart(snapshot.id, snapshot.data()) : null;
-    if (!current) throw new Error('Esta cifra não está mais disponível no catálogo.');
-    if (current.chordPro !== base.chordPro && current.chordPro !== chordPro) throw new Error('Outra pessoa alterou esta cifra. Seu texto foi mantido. Recarregue a referência do catálogo e confira a versão atual antes de salvar novamente.');
-    transaction.update(ref, { chordPro });
-    return mapCatalogChart(base.id, { ...snapshot.data(), chordPro })!;
-  });
-  assert(); pages.clear(); documents.delete(base.id);
-  remember(documents, base.id, result, 120);
-  return result;
+  const user = getAccountState().user;
+  if (!user || cloudAuth.currentUser?.uid !== user.uid) throw new Error('A sessão mudou. Entre novamente para enviar ao catálogo.');
+  return { uid: user.uid, name: user.name || 'Músico', photo: user.photo ?? '' };
+};
+const requireOnline = () => { if (!navigator.onLine) throw new Error('Conecte-se para enviar ao catálogo. Seu texto foi mantido.'); };
+const validId = (id: string) => { if (!id || id.includes('/')) throw new Error('Identificação da cifra inválida.'); };
+const store = (chart: CatalogChart): CatalogChart => { pages.clear(); remember(documents, chart.id, chart, 120); return chart; };
+const readFresh = async (id: string): Promise<{ chart: CatalogChart; data: Record<string, unknown> }> => {
+  const snapshot = await deadline(getDocFromServer(doc(firestore, 'cifras', id)));
+  const data = snapshot.exists() ? snapshot.data() : null;
+  const chart = data ? mapCatalogChart(snapshot.id, data) : null;
+  if (!chart || !data) throw new Error('Esta cifra não está mais disponível no catálogo.');
+  return { chart, data };
+};
+/** The chart as it is after a write we just made, without reading it back (saves a read). */
+const applyLocally = (id: string, data: Record<string, unknown>, patch: Record<string, unknown>): CatalogChart => {
+  const chart = mapCatalogChart(id, { ...data, ...patch });
+  if (!chart) throw new Error('Esta cifra não está mais disponível no catálogo.');
+  return chart;
+};
+type OwnOptions = Record<string, { chordPro: string; createdAt: string; updatedAt: string }>;
+const mine = (data: Record<string, unknown>, uid: string): OwnOptions => {
+  const entry = (data.chordOptions as Record<string, { options?: OwnOptions }> | undefined)?.[uid];
+  return { ...(entry?.options ?? {}) };
+};
+const checkText = (chordPro: string) => {
+  if (!chordPro.trim()) throw new Error('A cifra precisa ter conteúdo.');
+  if (chordPro.length > MAX_CHORDPRO) throw new Error(`A cifra passou de ${MAX_CHORDPRO.toLocaleString('pt-BR')} caracteres. Reduza o texto para enviar ao catálogo.`);
+};
+const duplicateMessage = (chart: CatalogChart, key: string) => `Este texto é igual ${key === MAIN_KEY ? 'à cifra principal' : `à ${itemLabel(chart.options, key)}`}. Altere a cifra antes de enviar como opção.`;
+
+/** Adds the signed-in musician's option to a catalog chart, or replaces one of their own (`replaceId`). */
+export const submitCatalogOption = async (chartId: string, chordPro: string, replaceId?: string): Promise<CatalogChart> => {
+  requireOnline(); validId(chartId); checkText(chordPro);
+  const me = await signedIn();
+  const { chart, data } = await readFresh(chartId);
+  const own = mine(data, me.uid);
+  const replacing = replaceId && own[replaceId] ? replaceId : undefined;
+  const duplicate = duplicateOf(chart, chordPro, replacing ? optionKey(me.uid, replacing) : undefined);
+  if (duplicate) throw new Error(duplicateMessage(chart, duplicate));
+  if (!replacing && Object.keys(own).length >= MAX_OPTIONS_PER_AUTHOR) throw new Error(`Você já enviou ${MAX_OPTIONS_PER_AUTHOR} opções para esta música. Edite ou apague uma delas para enviar outra.`);
+  const authors = Object.keys((data.chordOptions as Record<string, unknown> | undefined) ?? {});
+  if (!authors.includes(me.uid) && authors.length >= MAX_AUTHORS) throw new Error('Esta música já tem o máximo de opções da comunidade.');
+  if (chart.docBytes + new TextEncoder().encode(chordPro).length > MAX_DOC_BYTES) throw new Error('Esta música não tem mais espaço para novas opções no catálogo.');
+  const stamp = new Date().toISOString();
+  const id = replacing ?? newOptionId();
+  own[id] = { chordPro, createdAt: own[id]?.createdAt ?? stamp, updatedAt: stamp };
+  const entry = { author: me, options: own };
+  await deadline(updateDoc(doc(firestore, 'cifras', chartId), new FieldPath('chordOptions', me.uid), entry));
+  return store(applyLocally(chartId, data, { chordOptions: { ...(data.chordOptions as object | undefined), [me.uid]: entry } }));
+};
+
+/** Removes one of the signed-in musician's own options. */
+export const deleteCatalogOption = async (chartId: string, optionId: string): Promise<CatalogChart> => {
+  requireOnline(); validId(chartId);
+  const me = await signedIn();
+  const { data } = await readFresh(chartId);
+  const own = mine(data, me.uid);
+  if (!own[optionId]) throw new Error('Esta opção não é sua ou já foi apagada.');
+  delete own[optionId];
+  const entry = Object.keys(own).length ? { author: me, options: own } : null;
+  await deadline(updateDoc(doc(firestore, 'cifras', chartId), new FieldPath('chordOptions', me.uid), entry ?? deleteField()));
+  const options = { ...(data.chordOptions as Record<string, unknown> | undefined) };
+  if (entry) options[me.uid] = entry; else delete options[me.uid];
+  return store(applyLocally(chartId, data, { chordOptions: options }));
+};
+
+/** Gives (or changes) the signed-in musician's stars and short comment for the main chart or an option. No extra read. */
+export const rateCatalogItem = async (chart: CatalogChart, itemKey: string, stars: number, comment = ''): Promise<CatalogChart> => {
+  requireOnline(); validId(chart.id);
+  const me = await signedIn();
+  if (!Number.isInteger(stars) || stars < 1 || stars > 5) throw new Error('Escolha de 1 a 5 estrelas.');
+  const option = chart.options.find(o => o.key === itemKey);
+  if (itemKey !== MAIN_KEY && !option) throw new Error('Esta opção não está mais disponível.');
+  if (option?.author.uid === me.uid || (itemKey === MAIN_KEY && chart.author?.uid === me.uid)) throw new Error('Você não pode avaliar a sua própria cifra.');
+  const note = comment.trim().slice(0, MAX_COMMENT);
+  const previous = chart.ratings[me.uid];
+  const isNewComment = !!note && !previous?.items[itemKey]?.comment;
+  // Near the size ceiling a new comment is dropped; the stars still count.
+  const keepComment = !!note && (!isNewComment || chart.docBytes < MAX_DOC_BYTES);
+  const items = { ...(previous?.items ?? {}), [itemKey]: { stars, at: new Date().toISOString(), ...(keepComment ? { comment: note } : {}) } };
+  await deadline(updateDoc(doc(firestore, 'cifras', chart.id), new FieldPath('chordRatings', me.uid), { name: me.name, photo: me.photo, items }));
+  const ratings = { ...chart.ratings, [me.uid]: { name: me.name, photo: me.photo, items } };
+  return store({ ...chart, ratings, docBytes: chart.docBytes + 120 + (keepComment ? note.length : 0) });
+};
+
+/** Publishes a new chart in the catalog, signed by the musician. Writes `content` too, so Alt7 also shows it. */
+export const createPublicChart = async (input: { title: string; artist: string; artistSlug?: string; style: string; key?: string; chordPro: string }): Promise<CatalogChart> => {
+  requireOnline(); checkText(input.chordPro);
+  const title = input.title.trim(); const artist = input.artist.trim(); const style = input.style.trim();
+  if (!title || !artist || !style) throw new Error('Para publicar, informe título, artista e estilo.');
+  const me = await signedIn();
+  const ref = doc(collection(firestore, 'cifras'));
+  const fields = {
+    title, artist: { name: artist, slug: input.artistSlug?.trim() || slugify(artist) }, style,
+    ...(input.key ? { key: input.key } : {}),
+    chordPro: input.chordPro, content: input.chordPro, author: me, origin: 'will-music',
+  };
+  await deadline(setDoc(ref, { ...fields, createdAt: serverTimestamp() }));
+  return store(applyLocally(ref.id, fields, {}));
+};
+
+/** The creator may correct their own public chart while nobody else has sent options to it. */
+export const canEditOwnPublicChart = (chart: CatalogChart, uid: string | undefined): boolean =>
+  !!uid && chart.author?.uid === uid && chart.options.every(o => o.author.uid === uid);
+
+export const updateOwnPublicChart = async (chartId: string, chordPro: string): Promise<CatalogChart> => {
+  requireOnline(); validId(chartId); checkText(chordPro);
+  const me = await signedIn();
+  const { chart, data } = await readFresh(chartId);
+  if (!canEditOwnPublicChart(chart, me.uid)) throw new Error('Só quem publicou pode corrigir esta cifra, e apenas enquanto ela não tiver opções de outras pessoas. Envie como opção.');
+  await deadline(updateDoc(doc(firestore, 'cifras', chartId), { chordPro, content: chordPro }));
+  return store(applyLocally(chartId, data, { chordPro, content: chordPro }));
 };
 
 const pendingPhotos = new Map<string, Promise<void>>();

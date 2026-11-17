@@ -1,10 +1,13 @@
+import { createSeparationReporter } from './separationProgress.ts';
 import { analyzeInWorker } from '../worker/client.ts';
 import { buildChart, keyToChord } from './chart.ts';
 import { type Analysis, type Chart, db, now, updateSong } from './db.ts';
 import { decodeForAnalysis } from './decode.ts';
 import { retainSessionStems } from './sessionStems.ts';
 import { lyricsToKeep } from './lyricsApply.ts';
-import { transcribeSong } from './whisper.ts';
+import { transcribeSong, warmWhisper, type WhisperWarm } from './whisper.ts';
+import { findSongLyrics } from './lrclib.ts';
+import { alignLyricsToWords } from './lyricsAlign.ts';
 import { describeTranscription } from './transcript.ts';
 import { getPendingAnalysis, setPendingAnalysis, retainSessionAnalysis } from './pendingAnalysis.ts';
 import { savePendingAnalysis } from './saveAnalysis.ts';
@@ -34,6 +37,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
   let chordsMs = 0;
   let lyricsMs = 0;
   let transcriptionRetried = false;
+  let warm: WhisperWarm | null = null;
   try {
     const execution = await resolveAnalysisExecution(options.execution);
     const mobile = isMobileStudio();
@@ -42,43 +46,36 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
     let lyrics = lyricsToKeep(previous?.lyrics);
     let tempo = song.tempo;
     const tracksTask: AnalysisTaskProgress = { id: 'tracks', label: mobile ? 'Usando o áudio original' : 'Separando faixas da música…', status: mobile ? 'skipped' : 'running' };
-    const chordsTask: AnalysisTaskProgress = { id: 'chords', label: mobile ? 'Preparando o áudio dos acordes' : 'Aguardando a separação das faixas', status: mobile ? 'running' : 'waiting' };
-    const lyricsTask: AnalysisTaskProgress = { id: 'lyrics', label: lyrics?.lines.length ? 'Letra preservada' : 'Aguardando a transcrição', status: lyrics?.lines.length ? 'skipped' : 'waiting' };
-    if (mobile) { lyricsTask.status = 'skipped'; lyricsTask.label = lyrics?.lines.length ? 'Letra preservada' : 'Transcrição disponível no computador'; }
+    // The chords read the original mix on the processor; they do not wait for the tracks (separated on the GPU).
+    const chordsTask: AnalysisTaskProgress = { id: 'chords', label: 'Preparando o áudio dos acordes', status: 'running' };
+    const lyricsTask: AnalysisTaskProgress = { id: 'lyrics', label: lyrics?.lines.length ? 'Letra preservada' : 'Aguardando a voz separada', status: lyrics?.lines.length ? 'skipped' : 'waiting' };
+    if (mobile) { lyricsTask.status = lyrics?.lines.length ? 'skipped' : 'waiting'; lyricsTask.label = lyrics?.lines.length ? 'Letra preservada' : 'Aguardando para buscar a letra'; }
     const snapshot = () => [{ ...tracksTask }, { ...chordsTask }, { ...lyricsTask }];
     const publish = () => {
       if (stopped || controller.signal.aborted || assembling) return;
-      const active = tracksTask.status === 'running' ? tracksTask : chordsTask.status === 'running' ? chordsTask : lyricsTask;
-      const both = chordsTask.status === 'running' && lyricsTask.status === 'running';
-      onProgress({ label: both ? 'Analisando acordes e transcrevendo a letra…' : active.label, detail: active.detail, fraction: active.fraction, lyricsPending: chartPublished && lyricsTask.status === 'running', tasks: snapshot(), tempo });
+      const running = [tracksTask, chordsTask, lyricsTask].filter((t) => t.status === 'running');
+      // Once the chart is out, the bar follows what is still to come: the tracks, then the lyrics.
+      const active = chartPublished
+        ? (lyricsTask.status === 'running' ? lyricsTask : tracksTask.status === 'running' ? tracksTask : lyricsTask)
+        : running[0] ?? lyricsTask;
+      const label = !chartPublished && tracksTask.status === 'running' && chordsTask.status === 'running' ? 'Separando faixas e analisando acordes…'
+        : !chartPublished && chordsTask.status === 'running' && lyricsTask.status === 'running' ? 'Analisando acordes e transcrevendo a letra…'
+        : active.label;
+      const stillComing = lyricsTask.status === 'running' || lyricsTask.status === 'waiting' || tracksTask.status === 'running';
+      onProgress({ label, detail: active.detail, fraction: active.fraction, lyricsPending: chartPublished && stillComing, tasks: snapshot(), tempo });
     };
     publish();
-    if (!mobile) try {
-      const prepared = await prepareAnalysisStems(songId, p => {
-        tracksTask.detail = `Bloco ${Math.min(p.total, p.done + 1)} de ${p.total}`;
-        tracksTask.fraction = p.total ? p.done / p.total : undefined;
-        publish();
-      }, controller.signal);
-      if (prepared.warning) warnings.push(prepared.warning);
-      tracksTask.status = prepared.stems ? 'done' : 'skipped';
-      tracksTask.label = prepared.stems ? 'Faixas prontas' : 'Continuando com o áudio original';
-    } catch (error) {
-      controller.signal.throwIfAborted();
-      tracksTask.status = 'error';
-      tracksTask.label = 'Separação indisponível';
-      warnings.push('Não foi possível separar as faixas. A análise continua com o áudio original.');
-      console.warn('Separação inicial não terminou', error);
-    }
-    tracksTask.detail = undefined;
-    chordsTask.status = 'running';
-    chordsTask.label = 'Preparando o áudio dos acordes';
-    publish();
-    // Decode the chord input first; do not overlap two full native audio decoders on long files.
+    // Decode the chord input first; do not overlap two full native audio decoders on long files (the separation
+    // decodes its own copy right after).
     const { channels, durationSec } = await decodeForAnalysis(audio.blob, { mono: true });
     tempo = song.tempo ?? (channels[0] ? estimateAudioBpm(channels[0], 22050) : undefined);
     publish();
     let lyricsFailure: unknown;
     let lyricsPromise: Promise<void> | undefined;
+    // Desktop: the lyric text from LRCLIB (one request, started now) is placed on the times Whisper hears.
+    const lrclibPromise = !mobile && !lyrics?.lines.length
+      ? findSongLyrics(song.title, song.artist, song.durationSec || durationSec).catch((error: unknown) => { console.warn('Busca da letra no LRCLIB falhou', error); return null; })
+      : Promise.resolve(null);
     const launchLyrics = () => {
       const taskStarted = performance.now();
       lyricsFailure = undefined;
@@ -87,11 +84,36 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       lyricsTask.fraction = undefined;
       lyricsTask.detail = undefined;
       publish();
-      lyricsPromise = transcribeSong(songId, (p) => { Object.assign(lyricsTask, describeTranscription(p)); publish(); }, { signal: controller.signal })
-        .then((heard) => { lyrics = { source: 'transcription', lines: heard.lines }; lyricsTask.status = 'done'; lyricsTask.label = 'Letra transcrita'; lyricsTask.fraction = 1; })
+      lyricsPromise = transcribeSong(songId, (p) => { Object.assign(lyricsTask, describeTranscription(p)); publish(); }, { signal: controller.signal, warm: warm ?? undefined })
+        .then(async (heard) => {
+          const found = await lrclibPromise;
+          const aligned = found && heard.words ? alignLyricsToWords(found.lines, heard.words, song.durationSec || durationSec) : null;
+          if (found && aligned && aligned.coverage >= 0.5) {
+            lyrics = { source: 'lrclib', lrclibId: found.lrclibId, lines: aligned.lines };
+            lyricsTask.label = 'Letra encontrada e sincronizada';
+          } else if (found && !found.warning && (!aligned || aligned.coverage < 0.5)) {
+            // The transcription disagrees with the text: LRCLIB's own synced times are the safer choice.
+            lyrics = found;
+            lyricsTask.label = 'Letra encontrada';
+          } else {
+            lyrics = { source: 'transcription', lines: heard.lines };
+            lyricsTask.label = 'Letra transcrita';
+          }
+          lyricsTask.status = 'done'; lyricsTask.fraction = 1;
+        })
         .catch((error: unknown) => { if (!controller.signal.aborted) { lyricsFailure = error; lyricsTask.status = 'error'; lyricsTask.label = 'A transcrição não terminou'; } })
         .finally(() => { lyricsMs += performance.now() - taskStarted; publish(); });
     };
+    // Desktop: the lyrics model loads in its own worker while the tracks are separated, so the transcription starts
+    // as soon as the voice is ready. "Sequential" (weaker machines) skips it to keep one model in memory at a time.
+    warm = !mobile && !lyrics?.lines.length && execution === 'parallel' ? warmWhisper() : null;
+    warm?.listen((msg) => {
+      if (lyricsTask.status !== 'waiting') return;
+      if (msg.type === 'warmed') lyricsTask.label = msg.ok ? 'Modelo da letra pronto, aguardando a voz separada' : 'Aguardando a voz separada';
+      else if (msg.type === 'progress' && lyricsTask.label === 'Aguardando a voz separada') lyricsTask.label = 'Preparando o modelo da letra enquanto as faixas são separadas';
+      else return;
+      publish();
+    });
     const chordsStarted = performance.now();
     const chordPromise = analyzeInWorker(channels, (e) => {
       chordsTask.label = e.stage === 'models' ? 'Carregando modelos de acordes (' + mb(e.done) + ' de ' + mb(e.total) + ' MB)' : e.stage === 'key' ? 'Identificando o tom…' : 'Analisando acordes… (bloco ' + Math.min(e.total, e.done + 1) + ' de ' + e.total + ')';
@@ -99,10 +121,61 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       chordsTask.fraction = e.total ? e.done / e.total : undefined;
       publish();
     }, controller.signal);
-    if (!mobile && execution === 'parallel' && !lyrics?.lines.length) launchLyrics();
-    const result = await chordPromise;
-    chordsMs = performance.now() - chordsStarted;
-    chordsTask.status = 'done'; chordsTask.label = 'Tom e acordes prontos'; chordsTask.fraction = 1;
+    const chordsDone = chordPromise.then((r) => {
+      chordsMs = performance.now() - chordsStarted;
+      chordsTask.status = 'done'; chordsTask.label = 'Tom e acordes prontos'; chordsTask.fraction = 1; chordsTask.detail = undefined;
+      publish();
+      return r;
+    });
+    const separation = mobile ? Promise.resolve() : (async () => {
+      try {
+        const report = createSeparationReporter();
+        const prepared = await prepareAnalysisStems(songId, p => {
+          Object.assign(tracksTask, report(p));
+          publish();
+        }, controller.signal);
+        if (prepared.warning) warnings.push(prepared.warning);
+        tracksTask.status = prepared.stems ? 'done' : 'skipped';
+        tracksTask.label = prepared.stems ? 'Faixas prontas' : 'Continuando com o áudio original';
+      } catch (error) {
+        controller.signal.throwIfAborted();
+        tracksTask.status = 'error';
+        tracksTask.label = 'Separação indisponível';
+        warnings.push('Não foi possível separar as faixas. A letra continua com o áudio original.');
+        console.warn('Separação inicial não terminou', error);
+      }
+      tracksTask.detail = undefined;
+      tracksTask.fraction = undefined;
+      publish();
+    })();
+    // Whisper listens to the separated voice: it starts when the tracks are ready (and, on "sequential", after the chords).
+    const lyricsStart = separation.then(async () => {
+      if (mobile || lyrics?.lines.length) return;
+      if (execution === 'sequential') await chordsDone.catch(() => undefined);
+      controller.signal.throwIfAborted();
+      launchLyrics();
+    });
+    // Awaited below; a failure here must not surface as an unhandled rejection while the chords still run.
+    lyricsStart.catch(() => undefined);
+    // On phones no model transcribes (it does not fit in memory): the lyrics come from LRCLIB, a single request.
+    if (mobile && !lyrics?.lines.length) {
+      const taskStarted = performance.now();
+      lyricsTask.status = 'running'; lyricsTask.label = 'Buscando a letra…'; publish();
+      lyricsPromise = findSongLyrics(song.title, song.artist, song.durationSec || durationSec)
+        .catch((error: unknown) => { console.warn('Busca da letra no LRCLIB falhou', error); return null; })
+        .then((found) => {
+          if (found) {
+            lyrics = found;
+            if (found.warning) warnings.push(found.warning);
+            lyricsTask.status = 'done'; lyricsTask.label = 'Letra encontrada';
+          } else {
+            warnings.push('Não encontramos a letra desta música. Você pode colar a letra na cifra; a transcrição automática está disponível no computador.');
+            lyricsTask.status = 'skipped'; lyricsTask.label = 'Letra não encontrada';
+          }
+        })
+        .finally(() => { lyricsMs += performance.now() - taskStarted; publish(); });
+    }
+    const result = await chordsDone;
     const saveResult = async () => {
       assembling = true;
       onProgress({ label: 'Montando sua música…', tasks: snapshot() });
@@ -142,12 +215,13 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
 
       assembling = false;
     };
-    if (!mobile && !lyrics?.lines.length && (lyricsTask.status === 'running' || execution === 'sequential')) {
+    // The chart (chords, and lyrics once they come) shows while the tracks and the transcription finish.
+    if (!mobile && (tracksTask.status === 'running' || lyricsTask.status === 'waiting' || lyricsTask.status === 'running')) {
       await saveResult();
       chartPublished = true;
-      if (execution === 'sequential') launchLyrics();
       publish();
     }
+    await lyricsStart;
     await lyricsPromise;
     // A resource-related overlap failure gets one isolated retry after the chord worker has ended.
     if (execution === 'parallel' && lyricsFailure && isResourceFailure(lyricsFailure)) {
@@ -155,6 +229,16 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       transcriptionRetried = true;
       launchLyrics();
       await lyricsPromise;
+    }
+    if (lyricsFailure) {
+      // Whisper could not finish: LRCLIB's lyrics (with their own times) still fill the chart.
+      const found = await lrclibPromise;
+      if (found) {
+        lyrics = found;
+        if (found.warning) warnings.push(found.warning);
+        lyricsTask.status = 'done'; lyricsTask.label = 'Letra encontrada';
+        lyricsFailure = undefined;
+      }
     }
     if (lyricsFailure) {
       warnings.push('Não foi possível transcrever a letra. Você pode tentar novamente ou inserir a letra manualmente.');
@@ -169,6 +253,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
     throw error;
   } finally {
     stopped = true;
+    warm?.dispose();
     controller.abort();
     release();
     releaseAnalysis();

@@ -9,7 +9,7 @@ const DEMUCS6S = 'https://huggingface.co/kramp/htdemucs-6s-webgpu-onnx/resolve/0
 
 const KARA2 = 'https://huggingface.co/musetric/mel-band-roformer-duality-kara2-student-onnx/resolve/48a53200678a45f88e21dc1af957f1e4b55ba5ae';
 
-export type ModelId = keyof typeof LV_MODELS |  'chordnet' | 'cqtPlan' | 'skey' | 'kara2Core' | 'kara2Data' | 'basicPitch' | 'demucs6s';
+export type ModelId = keyof typeof LV_MODELS | 'scnetTran' | 'chordnet' | 'cqtPlan' | 'skey' | 'kara2Core' | 'kara2Data' | 'basicPitch' | 'demucs6s';
 
 /** Pinned model files (revision + SHA-256). Shared by the app and the Phase 0 tool. */
 export const MODELS: Record<ModelId, { url: string; sha256: string; file: string; bytes: number }> = {
@@ -21,6 +21,8 @@ export const MODELS: Record<ModelId, { url: string; sha256: string; file: string
   kara2Data: { url: `${KARA2}/duality_kara2_student_core_t1100.onnx.data`, sha256: '176673d2446d8578976dd1a17ebca5fa0651dd23446967ff44fad5bf22c45d5c', file: 'duality_kara2_student_core_t1100.onnx.data', bytes: 235400588 },
   // Spotify Basic Pitch (Apache-2.0), byte-identical to basic_pitch/saved_models/icassp_2022/nmp.onnx.
   basicPitch: { url: `${BASIC_PITCH_REPO}/nmp.onnx`, sha256: '2c3c1d144bfa61ad236e92e169c13535c880469a12a047d4e73451f2c059a0ec', file: 'nmp.onnx', bytes: 230444 },
+  // SCNet Tran Small (ZFTurbo, MIT), core-only fp16 export by ClickSmith (MIT); served by the app (GitHub releases block CORS).
+  scnetTran: { url: '/models/scnet-tran-v1/scnet_tran_core_fp16.onnx', sha256: '46de9983af079ed349887ce7b363c36fc988539500f9f63c3a89c7886faa4ee6', file: 'scnet_tran_core_fp16.onnx', bytes: 26957934 },
   demucs6s: { url: `${DEMUCS6S}/htdemucs_6s.onnx`, sha256: 'a3f5050696cda4b2344d465123acb21ee699dad7d0634dba1d282497a04ac86a', file: 'htdemucs_6s.onnx', bytes: 284797240 },
 };
 

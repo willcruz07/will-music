@@ -19,7 +19,7 @@ export const ChartOptions = ({ chart, song, shownKey, content, onPatch, onEdit, 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
-  const publication = useCatalogPublication(song.catalogSource, open);
+  const publication = useCatalogPublication(song, open);
   const patch = async (value: Partial<Chart>) => {
     if (busy) return;
     setBusy(true); setError(null);

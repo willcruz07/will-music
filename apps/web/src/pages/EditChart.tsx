@@ -49,7 +49,7 @@ export const EditChart = () => {
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const publication = useCatalogPublication(song?.catalogSource, loaded);
+  const publication = useCatalogPublication(song, loaded);
   const [, force] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const ONLY_CHORDPRO = 'Esta cifra tem trechos que só cabem em ChordPro (acordes que o app não reconhece, ou linhas de letra que parecem acordes), então ela abre só em ChordPro para nada se perder.';
@@ -117,12 +117,12 @@ export const EditChart = () => {
 
   const save = useCallback(async () => {
     // Nothing to save before the chart has loaded or when nothing changed (Ctrl+S included).
-    if (!loaded || (chordPro === saved && !publication.needsMigration) || savingLock.current) return;
+    if (!loaded || (chordPro === saved && publication.mode === 'local') || savingLock.current) return;
     savingLock.current = true; setSaving(true); setSaveError(null);
     try { await publication.save(chordPro, () => saveEditedChart(id, chordPro)); if (mounted.current) { setSaved(chordPro); navigate(`/musica/${id}`, { replace: true }); } }
     catch (error) { setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar. Seu texto foi mantido.'); }
     finally { savingLock.current = false; setSaving(false); }
-  }, [id, chordPro, saved, loaded, navigate, publication.save]);
+  }, [id, chordPro, saved, loaded, navigate, publication.save, publication.mode]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -290,7 +290,7 @@ export const EditChart = () => {
         <Button variant="outline" onClick={leave}>
           Cancelar
         </Button>
-        <Button onClick={() => void save()} disabled={(!dirty && !publication.needsMigration) || saving || publication.blocked}>
+        <Button onClick={() => void save()} disabled={(!dirty && publication.mode === 'local') || saving || publication.blocked}>
           {saving ? 'Salvando…' : 'Salvar'}
         </Button>
       </div>

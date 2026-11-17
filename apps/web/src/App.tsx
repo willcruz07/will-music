@@ -46,6 +46,11 @@ const CatalogChart = named(() => import('./pages/CatalogChart.tsx'), 'CatalogCha
 const CatalogChartRoute = () => { const { id } = useParams(); return <CatalogChart key={id} />; };
 const CatalogArtist = named(() => import('./pages/CatalogArtist.tsx'), 'CatalogArtist');
 const CatalogArtistRoute = () => { const { artistId } = useParams(); return <CatalogArtist key={artistId} />; };
+const SheetEditor = named(() => import('./pages/SheetEditor.tsx'), 'SheetEditor');
+const SheetEditorRoute = () => { const { id } = useParams(); return <SheetEditor key={id} />; };
+const NewSheet = named(() => import('./pages/NewSheet.tsx'), 'NewSheet');
+const SheetStudyPage = named(() => import('./pages/SheetStudyPage.tsx'), 'SheetStudyPage');
+const SharedSheetPage = named(() => import('./pages/SheetStudyPage.tsx'), 'SharedSheetPage');
 const LegacySetlistRoute = () => { const { id } = useParams(); return <Navigate to={`/palco/repertorio/${id}`} replace />; };
 
 // Reads the saved preference, never the <html> class (the stage forces dark while it is open).
@@ -126,6 +131,10 @@ const Layout = () => {
           <Route path="/musica/:id/editar" element={<EditChart />} />
           <Route path="/musica/:id/partitura" element={<SongScore />} />
           <Route path="/partituras" element={<Navigate to="/?aba=partituras" replace />} />
+          <Route path="/partitura/nova" element={<NewSheet />} />
+          <Route path="/partitura/compartilhada/:id" element={<SharedSheetPage />} />
+          <Route path="/partitura/:id" element={<SheetEditorRoute />} />
+          <Route path="/partitura/:id/estudar" element={<SheetStudyPage />} />
           <Route path="/pasta" element={<FolderPage />} />
           <Route path="/microfone" element={<MicPage />} />
           <Route path="/estudo" element={<StudyHome />} />
