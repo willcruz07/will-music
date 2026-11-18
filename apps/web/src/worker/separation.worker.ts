@@ -125,9 +125,16 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
           const names = demucsTrackNames(demucsMode);
           const encoders = await Promise.all(names.map(() => mp3Stream(DEMUCS.SAMPLE_RATE)));
           const acc = createStreamingAccumulator(demucsPlan, samples, names.length);
+          const runBlock = (i: number) => session.run({ [DEMUCS.INPUT]: new ort.Tensor('float32', sliceChunk(planar, samples, demucsPlan[i]!.start, DEMUCS.SEGMENT), [1, 2, DEMUCS.SEGMENT]) });
+          // One block ahead: the next block is handed to the GPU before this one is mixed in and encoded to MP3,
+          // so the graphics card does not sit idle while the processor encodes.
+          let ahead: ReturnType<typeof runBlock> | null = demucsPlan.length ? runBlock(0) : null;
           for (let i = 0; i < demucsPlan.length; i++) {
             stage = `separar em faixas (bloco ${i + 1} de ${demucsPlan.length})`;
-            const out = await session.run({ [DEMUCS.INPUT]: new ort.Tensor('float32', sliceChunk(planar, samples, demucsPlan[i]!.start, DEMUCS.SEGMENT), [1, 2, DEMUCS.SEGMENT]) });
+            const out = await ahead!;
+            ahead = i + 1 < demucsPlan.length ? runBlock(i + 1) : null;
+            // A failed block ahead is reported when its turn comes, not as an unhandled rejection now.
+            ahead?.catch(() => undefined);
             const stems = out[DEMUCS.OUTPUT]?.data;
             if (!(stems instanceof Float32Array)) throw new Error('O modelo de separação não devolveu as faixas.');
             const region = acc.add(i, demucsTracks(demucsMode, stems, DEMUCS.SEGMENT));

@@ -5,7 +5,21 @@ import { getSessionStems, setSessionStems } from './sessionStems.ts';
 import { hasUsableWebGpu, listStemSets, separateSong, type SeparationProgress } from './stems.ts';
 import { isMobileStudio } from './studioDevice.ts';
 
-export const prepareAnalysisStems = async (songId: string, progress: (p: SeparationProgress) => void, signal?: AbortSignal): Promise<{ stems?: StemsRecord; warning?: string }> => {
+/** True when the desktop analysis will separate this song (no six-track set yet, and WebGPU works). */
+export const separationNeeded = async (songId: string): Promise<boolean> => {
+  if (isMobileStudio()) return false;
+  if (getSessionStems(songId) ?? (await listStemSets(songId)).find((set) => set.mode === 'six')) return false;
+  const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
+  return hasUsableWebGpu(gpu);
+};
+
+export const prepareAnalysisStems = async (
+  songId: string,
+  progress: (p: SeparationProgress) => void,
+  signal?: AbortSignal,
+  /** The audio already decoded at the separation rate (decodeStudioAudio), so it is not decoded again. */
+  decoded?: { planar: Float32Array; samples: number },
+): Promise<{ stems?: StemsRecord; warning?: string }> => {
   signal?.throwIfAborted();
   if (isMobileStudio()) return {};
   const existing = getSessionStems(songId) ?? (await listStemSets(songId)).find((set) => set.mode === 'six');
@@ -13,7 +27,7 @@ export const prepareAnalysisStems = async (songId: string, progress: (p: Separat
   const gpu = (navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } }).gpu;
   if (!(await hasUsableWebGpu(gpu))) return { warning: 'Separação indisponível neste navegador. A letra e os acordes foram analisados a partir do áudio original.' };
   signal?.throwIfAborted();
-  const result = await separateSong(songId, progress, { mode: 'six', persist: false, signal });
+  const result = await separateSong(songId, progress, { mode: 'six', persist: false, signal, ...(decoded ? { decode: async () => decoded } : {}) });
   setSessionStems(songId, result.record);
   return { stems: result.record };
 };

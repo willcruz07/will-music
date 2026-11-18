@@ -1,7 +1,10 @@
 import type { PipelineProgress } from './pipeline.ts';
 
 type Event = PipelineProgress | 'done';
-type Job = { promise: Promise<void>; progress?: PipelineProgress; listeners: Set<(e: Event) => void> };
+type Job = { promise: Promise<void>; progress?: PipelineProgress; listeners: Set<(e: Event) => void>; controller: AbortController; tasks: Record<CancellableTask, AbortController> };
+
+/** Steps that can stop on their own while the rest of the analysis goes on (the chords are the chart: they stop it all). */
+export type CancellableTask = 'tracks' | 'lyrics';
 
 // Lives outside React so a song page mounted later can follow an analysis that is already running.
 const jobs = new Map<string, Job>();
@@ -15,10 +18,10 @@ export const subscribeAnalysisFinished = (listener: (songId: string, succeeded: 
 
 export const isRunning = (songId: string): boolean => jobs.has(songId);
 
-export const startAnalysis = (songId: string, run: (onProgress: (p: PipelineProgress) => void) => Promise<void>): Promise<void> => {
+export const startAnalysis = (songId: string, run: (onProgress: (p: PipelineProgress) => void, signal: AbortSignal, taskSignals: Record<CancellableTask, AbortSignal>) => Promise<void>): Promise<void> => {
   const existing = jobs.get(songId);
   if (existing) return existing.promise;
-  const job: Job = { promise: Promise.resolve(), listeners: new Set() };
+  const job: Job = { promise: Promise.resolve(), listeners: new Set(), controller: new AbortController(), tasks: { tracks: new AbortController(), lyrics: new AbortController() } };
   jobs.set(songId, job);
   job.promise = (async () => {
     let succeeded = false;
@@ -26,7 +29,7 @@ export const startAnalysis = (songId: string, run: (onProgress: (p: PipelineProg
       await run((p) => {
         job.progress = p;
         for (const listener of job.listeners) listener(p);
-      });
+      }, job.controller.signal, { tracks: job.tasks.tracks.signal, lyrics: job.tasks.lyrics.signal });
       // The pipeline can preserve chords while reporting a failed transcription.
       // That partial result must not automatically launch another expensive model.
       succeeded = !job.progress?.tasks?.some((task) => task.status === 'error');
@@ -47,4 +50,16 @@ export const subscribeAnalysis = (songId: string, listener: (e: Event) => void):
   job.listeners.add(listener);
   if (job.progress) listener(job.progress);
   return () => job.listeners.delete(listener);
+};
+
+/** Stops a running analysis (its models and workers are released by the pipeline). */
+export const cancelAnalysis = (songId: string): void => {
+  jobs.get(songId)?.controller.abort(new DOMException('Análise cancelada.', 'AbortError'));
+};
+
+export const isCancelled = (error: unknown): boolean => error instanceof DOMException && error.name === 'AbortError';
+
+/** Stops one step (the separation or the lyrics); the analysis continues without it. */
+export const cancelAnalysisTask = (songId: string, task: CancellableTask): void => {
+  jobs.get(songId)?.tasks[task].abort(new DOMException('Etapa cancelada.', 'AbortError'));
 };

@@ -12,11 +12,11 @@ import { Player, type PlayerControls, activeIndexAt } from '../components/Player
 import { SongInfoForm } from '../components/SongInfoForm.tsx';
 import { setChordProMeta } from '../lib/chordProEdit.ts';
 import { type Analysis, type Chart, type Song as SongRecord, db, updateSong } from '../lib/db.ts';
-import { isRunning, startAnalysis, subscribeAnalysis } from '../lib/jobs.ts';
+import { cancelAnalysis, cancelAnalysisTask, isCancelled, isRunning, startAnalysis, subscribeAnalysis } from '../lib/jobs.ts';
 import { type PipelineProgress, runPipeline } from '../lib/pipeline.ts';
 import { prefersFlats, transposeChord, transposeKey } from '../lib/transpose.ts';
 import { toDisplayLabel } from '@will-music/engine';
-import { ExportButton } from '../components/PackageButtons.tsx';
+import { SaveResultCard } from '../components/SaveResultCard.tsx';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
 import { ChordHelp } from '../components/ChordHelp.tsx';
 import { useScrollPrefs, useSteadyScroll } from '../lib/steadyScroll.ts';
@@ -27,8 +27,6 @@ import { ChartChordShapes } from '../components/ChartChordShapes.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
 import { confirmDialog } from '../ui/Dialog.tsx';
 import { getPendingAnalysis, retainSessionAnalysis } from '../lib/pendingAnalysis.ts';
-import { savePendingAnalysis } from '../lib/saveAnalysis.ts';
-import { diagnoseAudioImport } from '../lib/importDiagnostics.ts';
 import { Studio } from '../components/Studio.tsx';
 import { ChordVariations } from '../components/ChordVariations.tsx';
 import { BottomSheet } from '../ui/BottomSheet.tsx';
@@ -40,11 +38,9 @@ export const Song = () => {
   const [chart, setChart] = useState<Chart | undefined>();
   const [analysis, setAnalysis] = useState<Analysis | undefined>();
   const [unsaved, setUnsaved] = useState(false);
-  const [savingResult, setSavingResult] = useState(false);
   const [resultSaveError, setResultSaveError] = useState<string | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
-  const [diagnosingResult, setDiagnosingResult] = useState(false);
-  const [resultDiagnostic, setResultDiagnostic] = useState<string | null>(null);
+  const [cancelled, setCancelled] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string>();
   const stems = useStems(id, audioUrl, true);
   const [progress, setProgress] = useState<PipelineProgress | null>(null);
@@ -106,7 +102,9 @@ export const Song = () => {
   const analyze = useCallback(() => {
     setRuntimeError(null);
     setProgress({ label: 'Preparando o áudio' });
-    startAnalysis(id, (onProgress) => runPipeline(id, onProgress, { persist: false })).catch((error: unknown) => {
+    setCancelled(false);
+    startAnalysis(id, (onProgress, signal, taskSignals) => runPipeline(id, onProgress, { persist: false, signal, taskSignals })).catch((error: unknown) => {
+      if (isCancelled(error)) { setCancelled(true); return; }
       setRuntimeError(error instanceof Error ? error.message : 'A análise falhou.');
     });
     return follow();
@@ -215,13 +213,13 @@ export const Song = () => {
       tools={<Button variant="ghost" onClick={() => setStudioOptions(true)}><Info className="size-4" /> Dados da música</Button>}
       activeLine={activeLine} currentIndex={currentIndex} shownKey={shownKey} playing={isPlaying} autoScroll={autoScroll && scroll.mode === 'follow'}
       onSeek={time => player.current?.playFrom(time)} getTime={() => player.current?.currentTime() ?? 0} onChord={setStudioChord}
-      onRetry={() => { if (!scoreBusy) void analyze(); }} error={runtimeError ?? (song.analysisStatus === 'error' ? song.analysisError : null)}
+      onRetry={() => { if (!scoreBusy) void analyze(); }} onCancel={() => cancelAnalysis(id)} onCancelTask={(task) => cancelAnalysisTask(id, task)} onReload={load} cancelled={cancelled} error={runtimeError ?? (song.analysisStatus === 'error' ? song.analysisError : null)}
       onEdit={async chordPro => {
         if (!chart) return;
         await saveChart({ chordPro, origin: 'edited', lineTimes: remapLineTimes(chart.chordPro, chordPro, chart.lineTimes ?? lineStarts.current) });
         await load();
       }}
-      recovery={unsaved && !progress ? <details className="mt-4 rounded-xl border border-border p-3 text-sm"><summary>Salvar ou exportar resultado</summary><p className="mt-2 text-muted-foreground">Este resultado está nesta sessão. Salve ou exporte antes de fechar o app.</p><div className="mt-3 flex flex-wrap gap-2"><Button disabled={savingResult} onClick={() => { setSavingResult(true); void savePendingAnalysis(id).then(load).catch((e: unknown) => setResultSaveError(String(e))).finally(() => setSavingResult(false)); }}>Tentar salvar sem reanalisar</Button><ExportButton songIds={[id]} title={song.title} label="Exportar resultado" /></div>{resultSaveError && <p role="alert" className="mt-2 text-danger">{resultSaveError}</p>}</details> : null}
+      recovery={unsaved && !progress ? <SaveResultCard songId={id} title={song.title} onSaved={load} /> : null}
       player={<Player key={id} sources={stems.sources} songId={id} title={song.title} onTime={onTime} controls={player}
         deferWaveform={!!progress}
         studio={{ artist: song.artist, tempo: song.tempo, keyLabel: shownKey }}
@@ -268,35 +266,10 @@ export const Song = () => {
         onEdit={async chordPro => { await saveChart({ chordPro, origin: 'edited', lineTimes: remapLineTimes(chart.chordPro, chordPro, chart.lineTimes ?? lineStarts.current) }); await load(); }}
       />}
 
-      {progress && !lyricsPending && <AnalysisProgress progress={progress} />}
-      {progress && lyricsPending && <TranscribingBar progress={progress} />}
+      {progress && !lyricsPending && <AnalysisProgress progress={progress} onCancel={() => cancelAnalysis(id)} />}
+      {progress && lyricsPending && <TranscribingBar progress={progress} onCancel={() => cancelAnalysis(id)} />}
 
-      {!progress && unsaved && (
-        <details className="mt-6 max-w-2xl rounded-lg border border-border p-4">
-          <summary className="cursor-pointer text-sm">Salvar ou exportar resultado</summary>
-          <p className="mt-1 text-sm text-muted-foreground">A letra e os acordes estão disponíveis nesta sessão. Recarregar ou fechar o app descarta este resultado. Exporte um pacote para preservá-lo ou tente salvar novamente. A edição completa fica disponível após salvar.</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button disabled={savingResult || diagnosingResult} onClick={() => {
-              setSavingResult(true);
-              setResultSaveError(null);
-              void savePendingAnalysis(id).then(() => load())
-                .catch((error: unknown) => setResultSaveError(error instanceof Error ? error.message : 'O navegador recusou a gravação novamente.'))
-                .finally(() => setSavingResult(false));
-            }}>{savingResult ? 'Salvando…' : 'Tentar salvar sem reanalisar'}</Button>
-            <ExportButton songIds={[id]} title={song.title} label="Exportar resultado" />
-            <Button variant="outline" disabled={savingResult || diagnosingResult} onClick={() => {
-              setDiagnosingResult(true);
-              void (async () => {
-                const audio = await db.audio.get(id);
-                setResultDiagnostic(await diagnoseAudioImport(getPendingAnalysis(id)?.error, { size: audio?.blob.size ?? 0, type: audio?.mimeType ?? '' }));
-              })().catch((error: unknown) => setResultDiagnostic(String(error)))
-                .finally(() => setDiagnosingResult(false));
-            }}>{diagnosingResult ? 'Verificando armazenamento…' : 'Diagnosticar armazenamento'}</Button>
-          </div>
-          {resultSaveError && <p className="mt-2 text-sm text-danger" role="alert">{resultSaveError}</p>}
-          {resultDiagnostic && <textarea readOnly aria-label="Diagnóstico de armazenamento" value={resultDiagnostic} rows={8} className="mt-3 w-full rounded-lg border border-border bg-surface p-2 font-mono text-xs" onFocus={(event) => event.currentTarget.select()} />}
-        </details>
-      )}
+      {!progress && unsaved && <SaveResultCard songId={id} title={song.title} onSaved={load} />}
 
       {!progress && !unsaved && (runtimeError || song.analysisStatus === 'error') && (
         <div className="mt-8 max-w-lg rounded-lg border border-danger/40 p-4">

@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Grid2X2, Music4, Pencil, Save, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, FileText, Grid2X2, Music4, Pencil, RotateCcw, Save, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { enterStudioLayout } from '../lib/studioLayout.ts';
 import { Link } from 'react-router';
@@ -13,6 +13,8 @@ import { BottomSheet } from '../ui/BottomSheet.tsx';
 import { confirmDialog } from '../ui/Dialog.tsx';
 import { ChartView } from './ChartView.tsx';
 import { LyricsSkeleton, ProgressBar } from './AnalysisProgress.tsx';
+import { ACTIVITY_WORD, StudioTabIcon, type TabActivity } from './StudioTabIcon.tsx';
+import { LyricsRetry } from './LyricsRetry.tsx';
 import { ChordVariations } from './ChordVariations.tsx';
 import { StemsPanel } from './player/StemsPanel.tsx';
 import { StudioMixer } from './StudioMixer.tsx';
@@ -30,12 +32,14 @@ type Props = {
   shownKey?: string; autoScroll: boolean; playing?: boolean; recovery: ReactNode; error?: string | null;
   onSeek: (time: number) => void; onChord: (chord: string) => void;
   getTime: () => number;
-  onEdit: (chordPro: string) => Promise<void>; onRetry: () => void;
+  onEdit: (chordPro: string) => Promise<void>; onRetry: () => void; onCancel?: () => void; cancelled?: boolean;
+  /** Stops only the separation or the lyrics; the analysis goes on. */ onCancelTask?: (task: 'tracks' | 'lyrics') => void;
+  /** Reloads the result after the lyrics are loaded again from their tab. */ onReload?: () => Promise<unknown> | void;
   tools?: ReactNode;
   onScoreBusyChange?: (busy: boolean) => void;
 };
 const clock = (n: number) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`;
-const TABS = [{ id: 'tracks', label: 'Tracks', icon: SlidersHorizontal }, { id: 'chords', label: 'Acordes', icon: Grid2X2 }, { id: 'lyrics', label: 'Letras', icon: FileText }, { id: 'scores', label: 'Partituras', icon: Music4 }] as const;
+const TABS = [{ id: 'tracks', label: 'Faixas', icon: SlidersHorizontal }, { id: 'chords', label: 'Acordes', icon: Grid2X2 }, { id: 'lyrics', label: 'Letras', icon: FileText }, { id: 'scores', label: 'Partituras', icon: Music4 }] as const;
 
 export const Studio = (props: Props) => {
   useEffect(enterStudioLayout, []);
@@ -73,6 +77,34 @@ export const Studio = (props: Props) => {
   const chordTask = progress?.tasks?.find(t => t.id === 'chords');
   const lyricsLoading = !mobile && !!progress && lyricsTask?.status !== 'done' && lyricsTask?.status !== 'skipped' && lyricsTask?.status !== 'error';
   const chordsLoading = !!progress && chordTask?.status !== 'done';
+  const cancelledHere = !!props.cancelled && !progress && !analysis;
+  // Tab icons: live state during the analysis (or a manual separation), then a check for a few seconds once it ends.
+  const liveActivity = (id: (typeof TABS)[number]['id']): TabActivity => {
+    if (id === 'tracks' && stems.progress) return { status: 'running', fraction: stems.progress.stage === 'separate' && stems.progress.total ? stems.progress.done / stems.progress.total : undefined };
+    const task = id === 'tracks' ? tracksTask : id === 'chords' ? chordTask : id === 'lyrics' ? lyricsTask : undefined;
+    if (!progress || !task) return { status: 'idle' };
+    if (task.status === 'running') return { status: 'running', fraction: task.fraction };
+    if (task.status === 'waiting') return { status: 'waiting' };
+    if (task.status === 'done') return { status: 'done' };
+    if (task.status === 'error') return { status: 'error' };
+    return { status: 'idle' };
+  };
+  const [justDone, setJustDone] = useState<ReadonlySet<string>>(new Set());
+  const lastActivity = useRef<Record<string, TabActivity['status']>>({});
+  const doneTimers = useRef<number[]>([]);
+  const activities = Object.fromEntries(TABS.map(({ id }) => [id, liveActivity(id)])) as Record<(typeof TABS)[number]['id'], TabActivity>;
+  const activityKey = TABS.map(({ id }) => activities[id].status).join();
+  useEffect(() => {
+    const finished = TABS.filter(({ id }) => activities[id].status === 'idle' && ['running', 'done'].includes(lastActivity.current[id] ?? '')).map(({ id }) => id);
+    lastActivity.current = Object.fromEntries(TABS.map(({ id }) => [id, activities[id].status]));
+    if (!finished.length) return;
+    setJustDone((prev) => new Set([...prev, ...finished]));
+    // Not cleared when the states change again: each check fades on its own; unmount clears them all.
+    doneTimers.current.push(window.setTimeout(() => setJustDone((prev) => new Set([...prev].filter((id) => !finished.includes(id as never)))), 4000));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activityKey]);
+  useEffect(() => () => doneTimers.current.forEach(clearTimeout), []);
+  const activityOf = (id: (typeof TABS)[number]['id']): TabActivity => activities[id].status === 'idle' && justDone.has(id) ? { status: 'done' } : activities[id];
   const startEdit = () => { setDraft(chart?.chordPro ?? ''); setSavedDraft(chart?.chordPro ?? ''); setEditError(null); setEditing(true); };
   const closeEditor = () => {
     if (busy) return;
@@ -101,7 +133,7 @@ export const Studio = (props: Props) => {
   return <section className="studio-shell">
     <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <Link to="/" className="-ml-1 inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-chord hover:text-primary"><ArrowLeft className="size-4" /> Biblioteca</Link>
-      <div className="flex flex-wrap gap-2">{props.tools}</div>
+      <div className="flex flex-wrap gap-2">{progress && props.onCancel && <Button variant="ghost" onClick={props.onCancel}><X className="size-4" /> Cancelar análise</Button>}{props.tools}</div>
     </header>
     <div ref={sentinel} className="h-px" aria-hidden />
     <div className="studio-player-sticky" data-compact={compactPlayer}>
@@ -121,27 +153,27 @@ export const Studio = (props: Props) => {
       <section id="studio-lyrics" role="tabpanel" aria-labelledby="studio-tab-lyrics" hidden={tab !== 'lyrics'}>
         {mobile && <MobileNotice text={MOBILE_LYRICS_NOTICE} />}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">Letra e cifra</h2><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={!chart || !!progress} onClick={startEdit}><Pencil className="size-4" /> Editar letra e cifra</Button><Button disabled={!chart || !!progress || busy} onClick={() => void saveCurrent()}><Save className="size-4" />{busy ? 'Salvando…' : 'Salvar cifra'}</Button><PrintChartButton content={printable} title={song.title} artist={song.artist} disabled={!chart || !!progress} /></div></div>
-        {lyricsLoading ? <Loading label={lyricsTask?.label ?? 'Preparando a letra…'} fraction={lyricsTask?.fraction} /> : chart ? <div ref={printable}><ChartView chordPro={chart.chordPro} transpose={chart.transpose} fontSize={chart.fontSize} preferFlats={false} spellKey={props.shownKey} activeLineIndex={props.playing ? props.activeLine : -1} highlight="marker" autoScroll={props.autoScroll && !!props.playing && tab === 'lyrics'} onChordTap={chord => props.onChord(chord)} /><ChartChordShapes chart={{ ...chart, chordShapes: shapeChoices, chordInstrument: galleryInstrument }} spellKey={props.shownKey} onChange={(choices, instrument) => { setShapeChoices(choices); if (instrument) setGalleryInstrument(instrument); }} /></div> : <p className="text-muted-foreground">A letra e os acordes aparecerão aqui após a análise.</p>}
-        {!mobile && !lyricsLoading && !analysis?.lyrics && analysis && <p className="mt-5 text-sm text-muted-foreground">A transcrição não trouxe letra. Você pode editar o texto ou tentar a análise novamente.</p>}
+        {lyricsLoading ? <Loading label={lyricsTask?.label ?? 'Preparando a letra…'} fraction={lyricsTask?.fraction} onCancel={props.onCancelTask && lyricsTask ? () => props.onCancelTask!('lyrics') : undefined} /> : chart ? <div ref={printable}><ChartView chordPro={chart.chordPro} transpose={chart.transpose} fontSize={chart.fontSize} preferFlats={false} spellKey={props.shownKey} activeLineIndex={props.playing ? props.activeLine : -1} highlight="marker" autoScroll={props.autoScroll && !!props.playing && tab === 'lyrics'} onChordTap={chord => props.onChord(chord)} /><ChartChordShapes chart={{ ...chart, chordShapes: shapeChoices, chordInstrument: galleryInstrument }} spellKey={props.shownKey} onChange={(choices, instrument) => { setShapeChoices(choices); if (instrument) setGalleryInstrument(instrument); }} /></div> : cancelledHere ? <CancelledSection what="A análise foi cancelada antes de montar a letra e a cifra." onRetry={props.onRetry} disabled={!!stems.progress} /> : <p className="text-muted-foreground">A letra e os acordes aparecerão aqui após a análise.</p>}
+        {!progress && analysis && !analysis.lyrics?.lines.length && <LyricsRetry songId={song.id} reason="Esta cifra ainda está sem letra: a etapa foi cancelada ou não encontrou o texto." onLoaded={() => props.onReload?.()} />}
       </section>
       <section id="studio-chords" role="tabpanel" aria-labelledby="studio-tab-chords" hidden={tab !== 'chords'}>
         {mobile && <MobileNotice text={`Neste aparelho, a análise identifica tom e acordes no áudio original e busca a letra no LRCLIB. ${MOBILE_MODELS_NOTICE}`} />}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">Harmonia da música</h2><span className="text-xs text-muted-foreground">Sequência por tempo</span></div>
-        {chordsLoading ? <div role="status"><p className="text-sm text-muted-foreground">{chordTask?.label ?? 'Identificando tom e acordes…'}</p><ProgressBar fraction={chordTask?.fraction} /><ChordsSkeleton /></div> : <>
+        {chordsLoading ? <div role="status"><p className="text-sm text-muted-foreground">{chordTask?.label ?? 'Identificando tom e acordes…'}</p><ProgressBar fraction={chordTask?.fraction} />{props.onCancel && <SectionCancel label="Cancelar análise" hint="A cifra depende dos acordes: cancelar aqui para a análise inteira." onClick={props.onCancel} />}<ChordsSkeleton /></div> : cancelledHere ? <CancelledSection what="A análise foi cancelada antes de identificar os acordes." onRetry={props.onRetry} disabled={!!stems.progress} /> : <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">{chords.map((c, i) => <button key={`${c.start}-${i}`} type="button" aria-current={i === props.currentIndex ? 'true' : undefined} onClick={() => props.onSeek(c.start)} className={`rounded-xl border p-4 text-left transition-colors ${i === props.currentIndex ? 'border-primary bg-primary/15' : 'border-border bg-surface/60 hover:border-primary/50'}`}><span className="block text-xs tabular-nums text-muted-foreground">{clock(c.start)} — {clock(c.end)}</span><span className="mt-2 block text-lg font-semibold text-chord">{name(c.raw)}</span></button>)}</div>
           {!chords.length && <p className="text-muted-foreground">Nenhum acorde disponível para esta música.</p>}
         </>}
       </section>
       <section id="studio-tracks" role="tabpanel" aria-labelledby="studio-tab-tracks" hidden={tab !== 'tracks'}>
-        <h2 className="mb-5 text-lg font-semibold">Tracks</h2>
-        {tracksLoading ? <><p className="text-sm text-muted-foreground" role="status">{tracksTask?.label ?? 'Preparando faixas…'}</p><ProgressBar fraction={tracksTask?.fraction} /><p className="text-xs text-muted-foreground tabular-nums">{tracksTask?.detail}</p><TracksSkeleton /></> : <StemsPanel stems={stems} title={song.title} hasAudio automaticMix mixer={tab === 'tracks' && !progress ? <StudioMixer stems={stems} onSeek={props.onSeek} getTime={props.getTime} /> : undefined} />}
+        <h2 className="mb-5 text-lg font-semibold">Faixas</h2>
+        {tracksLoading ? <><p className="text-sm text-muted-foreground" role="status">{tracksTask?.label ?? 'Preparando faixas…'}</p><ProgressBar fraction={tracksTask?.fraction} /><p className="text-xs text-muted-foreground tabular-nums">{tracksTask?.detail}</p>{props.onCancelTask && tracksTask && <SectionCancel label="Cancelar separação" hint="A análise continua sem as faixas; a letra usa o áudio original. Você pode separar depois aqui mesmo." onClick={() => props.onCancelTask!('tracks')} />}<TracksSkeleton /></> : <StemsPanel stems={stems} title={song.title} hasAudio automaticMix mixer={tab === 'tracks' && !progress ? <StudioMixer stems={stems} onSeek={props.onSeek} getTime={props.getTime} /> : undefined} />}
       </section>
       <section id="studio-scores" role="tabpanel" aria-labelledby="studio-tab-scores" hidden={tab !== 'scores'}>
         {mobile && <MobileNotice text="A geração de partituras depende das faixas separadas e também pode exigir muita memória. Recomendamos gerar no computador. Partituras já salvas podem ser abertas na biblioteca." />}
         <StudioScores song={song} chart={chart} analysis={analysis} tracks={stems.tracks} active={tab === 'scores'} waiting={!!progress || !!stems.progress} onBusyChange={props.onScoreBusyChange} />
       </section>
     </div>
-    <nav className="studio-tabs" aria-label="Estúdio"><div role="tablist" aria-label="Abas do Estúdio" onKeyDown={rovingKeys} className="glass-strong flex w-full max-w-lg gap-1 rounded-2xl border border-border p-2 shadow-lg">{TABS.map(({ id, label, icon: Icon }) => <button key={id} id={`studio-tab-${id}`} type="button" role="tab" aria-selected={tab === id} aria-controls={`studio-${id}`} onClick={() => setTab(id)} className={`relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs sm:flex-row sm:gap-2 sm:px-2 sm:text-sm ${tab === id ? 'bg-primary/20 font-semibold text-chord' : 'text-muted-foreground hover:bg-muted'}`}><Icon className="size-4 shrink-0" />{label}{((id === 'lyrics' && lyricsLoading) || (id === 'chords' && chordsLoading) || (id === 'tracks' && (tracksLoading || !!stems.progress))) && <span aria-label="Processando" className="absolute right-1 top-1 size-1.5 animate-pulse rounded-full bg-primary" />}</button>)}</div></nav>
+    <nav className="studio-tabs" aria-label="Estúdio"><div role="tablist" aria-label="Abas do Estúdio" onKeyDown={rovingKeys} className="glass-strong flex w-full max-w-lg gap-1 rounded-2xl border border-border p-2 shadow-lg">{TABS.map(({ id, label, icon: Icon }) => <button key={id} id={`studio-tab-${id}`} type="button" role="tab" aria-selected={tab === id} aria-controls={`studio-${id}`} onClick={() => setTab(id)} className={`relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs sm:flex-row sm:gap-2 sm:px-2 sm:text-sm ${tab === id ? 'bg-primary/20 font-semibold text-chord' : 'text-muted-foreground hover:bg-muted'}`}><StudioTabIcon icon={Icon} activity={activityOf(id)} /><span className="truncate">{label}</span>{activityOf(id).status !== 'idle' && <span className="sr-only">: {ACTIVITY_WORD[activityOf(id).status]}</span>}</button>)}</div></nav>
     {editing && <BottomSheet title="Editar letra e cifra" onClose={closeEditor} size="wide" initialFocus={panel => panel.querySelector('textarea')}>{() => <div className="overflow-auto px-4 pb-5">
       <p className="mb-3 text-sm text-muted-foreground">Escreva os acordes entre colchetes: [G]letra da música [D].</p>
       <textarea aria-label="Cifra em ChordPro" value={draft} onChange={e => setDraft(e.target.value)} disabled={busy} spellCheck={false} className="h-[42dvh] w-full resize-y rounded-xl border border-border bg-background p-4 font-mono text-base focus:border-primary" />
@@ -150,5 +182,22 @@ export const Studio = (props: Props) => {
     </div>}</BottomSheet>}
   </section>;
 };
-const Loading = ({ label, fraction }: { label: string; fraction?: number }) => <div role="status"><p className="text-sm text-muted-foreground">{label}</p><ProgressBar fraction={fraction} /><LyricsSkeleton /></div>;
+const Loading = ({ label, fraction, onCancel }: { label: string; fraction?: number; onCancel?: () => void }) => <div role="status"><p className="text-sm text-muted-foreground">{label}</p><ProgressBar fraction={fraction} />{onCancel && <SectionCancel label="Cancelar letra" hint="A cifra continua com os acordes; você pode carregar a letra de novo depois." onClick={onCancel} />}<LyricsSkeleton /></div>;
+
+/** Cancel button inside a tab while its step loads, with what happens next. */
+const SectionCancel = ({ label, hint, onClick }: { label: string; hint: string; onClick: () => void }) => (
+  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+    <Button variant="ghost" className="-ml-2" onClick={onClick}><X className="size-4" /> {label}</Button>
+    <span className="text-xs text-muted-foreground">{hint}</span>
+  </div>
+);
+
+/** A tab whose step was cancelled with the whole analysis: load it again from here. */
+const CancelledSection = ({ what, onRetry, disabled }: { what: string; onRetry: () => void; disabled?: boolean }) => (
+  <div className="progress-fade rounded-xl border border-border bg-surface p-4" role="status">
+    <p className="font-semibold">Carregamento cancelado</p>
+    <p className="mt-1 text-sm text-muted-foreground">{what} A música continua na biblioteca.</p>
+    <Button className="mt-3" variant="outline" disabled={disabled} onClick={onRetry}><RotateCcw className="size-4" /> Carregar novamente</Button>
+  </div>
+);
 const MobileNotice = ({ text }: { text: string }) => <p className="mb-5 rounded-xl border border-border bg-surface p-4 text-sm leading-relaxed text-muted-foreground">{text}</p>;

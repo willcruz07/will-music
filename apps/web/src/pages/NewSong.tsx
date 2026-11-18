@@ -7,6 +7,7 @@ import { readTags } from '../lib/metadata.ts';
 import { diagnoseAudioImport } from '../lib/importDiagnostics.ts';
 import { explainQuota, formatBytes, isQuotaError, storageStatus } from '../lib/storage.ts';
 import { Button } from '../ui/Button.tsx';
+import { ImportPlan } from '../components/ImportPlan.tsx';
 
 const minutes = (sec: number) => (sec ? `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}` : '');
 
@@ -79,7 +80,7 @@ export const NewSong = () => {
       >
         {file ? <FileAudio className="size-8 text-primary" /> : <Upload className="size-8 text-primary" />}
         <span className="font-semibold">{file ? file.name : 'Escolha um arquivo de áudio ou arraste para cá'}</span>
-        <span className="text-sm text-muted-foreground">{file ? minutes(duration) : 'MP3, WAV, M4A ou OGG'}</span>
+        <span className="text-sm text-muted-foreground tabular-nums">{file ? [minutes(duration), formatBytes(file.size)].filter(Boolean).join(' · ') : 'MP3, WAV, M4A ou OGG'}</span>
         <input type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg" className="sr-only" aria-label="Arquivo de áudio" disabled={saving || diagnosing} onChange={(e) => void choose(e.target.files?.[0])} />
       </label>
 
@@ -126,8 +127,9 @@ export const NewSong = () => {
               )}
             </div>
           )}
+          <ImportPlan />
           <Button onClick={() => void submit()} disabled={saving || diagnosing || !title.trim()} className="w-full sm:w-auto">
-            {saving ? 'Salvando…' : 'Analisar música'}
+            {saving ? 'Guardando o áudio…' : 'Analisar música'}
           </Button>
         </div>
       )}

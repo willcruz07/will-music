@@ -2,18 +2,18 @@ import { createSeparationReporter } from './separationProgress.ts';
 import { analyzeInWorker } from '../worker/client.ts';
 import { buildChart, keyToChord } from './chart.ts';
 import { type Analysis, type Chart, db, now, updateSong } from './db.ts';
-import { decodeForAnalysis } from './decode.ts';
+import { decodeForAnalysis, decodeStudioAudio } from './decode.ts';
 import { retainSessionStems } from './sessionStems.ts';
 import { lyricsToKeep } from './lyricsApply.ts';
 import { transcribeSong, warmWhisper, type WhisperWarm } from './whisper.ts';
 import { findSongLyrics } from './lrclib.ts';
-import { alignLyricsToWords } from './lyricsAlign.ts';
+import { chooseLyrics } from './lyricsChoice.ts';
 import { describeTranscription } from './transcript.ts';
 import { getPendingAnalysis, setPendingAnalysis, retainSessionAnalysis } from './pendingAnalysis.ts';
 import { savePendingAnalysis } from './saveAnalysis.ts';
 import { isQuotaError } from './storage.ts';
 import { estimateAudioBpm } from './audioTempo.ts';
-import { prepareAnalysisStems } from './analysisAudio.ts';
+import { prepareAnalysisStems, separationNeeded } from './analysisAudio.ts';
 import { isMobileStudio } from './studioDevice.ts';
 
 import { resolveAnalysisExecution, isResourceFailure, type ExecutionPreference } from './analysisExecution.ts';
@@ -22,7 +22,7 @@ export type AnalysisTaskProgress = { id: 'tracks' | 'chords' | 'lyrics'; label: 
 export type PipelineProgress = { label: string; fraction?: number; detail?: string; lyricsPending?: boolean; tasks?: AnalysisTaskProgress[]; tempo?: number };
 const mb = (bytes: number) => (bytes / 1e6).toFixed(0);
 
-export const runPipeline = async (songId: string, onProgress: (p: PipelineProgress) => void, options: { execution?: ExecutionPreference; persist?: boolean } = {}): Promise<void> => {
+export const runPipeline = async (songId: string, onProgress: (p: PipelineProgress) => void, options: { execution?: ExecutionPreference; persist?: boolean; signal?: AbortSignal; taskSignals?: Partial<Record<'tracks' | 'lyrics', AbortSignal>> } = {}): Promise<void> => {
   const song = await db.songs.get(songId);
   const audio = await db.audio.get(songId);
   if (!song || !audio) throw new Error('Música não encontrada.');
@@ -30,6 +30,11 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
   const release = retainSessionStems(songId);
   const releaseAnalysis = retainSessionAnalysis(songId);
   const controller = new AbortController();
+  const cancel = () => controller.abort(options.signal?.reason);
+  if (options.signal?.aborted) cancel(); else options.signal?.addEventListener('abort', cancel, { once: true });
+  // A step the musician stopped: it ends on its own signal, the rest of the analysis keeps going.
+  const stepSignal = (task: 'tracks' | 'lyrics') => options.taskSignals?.[task] ? AbortSignal.any([controller.signal, options.taskSignals[task]!]) : controller.signal;
+  const stepCancelled = (task: 'tracks' | 'lyrics') => !!options.taskSignals?.[task]?.aborted && !controller.signal.aborted;
   let stopped = false;
   let assembling = false;
   let chartPublished = false;
@@ -67,7 +72,11 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
     publish();
     // Decode the chord input first; do not overlap two full native audio decoders on long files (the separation
     // decodes its own copy right after).
-    const { channels, durationSec } = await decodeForAnalysis(audio.blob, { mono: true });
+    let forSeparation: { planar: Float32Array; samples: number } | undefined;
+    const decoded = !mobile && await separationNeeded(songId)
+      ? await decodeStudioAudio(audio.blob).then((d) => { forSeparation = d.separation; return d.chords; })
+      : await decodeForAnalysis(audio.blob, { mono: true });
+    const { channels, durationSec } = decoded;
     tempo = song.tempo ?? (channels[0] ? estimateAudioBpm(channels[0], 22050) : undefined);
     publish();
     let lyricsFailure: unknown;
@@ -84,24 +93,18 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       lyricsTask.fraction = undefined;
       lyricsTask.detail = undefined;
       publish();
-      lyricsPromise = transcribeSong(songId, (p) => { Object.assign(lyricsTask, describeTranscription(p)); publish(); }, { signal: controller.signal, warm: warm ?? undefined })
+      lyricsPromise = transcribeSong(songId, (p) => { Object.assign(lyricsTask, describeTranscription(p)); publish(); }, { signal: stepSignal('lyrics'), warm: warm ?? undefined })
         .then(async (heard) => {
-          const found = await lrclibPromise;
-          const aligned = found && heard.words ? alignLyricsToWords(found.lines, heard.words, song.durationSec || durationSec) : null;
-          if (found && aligned && aligned.coverage >= 0.5) {
-            lyrics = { source: 'lrclib', lrclibId: found.lrclibId, lines: aligned.lines };
-            lyricsTask.label = 'Letra encontrada e sincronizada';
-          } else if (found && !found.warning && (!aligned || aligned.coverage < 0.5)) {
-            // The transcription disagrees with the text: LRCLIB's own synced times are the safer choice.
-            lyrics = found;
-            lyricsTask.label = 'Letra encontrada';
-          } else {
-            lyrics = { source: 'transcription', lines: heard.lines };
-            lyricsTask.label = 'Letra transcrita';
-          }
+          const chosen = chooseLyrics(await lrclibPromise, heard, song.durationSec || durationSec)!;
+          lyrics = chosen.lyrics;
+          lyricsTask.label = chosen.label;
           lyricsTask.status = 'done'; lyricsTask.fraction = 1;
         })
-        .catch((error: unknown) => { if (!controller.signal.aborted) { lyricsFailure = error; lyricsTask.status = 'error'; lyricsTask.label = 'A transcrição não terminou'; } })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return;
+          if (stepCancelled('lyrics')) { lyricsTask.status = 'skipped'; lyricsTask.label = 'Letra cancelada'; lyricsTask.detail = undefined; return; }
+          lyricsFailure = error; lyricsTask.status = 'error'; lyricsTask.label = 'A transcrição não terminou';
+        })
         .finally(() => { lyricsMs += performance.now() - taskStarted; publish(); });
     };
     // Desktop: the lyrics model loads in its own worker while the tracks are separated, so the transcription starts
@@ -114,6 +117,12 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       else return;
       publish();
     });
+    options.taskSignals?.lyrics?.addEventListener('abort', () => {
+      warm?.dispose();
+      if (lyricsTask.status !== 'waiting') return;
+      lyricsTask.status = 'skipped'; lyricsTask.label = 'Letra cancelada';
+      publish();
+    }, { once: true });
     const chordsStarted = performance.now();
     const chordPromise = analyzeInWorker(channels, (e) => {
       chordsTask.label = e.stage === 'models' ? 'Carregando modelos de acordes (' + mb(e.done) + ' de ' + mb(e.total) + ' MB)' : e.stage === 'key' ? 'Identificando o tom…' : 'Analisando acordes… (bloco ' + Math.min(e.total, e.done + 1) + ' de ' + e.total + ')';
@@ -133,12 +142,20 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
         const prepared = await prepareAnalysisStems(songId, p => {
           Object.assign(tracksTask, report(p));
           publish();
-        }, controller.signal);
+        }, stepSignal('tracks'), forSeparation);
+        forSeparation = undefined;
         if (prepared.warning) warnings.push(prepared.warning);
         tracksTask.status = prepared.stems ? 'done' : 'skipped';
         tracksTask.label = prepared.stems ? 'Faixas prontas' : 'Continuando com o áudio original';
       } catch (error) {
         controller.signal.throwIfAborted();
+        if (stepCancelled('tracks')) {
+          tracksTask.status = 'skipped';
+          tracksTask.label = 'Separação cancelada';
+          tracksTask.detail = undefined; tracksTask.fraction = undefined;
+          publish();
+          return;
+        }
         tracksTask.status = 'error';
         tracksTask.label = 'Separação indisponível';
         warnings.push('Não foi possível separar as faixas. A letra continua com o áudio original.');
@@ -153,6 +170,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       if (mobile || lyrics?.lines.length) return;
       if (execution === 'sequential') await chordsDone.catch(() => undefined);
       controller.signal.throwIfAborted();
+      if (stepCancelled('lyrics')) return;
       launchLyrics();
     });
     // Awaited below; a failure here must not surface as an unhandled rejection while the chords still run.
@@ -164,6 +182,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       lyricsPromise = findSongLyrics(song.title, song.artist, song.durationSec || durationSec)
         .catch((error: unknown) => { console.warn('Busca da letra no LRCLIB falhou', error); return null; })
         .then((found) => {
+          if (stepCancelled('lyrics')) { lyricsTask.status = 'skipped'; lyricsTask.label = 'Letra cancelada'; return; }
           if (found) {
             lyrics = found;
             if (found.warning) warnings.push(found.warning);
@@ -247,12 +266,17 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
     await saveResult();
   } catch (error) {
     controller.abort();
+    if (options.signal?.aborted) {
+      if (options.persist !== false) await updateSong(songId, { analysisStatus: 'pending', analysisError: undefined }).catch(() => undefined);
+      throw new DOMException('Análise cancelada.', 'AbortError');
+    }
     const message = error instanceof Error ? error.message : String(error);
     try { if (options.persist !== false) await updateSong(songId, { analysisStatus: 'error', analysisError: message }); }
     catch (statusError) { console.warn('Não foi possível registrar o estado de erro da análise.', { songId, error, statusError }); }
     throw error;
   } finally {
     stopped = true;
+    options.signal?.removeEventListener('abort', cancel);
     warm?.dispose();
     controller.abort();
     release();

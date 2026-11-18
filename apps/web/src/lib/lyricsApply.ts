@@ -4,7 +4,7 @@ import { type Analysis, db, now } from './db.ts';
 export type LyricsChoice = NonNullable<Analysis['lyrics']>;
 
 /** Saves the chosen lyrics; rebuilds the chart unless the user has edited it. */
-export const applyLyrics = async (songId: string, lyrics: LyricsChoice): Promise<'rebuilt' | 'kept-edited' | 'no-analysis'> => {
+export const applyLyrics = async (songId: string, lyrics: LyricsChoice, options: { chosenByUser?: boolean } = {}): Promise<'rebuilt' | 'kept-edited' | 'no-analysis'> => {
   return db.transaction('rw', [db.songs, db.analyses, db.charts], async () => {
     const [song, analysis, chart] = await Promise.all([
       db.songs.get(songId),
@@ -13,7 +13,7 @@ export const applyLyrics = async (songId: string, lyrics: LyricsChoice): Promise
     ]);
     if (!song || !analysis) return 'no-analysis';
     const stamp = now();
-    await db.analyses.update(analysis.id, { lyrics: { ...lyrics, chosenByUser: true }, updatedAt: stamp });
+    await db.analyses.update(analysis.id, { lyrics: options.chosenByUser === false ? lyrics : { ...lyrics, chosenByUser: true }, updatedAt: stamp });
     if (chart && chart.origin !== 'generated') return 'kept-edited';
     const chordPro = buildChart({ title: song.title, artist: song.artist, key: analysis.key, chords: analysis.chords, lines: lyrics.lines });
     const lineTimes = lyrics.lines.map((l) => l.start);

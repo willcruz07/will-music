@@ -1,4 +1,5 @@
-import { AlertCircle, CheckCircle2, Circle, Loader2, MinusCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Circle, Loader2, MinusCircle, X } from 'lucide-react';
+import { Button } from '../ui/Button.tsx';
 import { useEffect, useState } from 'react';
 import type { AnalysisTaskProgress, PipelineProgress } from '../lib/pipeline.ts';
 
@@ -30,7 +31,12 @@ export const ProgressBar = ({ fraction, className = 'mt-3 h-2' }: { fraction?: n
 /** Same step while only its numbers change (bytes, "trecho 3 de 9"): the fade plays once per step. */
 const stepKey = (label: string) => label.replace(/[\d.,]+/g, '#');
 
-const TASK_NAMES = { tracks: 'Tracks', chords: 'Acordes e tom', lyrics: 'Letra' } as const;
+/** In the order they finish: what each step unlocks for the musician. */
+const STEPS: { id: AnalysisTaskProgress['id']; name: string; unlocks: string }[] = [
+  { id: 'chords', name: 'Acordes e tom', unlocks: 'A cifra aparece assim que esta etapa termina.' },
+  { id: 'tracks', name: 'Faixas', unlocks: 'Mixer por instrumento e a voz isolada para a letra.' },
+  { id: 'lyrics', name: 'Letra', unlocks: 'Letra sincronizada com a música.' },
+];
 
 const TaskIcon = ({ status }: { status: AnalysisTaskProgress['status'] }) => {
   if (status === 'running') return <Loader2 className="size-4 animate-spin text-primary" aria-hidden />;
@@ -40,21 +46,54 @@ const TaskIcon = ({ status }: { status: AnalysisTaskProgress['status'] }) => {
   return <Circle className="size-4 text-muted-foreground/60" aria-hidden />;
 };
 
-export const AnalysisProgress = ({ progress }: { progress: PipelineProgress }) => (
-  <div className="mt-10 max-w-md" role="status" aria-live="polite">
-    <p key={stepKey(progress.label)} className="progress-fade text-lg font-semibold">{progress.label}</p>
-    {progress.tasks ? <div className="mt-3 space-y-3" aria-label="Progresso das tarefas">
-      {progress.tasks.map((task) => <div key={task.id} className={`rounded-lg border p-3 transition-colors duration-300 ${task.status === 'running' ? 'border-primary/50 bg-primary/5' : 'border-border'}`}>
-        <p className="flex items-center gap-2 text-sm font-semibold"><TaskIcon key={task.status} status={task.status} /> {TASK_NAMES[task.id]}</p>
-        <p key={stepKey(task.label)} className="progress-fade mt-1 text-sm text-muted-foreground">{task.label}</p>
-        {task.status === 'running' && <ProgressBar fraction={task.fraction} className="mt-2 h-1.5" />}
-        {task.detail && <p className="mt-1 text-xs text-muted-foreground tabular-nums">{task.detail}</p>}
-      </div>)}
-    </div> : <><ProgressBar fraction={progress.fraction} />
-      {progress.detail && <p className="mt-2 text-sm text-muted-foreground tabular-nums">{progress.detail}</p>}</>}
-    <p className="mt-3 text-sm text-muted-foreground">Tudo é processado no seu aparelho. Os modelos necessários são baixados na primeira utilização e reutilizados nas próximas músicas.</p>
-  </div>
-);
+const STATUS_WORD: Record<AnalysisTaskProgress['status'], string> = { running: 'em andamento', done: 'concluída', error: 'com erro', skipped: 'pulada', waiting: 'na fila' };
+
+/** Seconds since the component mounted, ticking once a second. */
+const useElapsed = () => {
+  const [startedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(startedAt);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return now - startedAt;
+};
+
+export const AnalysisProgress = ({ progress, onCancel }: { progress: PipelineProgress; onCancel?: () => void }) => {
+  const elapsed = useElapsed();
+  const tasks = progress.tasks ? STEPS.map((step) => ({ step, task: progress.tasks!.find((t) => t.id === step.id) })).filter((x) => x.task) : [];
+  return (
+    <div className="mt-8 max-w-md" role="status" aria-live="polite">
+      <div className="flex items-baseline gap-3">
+        <p key={stepKey(progress.label)} className="progress-fade min-w-0 flex-1 text-lg font-semibold">{progress.label}</p>
+        <span className="shrink-0 text-sm text-muted-foreground tabular-nums" aria-label={`Tempo decorrido: ${formatElapsed(elapsed)}`}>{formatElapsed(elapsed)}</span>
+      </div>
+      {tasks.length ? <ol className="relative mt-4 space-y-3" aria-label="Etapas da análise">
+        {tasks.map(({ step, task }, i) => {
+          const t = task!;
+          const active = t.status === 'running';
+          return (
+            <li key={step.id} className={`relative rounded-xl border p-3 transition-colors duration-300 ${active ? 'border-primary/50 bg-primary/5' : 'border-border'} ${t.status === 'waiting' ? 'opacity-75' : ''}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground tabular-nums" aria-hidden>{i + 1}</span>
+                <TaskIcon key={t.status} status={t.status} />
+                <p className="text-sm font-semibold">{step.name}</p>
+                <span className="sr-only">: {STATUS_WORD[t.status]}</span>
+              </div>
+              <p key={stepKey(t.label)} className="progress-fade mt-1 text-sm text-muted-foreground">{t.label}</p>
+              {active && <ProgressBar fraction={t.fraction} className="mt-2 h-1.5" />}
+              {t.detail && <p className="mt-1 text-xs text-muted-foreground tabular-nums">{t.detail}</p>}
+              {(t.status === 'waiting' || active) && <p className="mt-1.5 text-xs text-muted-foreground/80">{step.unlocks}</p>}
+            </li>
+          );
+        })}
+      </ol> : <><ProgressBar fraction={progress.fraction} />
+        {progress.detail && <p className="mt-2 text-sm text-muted-foreground tabular-nums">{progress.detail}</p>}</>}
+      <p className="mt-3 text-sm text-muted-foreground">Tudo é processado neste aparelho. Os modelos são baixados só na primeira vez e reaproveitados nas próximas músicas.</p>
+      {onCancel && <Button variant="ghost" className="mt-2" onClick={onCancel}><X className="size-4" /> Cancelar análise</Button>}
+    </div>
+  );
+};
 
 /** "1 min 05 s" style elapsed time. */
 export const formatElapsed = (ms: number): string => {
@@ -66,13 +105,8 @@ export const formatElapsed = (ms: number): string => {
  * Sticky bar while the lyrics are transcribed and the chords already show: the step, a bar, the time so far and
  * the latest words heard, so a long transcription reads as working, not frozen.
  */
-export const TranscribingBar = ({ progress }: { progress: PipelineProgress }) => {
-  const [startedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(startedAt);
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+export const TranscribingBar = ({ progress, onCancel }: { progress: PipelineProgress; onCancel?: () => void }) => {
+  const elapsed = useElapsed();
   return (
     <div
       role="status"
@@ -82,9 +116,10 @@ export const TranscribingBar = ({ progress }: { progress: PipelineProgress }) =>
       <div className="flex items-center gap-2">
         <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
         <p key={stepKey(progress.label)} className="progress-fade min-w-0 flex-1 truncate text-sm font-semibold">{progress.label}</p>
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums" aria-label={`Tempo: ${formatElapsed(now - startedAt)}`}>
-          {formatElapsed(now - startedAt)}
+        <span className="shrink-0 text-xs text-muted-foreground tabular-nums" aria-label={`Tempo: ${formatElapsed(elapsed)}`}>
+          {formatElapsed(elapsed)}
         </span>
+        {onCancel && <button type="button" onClick={onCancel} aria-label="Cancelar análise" className="-mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"><X className="size-4" /></button>}
       </div>
       <ProgressBar fraction={progress.fraction} className="mt-2 h-1.5" />
       <p className="mt-1.5 truncate text-xs text-muted-foreground">
