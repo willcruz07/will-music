@@ -121,6 +121,8 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
         let model: Uint8Array | null = await take('demucs6s');
         const session = await ort.InferenceSession.create(model, { executionProviders: webgpu(device), graphOptimizationLevel: 'disabled' });
         model = null;
+        // The block running ahead on the GPU: the session is released only after it settles.
+        let ahead: Promise<ort.InferenceSession.OnnxValueMapType> | null = null;
         try {
           const names = demucsTrackNames(demucsMode);
           const encoders = await Promise.all(names.map(() => mp3Stream(DEMUCS.SAMPLE_RATE)));
@@ -128,7 +130,7 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
           const runBlock = (i: number) => session.run({ [DEMUCS.INPUT]: new ort.Tensor('float32', sliceChunk(planar, samples, demucsPlan[i]!.start, DEMUCS.SEGMENT), [1, 2, DEMUCS.SEGMENT]) });
           // One block ahead: the next block is handed to the GPU before this one is mixed in and encoded to MP3,
           // so the graphics card does not sit idle while the processor encodes.
-          let ahead: ReturnType<typeof runBlock> | null = demucsPlan.length ? runBlock(0) : null;
+          ahead = demucsPlan.length ? runBlock(0) : null;
           for (let i = 0; i < demucsPlan.length; i++) {
             stage = `separar em faixas (bloco ${i + 1} de ${demucsPlan.length})`;
             const out = await ahead!;
@@ -148,6 +150,7 @@ self.onmessage = async (event: MessageEvent<SeparationRequest>) => {
           }
           names.forEach((name, k) => (tracks[name] = encoders[k]!.finish()));
         } finally {
+          await ahead?.catch(() => undefined);
           await session.release();
         }
       }

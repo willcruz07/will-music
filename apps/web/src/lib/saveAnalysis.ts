@@ -2,24 +2,6 @@ import { db, now } from './db.ts';
 import { clearPendingAnalysis, getPendingAnalysis } from './pendingAnalysis.ts';
 import { lyricsToKeep } from './lyricsApply.ts';
 import { buildChart } from './chart.ts';
-import { getSessionStems } from './sessionStems.ts';
-import { isQuotaError } from './storage.ts';
-
-/**
- * Saving the result also keeps the tracks separated in this session, so reopening the song (or analysing it again)
- * does not separate it again. Best effort: a refused write keeps the analysis saved and the tracks in the session.
- */
-const keepSessionStems = async (songId: string): Promise<void> => {
-  const stems = getSessionStems(songId);
-  if (!stems) return;
-  try {
-    if (await db.stemSets.get([songId, stems.mode])) return;
-    await db.stemSets.put(stems);
-  } catch (error) {
-    if (!isQuotaError(error)) console.warn('Não foi possível guardar as faixas separadas junto com o resultado', error);
-  }
-};
-
 /** Retries only the final transaction: no model, separation or transcription is executed. */
 export const savePendingAnalysis = async (songId: string): Promise<void> => {
   const pending = getPendingAnalysis(songId);
@@ -41,7 +23,6 @@ export const savePendingAnalysis = async (songId: string): Promise<void> => {
       await db.songs.update(songId, { key: pending.song.key, tempo: song.tempo ?? pending.song.tempo, durationSec: song.durationSec || pending.song.durationSec, analysisStatus: 'done', analysisError: undefined, updatedAt: now() });
     });
     if (getPendingAnalysis(songId) === pending) clearPendingAnalysis(songId);
-    await keepSessionStems(songId);
   } catch (error) {
     pending.error = error;
     throw error;

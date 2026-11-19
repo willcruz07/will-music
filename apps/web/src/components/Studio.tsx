@@ -95,7 +95,8 @@ export const Studio = (props: Props) => {
   const activities = Object.fromEntries(TABS.map(({ id }) => [id, liveActivity(id)])) as Record<(typeof TABS)[number]['id'], TabActivity>;
   const activityKey = TABS.map(({ id }) => activities[id].status).join();
   useEffect(() => {
-    const finished = TABS.filter(({ id }) => activities[id].status === 'idle' && ['running', 'done'].includes(lastActivity.current[id] ?? '')).map(({ id }) => id);
+    // Only a step that really finished keeps its check: a cancelled or skipped one just loses its ring.
+    const finished = TABS.filter(({ id }) => activities[id].status === 'idle' && lastActivity.current[id] === 'done').map(({ id }) => id);
     lastActivity.current = Object.fromEntries(TABS.map(({ id }) => [id, activities[id].status]));
     if (!finished.length) return;
     setJustDone((prev) => new Set([...prev, ...finished]));

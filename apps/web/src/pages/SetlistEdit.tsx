@@ -1,16 +1,13 @@
 import { DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowDown, ArrowLeft, ArrowUp, GripVertical, Play, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, GripVertical, Loader2, Play, Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { type Setlist, type SetlistItem, type Song, db, listSongs } from '../lib/db.ts';
-import { deleteSetlist, keyOptions, moveItem, updateSetlist } from '../lib/setlists.ts';
+import { moveItem, updateSetlist } from '../lib/setlists.ts';
 import { ShareSetlist } from '../components/ShareSetlist.tsx';
-import { ExportButton } from '../components/PackageButtons.tsx';
 import { Button, IconButton } from '../ui/Button.tsx';
-import { confirmDialog } from '../ui/Dialog.tsx';
-import { SheetSelect } from '../ui/SheetSelect.tsx';
 import { BottomSheet } from '../ui/BottomSheet.tsx';
 import { LibraryEmptyState } from '../components/LibraryEmptyState.tsx';
 
@@ -18,47 +15,28 @@ const fold = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').to
 
 type Row = { key: string; index: number; item: SetlistItem; song?: Song };
 
-const ItemRow = ({ row, count, onChange, onMove, onRemove }: { row: Row; count: number; onChange: (patch: Partial<SetlistItem>) => void; onMove: (to: number) => void; onRemove: () => void }) => {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: row.key });
+const ItemRow = ({ row, count, onMove, onRemove }: { row: Row; count: number; onMove: (to: number) => void; onRemove: () => void }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.key });
   const title = row.song?.title ?? 'Música não encontrada';
   return (
-    <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className="flex flex-wrap items-center gap-2 border-b border-border bg-background py-3">
-      <button type="button" className="flex size-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-xl text-muted-foreground hover:bg-muted" aria-label={`Arrastar ${title}`} {...attributes} {...listeners}>
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`flex items-center gap-1 rounded-2xl border bg-surface py-1.5 pl-1 pr-1.5 sm:gap-2 ${isDragging ? 'relative z-10 border-primary shadow-lg' : 'border-border'}`}
+    >
+      <button type="button" className="flex size-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-xl text-muted-foreground hover:bg-muted active:cursor-grabbing" aria-label={`Arrastar ${title}`} {...attributes} {...listeners}>
         <GripVertical className="size-4" />
       </button>
-      <span className="w-6 text-right tabular-nums text-muted-foreground">{row.index + 1}</span>
-      <span className="min-w-40 flex-1">
-        <span className={`block font-semibold ${row.song ? '' : 'text-danger'}`}>{title}</span>
-        <span className="block text-sm text-muted-foreground">{row.song?.artist}</span>
+      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold tabular-nums text-chord">{row.index + 1}</span>
+      <span className="min-w-0 flex-1 px-1">
+        <span className={`block truncate font-semibold ${row.song ? '' : 'text-danger'}`}>{title}</span>
+        <span className="block truncate text-xs text-muted-foreground">{row.song ? [row.song.artist, row.song.key && `Tom ${row.song.key}`].filter(Boolean).join(' · ') : 'Removida da biblioteca'}</span>
       </span>
-      {row.song?.key && (
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Tom</span>
-          <SheetSelect
-            label={`Tom de ${title}`}
-            value={row.item.targetKey ?? ''}
-            onChange={(v) => onChange({ targetKey: v || undefined, transpose: undefined })}
-            valueClassName="font-bold text-chord"
-            options={[{ value: '', label: `${row.song.key} (original)` }, ...keyOptions(row.song.key).slice(1).map((k) => ({ value: k, label: k }))]}
-          />
-        </label>
-      )}
-      <input
-        aria-label={`Observação de ${title}`}
-        placeholder="Observação"
-        value={row.item.note ?? ''}
-        onChange={(e) => onChange({ note: e.target.value || undefined })}
-        className="h-10 w-40 rounded-lg border border-border bg-surface px-2 text-sm"
-      />
-      <IconButton label={`Subir ${title}`} disabled={row.index === 0} onClick={() => onMove(row.index - 1)}>
-        <ArrowUp className="size-4" />
-      </IconButton>
-      <IconButton label={`Descer ${title}`} disabled={row.index === count - 1} onClick={() => onMove(row.index + 1)}>
-        <ArrowDown className="size-4" />
-      </IconButton>
-      <IconButton label={`Remover ${title}`} onClick={onRemove}>
-        <Trash2 className="size-4" />
-      </IconButton>
+      <span className="hidden sm:contents">
+        <IconButton label={`Subir ${title}`} disabled={row.index === 0} onClick={() => onMove(row.index - 1)}><ArrowUp className="size-4" /></IconButton>
+        <IconButton label={`Descer ${title}`} disabled={row.index === count - 1} onClick={() => onMove(row.index + 1)}><ArrowDown className="size-4" /></IconButton>
+      </span>
+      <IconButton label={`Tirar ${title} da setlist`} onClick={onRemove}><X className="size-4" /></IconButton>
     </li>
   );
 };
@@ -110,7 +88,7 @@ export const SetlistEdit = () => {
       currentList.current = next; setSetlist(next); setSaving(true);
       const ticket = ++writeRevision.current;
       // Full snapshots make the last successful write include earlier edits and preserve action order.
-      writes.current = writes.current.catch(() => {}).then(() => updateSetlist(id, { name: next.name, date: next.date, items: next.items }))
+      writes.current = writes.current.catch(() => {}).then(() => updateSetlist(id, { name: next.name, items: next.items }))
         .then(() => { if (currentList.current?.id === id && ticket === writeRevision.current) setError(null); })
         .catch(() => { if (currentList.current?.id === id && ticket === writeRevision.current) setError('Não foi possível salvar. Suas alterações continuam nesta tela; tente salvar novamente.'); })
         .finally(() => { if (currentList.current?.id === id && ticket === writeRevision.current) setSaving(false); });
@@ -138,33 +116,28 @@ export const SetlistEdit = () => {
   };
 
   return (
-    <section>
+    <section className="pb-28 sm:pb-6">
       <Link to="/palco" className="-ml-1 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-chord hover:text-primary">
         <ArrowLeft className="size-4" /> Palco
       </Link>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="min-w-56 flex-1">
-          <span className="sr-only">Nome da lista</span>
-          <input aria-label="Nome da lista" value={setlist.name} onChange={(e) => save({ name: e.target.value })} className="w-full bg-transparent text-3xl font-bold tracking-tight outline-none focus:underline" />
-        </label>
-        <label className="text-sm">
-          <span className="block text-muted-foreground">Data</span>
-          <input type="date" aria-label="Data" value={setlist.date ?? ''} onChange={(e) => save({ date: e.target.value || undefined })} className="h-10 rounded-lg border border-border bg-surface px-2" />
-        </label>
+      <label className="mt-2 block">
+        <span className="sr-only">Nome da setlist</span>
+        <input aria-label="Nome da setlist" value={setlist.name} onChange={(e) => save({ name: e.target.value })} className="w-full rounded-lg bg-transparent text-2xl font-bold tracking-tight outline-none focus:bg-surface sm:text-3xl" />
+      </label>
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="text-sm text-muted-foreground">{items.length} {items.length === 1 ? 'cifra' : 'cifras'}</span>
+        {saving && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" role="status"><Loader2 className="size-3 animate-spin" aria-hidden /> Salvando</span>}
+        <span className="flex-1" />
         <ShareSetlist list={{ ...setlist, items }} disabled={saving || !!error} />
-        <ExportButton songIds={items.map((i) => i.songId)} title={setlist.name} setlist={setlist} label="Exportar lista" />
-        <Button onClick={() => navigate(`/palco/lista/${id}`)} disabled={items.length === 0 || saving || !!error}>
-          <Play className="size-4" /> Ler no palco
-        </Button>
+        <Button className="hidden sm:inline-flex" onClick={() => navigate(`/palco/lista/${id}`)} disabled={items.length === 0 || saving || !!error}><Play className="size-4" /> Ler no palco</Button>
       </div>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Arraste pela alça para definir a sequência, ou use as setas.</p><Button variant="outline" onClick={() => { setQuery(''); setSelected(new Set()); setResultLimit(30); setAdding(true); }}><Plus className="size-4" />Adicionar cifras</Button></div>
-      {saving && <p className="mt-2 text-xs text-muted-foreground" role="status">Salvando repertório…</p>}
       {error && <div role="alert" className="mt-3 rounded-xl border border-danger/30 p-3"><p className="text-sm">{error}</p><Button className="mt-2" variant="outline" disabled={saving} onClick={() => save({})}>Salvar novamente</Button></div>}
       {!items.length && <LibraryEmptyState section="Repertório" title="Escolha as cifras desta apresentação" description="Adicione cifras da sua biblioteca. A ordem que você montar aqui será a sequência da leitura no palco." />}
+      {items.length > 1 && <p className="mt-4 text-xs text-muted-foreground">Segure a alça <GripVertical className="inline size-3.5 align-[-2px]" aria-hidden /> e arraste para mudar a ordem.</p>}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={rows.map((r) => r.key)} strategy={verticalListSortingStrategy}>
-          <ol className="mt-6 border-t border-border">
+          <ol className="mt-2 space-y-2">
             {rows.map((row) => (
               <ItemRow
                 key={row.key}
@@ -172,12 +145,18 @@ export const SetlistEdit = () => {
                 count={rows.length}
                 onMove={(to) => save({ items: moveItem(items, row.index, to) })}
                 onRemove={() => save({ items: items.filter((_, i) => i !== row.index) })}
-                onChange={(patch) => save({ items: items.map((it, i) => (i === row.index ? { ...it, ...patch } : it)) })}
               />
             ))}
           </ol>
         </SortableContext>
       </DndContext>
+      <button type="button" onClick={() => { setQuery(''); setSelected(new Set()); setResultLimit(30); setAdding(true); }} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border text-sm font-semibold text-chord transition-colors hover:border-primary hover:bg-primary/5">
+        <Plus className="size-4" /> Adicionar cifras
+      </button>
+
+      {items.length > 0 && <div className="fixed inset-x-0 bottom-[calc(var(--nav-height,0px)+env(safe-area-inset-bottom)+0.75rem)] z-20 px-4 sm:hidden">
+        <Button className="w-full shadow-lg" onClick={() => navigate(`/palco/lista/${id}`)} disabled={saving || !!error}><Play className="size-4" /> Ler no palco</Button>
+      </div>}
 
       {adding && <BottomSheet title="Adicionar cifras à setlist" onClose={() => setAdding(false)} initialFocus={panel => panel.querySelector('input')}>{() => <div className="overflow-y-auto overscroll-contain px-4 pb-5">
         <label className="block text-sm font-semibold" htmlFor="add-song">
@@ -206,19 +185,6 @@ export const SetlistEdit = () => {
         <div className="sticky bottom-0 mt-4 border-t border-border bg-surface pt-3"><Button className="w-full" disabled={!selected.size} onClick={() => { save({ items: [...items, ...[...selected].filter(songId => eligibleIds.has(songId) && !items.some(item => item.songId === songId)).map(songId => ({ id: crypto.randomUUID(), songId }))] }); setAdding(false); }}>Adicionar {selected.size ? `(${selected.size})` : 'cifras'}</Button></div>
       </div>}</BottomSheet>}
 
-      <Button
-        variant="ghost"
-        className="mt-10 text-danger"
-        onClick={() => {
-          void confirmDialog({ title: 'Excluir a lista?', message: `A lista “${setlist.name}” será excluída. As músicas continuam na biblioteca.`, confirmLabel: 'Excluir' }).then(
-            (ok) => {
-              if (ok) void writes.current.then(() => deleteSetlist(id)).then(() => navigate('/palco')).catch(() => setError('Não foi possível excluir a setlist. Tente novamente.'));
-            },
-          );
-        }}
-      >
-        <Trash2 className="size-4" /> Excluir lista
-      </Button>
     </section>
   );
 };

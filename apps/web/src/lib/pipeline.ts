@@ -22,6 +22,16 @@ export type AnalysisTaskProgress = { id: 'tracks' | 'chords' | 'lyrics'; label: 
 export type PipelineProgress = { label: string; fraction?: number; detail?: string; lyricsPending?: boolean; tasks?: AnalysisTaskProgress[]; tempo?: number };
 const mb = (bytes: number) => (bytes / 1e6).toFixed(0);
 
+/** AbortSignal.any where available (Safari before 17.4 lacks it). */
+const anySignal = (a: AbortSignal, b: AbortSignal): AbortSignal => {
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([a, b]);
+  const c = new AbortController();
+  const stop = (s: AbortSignal) => () => c.abort(s.reason);
+  if (a.aborted) c.abort(a.reason); else if (b.aborted) c.abort(b.reason);
+  else { a.addEventListener('abort', stop(a), { once: true }); b.addEventListener('abort', stop(b), { once: true }); }
+  return c.signal;
+};
+
 export const runPipeline = async (songId: string, onProgress: (p: PipelineProgress) => void, options: { execution?: ExecutionPreference; persist?: boolean; signal?: AbortSignal; taskSignals?: Partial<Record<'tracks' | 'lyrics', AbortSignal>> } = {}): Promise<void> => {
   const song = await db.songs.get(songId);
   const audio = await db.audio.get(songId);
@@ -33,7 +43,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
   const cancel = () => controller.abort(options.signal?.reason);
   if (options.signal?.aborted) cancel(); else options.signal?.addEventListener('abort', cancel, { once: true });
   // A step the musician stopped: it ends on its own signal, the rest of the analysis keeps going.
-  const stepSignal = (task: 'tracks' | 'lyrics') => options.taskSignals?.[task] ? AbortSignal.any([controller.signal, options.taskSignals[task]!]) : controller.signal;
+  const stepSignal = (task: 'tracks' | 'lyrics') => options.taskSignals?.[task] ? anySignal(controller.signal, options.taskSignals[task]!) : controller.signal;
   const stepCancelled = (task: 'tracks' | 'lyrics') => !!options.taskSignals?.[task]?.aborted && !controller.signal.aborted;
   let stopped = false;
   let assembling = false;
@@ -109,7 +119,17 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
     };
     // Desktop: the lyrics model loads in its own worker while the tracks are separated, so the transcription starts
     // as soon as the voice is ready. "Sequential" (weaker machines) skips it to keep one model in memory at a time.
-    warm = !mobile && !lyrics?.lines.length && execution === 'parallel' ? warmWhisper() : null;
+    // Lyrics stopped by the musician (also before this point, e.g. during the decode): mark it now, never warm Whisper.
+    const onLyricsCancelled = () => {
+      warm?.dispose();
+      // On phones the LRCLIB request cannot be interrupted: its answer is ignored when it arrives.
+      if (lyricsTask.status !== 'waiting' && !(mobile && lyricsTask.status === 'running')) return;
+      lyricsTask.status = 'skipped'; lyricsTask.label = 'Letra cancelada'; lyricsTask.detail = undefined;
+      publish();
+    };
+    const lyricsSignal = options.taskSignals?.lyrics;
+    if (lyricsSignal?.aborted) onLyricsCancelled(); else lyricsSignal?.addEventListener('abort', onLyricsCancelled, { once: true });
+    warm = !mobile && !lyrics?.lines.length && execution === 'parallel' && !lyricsSignal?.aborted ? warmWhisper() : null;
     warm?.listen((msg) => {
       if (lyricsTask.status !== 'waiting') return;
       if (msg.type === 'warmed') lyricsTask.label = msg.ok ? 'Modelo da letra pronto, aguardando a voz separada' : 'Aguardando a voz separada';
@@ -117,12 +137,6 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       else return;
       publish();
     });
-    options.taskSignals?.lyrics?.addEventListener('abort', () => {
-      warm?.dispose();
-      if (lyricsTask.status !== 'waiting') return;
-      lyricsTask.status = 'skipped'; lyricsTask.label = 'Letra cancelada';
-      publish();
-    }, { once: true });
     const chordsStarted = performance.now();
     const chordPromise = analyzeInWorker(channels, (e) => {
       chordsTask.label = e.stage === 'models' ? 'Carregando modelos de acordes (' + mb(e.done) + ' de ' + mb(e.total) + ' MB)' : e.stage === 'key' ? 'Identificando o tom…' : 'Analisando acordes… (bloco ' + Math.min(e.total, e.done + 1) + ' de ' + e.total + ')';
@@ -142,8 +156,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
         const prepared = await prepareAnalysisStems(songId, p => {
           Object.assign(tracksTask, report(p));
           publish();
-        }, stepSignal('tracks'), forSeparation);
-        forSeparation = undefined;
+        }, stepSignal('tracks'), forSeparation).finally(() => { forSeparation = undefined; });
         if (prepared.warning) warnings.push(prepared.warning);
         tracksTask.status = prepared.stems ? 'done' : 'skipped';
         tracksTask.label = prepared.stems ? 'Faixas prontas' : 'Continuando com o áudio original';
@@ -176,7 +189,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
     // Awaited below; a failure here must not surface as an unhandled rejection while the chords still run.
     lyricsStart.catch(() => undefined);
     // On phones no model transcribes (it does not fit in memory): the lyrics come from LRCLIB, a single request.
-    if (mobile && !lyrics?.lines.length) {
+    if (mobile && !lyrics?.lines.length && !stepCancelled('lyrics')) {
       const taskStarted = performance.now();
       lyricsTask.status = 'running'; lyricsTask.label = 'Buscando a letra…'; publish();
       lyricsPromise = findSongLyrics(song.title, song.artist, song.durationSec || durationSec)
@@ -241,7 +254,9 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       publish();
     }
     await lyricsStart;
+    controller.signal.throwIfAborted();
     await lyricsPromise;
+    controller.signal.throwIfAborted();
     // A resource-related overlap failure gets one isolated retry after the chord worker has ended.
     if (execution === 'parallel' && lyricsFailure && isResourceFailure(lyricsFailure)) {
       if (!chartPublished) { await saveResult(); chartPublished = true; }
@@ -263,6 +278,7 @@ export const runPipeline = async (songId: string, onProgress: (p: PipelineProgre
       warnings.push('Não foi possível transcrever a letra. Você pode tentar novamente ou inserir a letra manualmente.');
       console.warn('Transcrição automática da letra não deu certo', lyricsFailure);
     }
+    controller.signal.throwIfAborted();
     await saveResult();
   } catch (error) {
     controller.abort();

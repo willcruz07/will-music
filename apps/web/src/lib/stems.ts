@@ -42,6 +42,8 @@ export const decodeForSeparation = async (blob: Blob): Promise<{ planar: Float32
 
 export const runSeparationInWorker = (planar: Float32Array, samples: number, mode: StemMode, onProgress: (p: SeparationProgress) => void, signal?: AbortSignal): Promise<SeparationTracks> =>
   new Promise((resolve, reject) => {
+    // Cancelled while the audio was being prepared: do not start a full separation.
+    if (signal?.aborted) return reject(signal.reason ?? new DOMException('Separação cancelada.', 'AbortError'));
     const worker = usesLightModel(mode)
       ? new Worker(new URL('../worker/separationLite.worker.ts', import.meta.url), { type: 'module' })
       : new Worker(new URL('../worker/separation.worker.ts', import.meta.url), { type: 'module' });

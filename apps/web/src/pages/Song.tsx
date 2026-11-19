@@ -16,7 +16,6 @@ import { cancelAnalysis, cancelAnalysisTask, isCancelled, isRunning, startAnalys
 import { type PipelineProgress, runPipeline } from '../lib/pipeline.ts';
 import { prefersFlats, transposeChord, transposeKey } from '../lib/transpose.ts';
 import { toDisplayLabel } from '@will-music/engine';
-import { SaveResultCard } from '../components/SaveResultCard.tsx';
 import { ChordDiagram } from '../components/ChordDiagram.tsx';
 import { ChordHelp } from '../components/ChordHelp.tsx';
 import { useScrollPrefs, useSteadyScroll } from '../lib/steadyScroll.ts';
@@ -219,7 +218,7 @@ export const Song = () => {
         await saveChart({ chordPro, origin: 'edited', lineTimes: remapLineTimes(chart.chordPro, chordPro, chart.lineTimes ?? lineStarts.current) });
         await load();
       }}
-      recovery={unsaved && !progress ? <SaveResultCard songId={id} title={song.title} onSaved={load} /> : null}
+      recovery={null}
       player={<Player key={id} sources={stems.sources} songId={id} title={song.title} onTime={onTime} controls={player}
         deferWaveform={!!progress}
         studio={{ artist: song.artist, tempo: song.tempo, keyLabel: shownKey }}
@@ -269,7 +268,6 @@ export const Song = () => {
       {progress && !lyricsPending && <AnalysisProgress progress={progress} onCancel={() => cancelAnalysis(id)} />}
       {progress && lyricsPending && <TranscribingBar progress={progress} onCancel={() => cancelAnalysis(id)} />}
 
-      {!progress && unsaved && <SaveResultCard songId={id} title={song.title} onSaved={load} />}
 
       {!progress && !unsaved && (runtimeError || song.analysisStatus === 'error') && (
         <div className="mt-8 max-w-lg rounded-lg border border-danger/40 p-4">
